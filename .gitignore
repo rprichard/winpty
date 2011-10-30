@@ -1,0 +1,8 @@
+CMakeCache.txt
+CMakeLists.txt.user
+CMakeFiles
+Makefile
+*.exe
+build.sh
+Scrape.cbp
+cmake_install.cmake
