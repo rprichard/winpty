@@ -2,6 +2,7 @@
 #include "DebugClient.h"
 #include <windows.h>
 #include <assert.h>
+#include <QCoreApplication>
 
 #define DIM(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -14,6 +15,13 @@ static void DoRequest(AgentSharedMemory *memory);
 // The agent is started with a hidden console (CONSOLE_NO_WINDOW).
 int main(int argc, char *argv[])
 {
+    QCoreApplication app(argc, argv);
+
+
+
+
+    return app.exec();
+#if 0
     assert(argc == 2);
     HANDLE mapping = OpenFileMapping(FILE_MAP_WRITE, FALSE, argv[1]);
     assert(mapping != NULL);
@@ -62,6 +70,7 @@ int main(int argc, char *argv[])
 
     Trace("agent shutting down");
     return 0;
+#endif
 }
 
 static void DoRequest(AgentSharedMemory *memory)

@@ -6,3 +6,5 @@ Makefile
 build.sh
 Scrape.cbp
 cmake_install.cmake
+*.pro.user
+*-build-desktop
