@@ -10,13 +10,13 @@ set_directory_properties(PROPERTIES COMPILE_DEFINITIONS "WINVER=0x0501")
 add_executable(
     Test
     Test.cc
-    AgentMessages.cc
-    Console.cc
+    Client.cc
+    AgentIo.cc
     DebugClient.cc
 )
 add_executable(
-    ConsoleAgent
-    ConsoleAgent.cc
-    AgentMessages.cc
+    Agent
+    Agent.cc
+    AgentIo.cc
     DebugClient.cc
 )
