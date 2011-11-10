@@ -8,7 +8,7 @@ QT       += core
 QT       -= gui
 QT       += network
 
-TARGET = TelnetServer
+TARGET = TestNetServer
 CONFIG   += console
 CONFIG   -= app_bundle
 
