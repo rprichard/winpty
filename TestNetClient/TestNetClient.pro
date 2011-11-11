@@ -4,8 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core
-
+QT       += core network
 QT       -= gui
 
 TARGET = TestNetClient
@@ -14,11 +13,8 @@ CONFIG   -= app_bundle
 
 TEMPLATE = app
 
-
 SOURCES += main.cc \
-    Client.cc
+    UnixClient.cc
 
 HEADERS += \
-    Client.h
-
-
+    UnixClient.h
