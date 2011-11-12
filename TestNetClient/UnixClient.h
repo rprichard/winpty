@@ -22,7 +22,7 @@ private:
 signals:
 
 private slots:
-    void socketReadFinished();
+    void socketDisconnected();
     void terminalReadActivated();
     void socketBytesWritten();
     void socketReadyRead();
