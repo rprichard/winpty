@@ -27,6 +27,7 @@ UnixClient::UnixClient(QTcpSocket *socket, QObject *parent) :
     // Read from TCP.
     connect(socket, SIGNAL(readyRead()), SLOT(socketReadyRead()));
     connect(socket, SIGNAL(bytesWritten(qint64)), SLOT(socketBytesWritten()));
+    connect(socket, SIGNAL(readChannelFinished()), SLOT(socketReadFinished()));
 }
 
 UnixClient::~UnixClient()
@@ -69,6 +70,12 @@ void UnixClient::restoreTerminalMode(termios original)
 {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &original) < 0)
         qFatal("error restoring terminal mode");
+}
+
+void UnixClient::socketReadFinished()
+{
+    printf("Connection terminated\r\n");
+    QCoreApplication::quit();
 }
 
 /////////////////////////////////////////////////////////////////////////////
