@@ -1,3 +1,4 @@
+#define _WIN32_WINNT 0x0501
 #include "Agent.h"
 #include "../Shared/DebugClient.h"
 #include <QCoreApplication>
@@ -30,14 +31,21 @@ Agent::Agent(const QString &socketServer, QObject *parent) : QObject(parent)
     m_socket->setReadBufferSize(64*1024);
 
     connect(m_socket, SIGNAL(readyRead()), SLOT(socketReadyRead()));
-    connect(m_socket, SIGNAL(readChannelFinished()), SLOT(socketClosed()));
+    connect(m_socket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
 
     m_timer = new QTimer(this);
     m_timer->setSingleShot(false);
     connect(m_timer, SIGNAL(timeout()), SLOT(pollTimeout()));
-    m_timer->start(500);
+    m_timer->start(100);
 
     Trace("agent starting...");
+}
+
+Agent::~Agent()
+{
+    HWND hwnd = GetConsoleWindow();
+    if (hwnd != NULL)
+        PostMessage(hwnd, WM_CLOSE, 0, 0);
 }
 
 void Agent::socketReadyRead()
@@ -51,13 +59,28 @@ void Agent::socketReadyRead()
     }
 }
 
-void Agent::socketClosed()
+void Agent::socketDisconnected()
 {
-    // TODO: cleanup?
     QCoreApplication::exit(0);
 }
 
 void Agent::pollTimeout()
+{
+    if (m_socket->state() == QLocalSocket::ConnectedState) {
+        DWORD dummy;
+        int count = GetConsoleProcessList(&dummy, 1);
+        Q_ASSERT(count >= 1);
+        scrapeOutput();
+        if (count == 1) {
+            Trace("No real processes in Console -- start shut down");
+            m_socket->disconnectFromServer();
+        }
+    } else {
+        m_timer->stop();
+    }
+}
+
+void Agent::scrapeOutput()
 {
     CONSOLE_SCREEN_BUFFER_INFO info;
     if (!GetConsoleScreenBufferInfo(m_conout, &info)) {

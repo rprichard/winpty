@@ -13,6 +13,9 @@ Session::Session(QTcpSocket *socket, QObject *parent) :
     connect(m_socket, SIGNAL(readyRead()), SLOT(onSocketReadyRead()));
     m_agentClient->startShell();
     connect(m_agentClient->getSocket(), SIGNAL(readyRead()), SLOT(onAgentReadyRead()));
+
+    connect(m_agentClient->getSocket(), SIGNAL(disconnected()), SLOT(cleanup()));
+    connect(m_socket, SIGNAL(disconnected()), SLOT(cleanup()));
 }
 
 void Session::onSocketReadyRead()
@@ -44,5 +47,21 @@ void Session::onSocketReadyRead()
 void Session::onAgentReadyRead()
 {
     QByteArray data = m_agentClient->getSocket()->readAll();
+    //Trace("onAgentReadyRead: read [...%s]", data.simplified().right(8).data());
     m_socket->write(data);
+}
+
+void Session::cleanup()
+{
+    Trace("%s entered", __FUNCTION__);
+    QAbstractSocket *s1 = m_socket;
+    QLocalSocket *s2 = m_agentClient->getSocket();
+    if (s1->state() == QAbstractSocket::ConnectedState)
+        s1->disconnectFromHost();
+    if (s2->state() == QLocalSocket::ConnectedState)
+        s2->disconnectFromServer();
+    if (s1->state() == QAbstractSocket::UnconnectedState &&
+            s2->state() == QLocalSocket::UnconnectedState)
+        deleteLater();
+    Trace("%s exited", __FUNCTION__);
 }
