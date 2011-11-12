@@ -72,6 +72,12 @@ void Agent::pollTimeout()
         Q_ASSERT(count >= 1);
         scrapeOutput();
         if (count == 1) {
+            // TODO: This approach doesn't seem to work when I run edit.com
+            // in a console.  I see an NTVDM.EXE process running after exiting
+            // cmd.exe.  Maybe NTVDM.EXE is doing the same thing I am -- it
+            // sees that there's still another process in the console process
+            // list, so it stays running.
+
             Trace("No real processes in Console -- start shut down");
             m_socket->disconnectFromServer();
         }
