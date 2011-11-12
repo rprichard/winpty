@@ -1,5 +1,5 @@
-#ifndef CLIENT_H
-#define CLIENT_H
+#ifndef UNIXCLIENT_H
+#define UNIXCLIENT_H
 
 #include <QObject>
 #include <QByteArray>
@@ -38,4 +38,4 @@ private:
     QByteArray terminalWriteBuffer;
 };
 
-#endif // CLIENT_H
+#endif // UNIXCLIENT_H

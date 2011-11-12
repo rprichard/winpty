@@ -13,6 +13,7 @@ TEMPLATE = app
 SOURCES += main.cc \
     ConsoleWindow.cc \
     ../Shared/AgentClient.cc \
+    ../Shared/DebugClient.cc \
     TextWidget.cc
 
 HEADERS  += ConsoleWindow.h \

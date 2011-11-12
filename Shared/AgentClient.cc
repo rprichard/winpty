@@ -5,25 +5,28 @@
 #include <QCoreApplication>
 #include <QtDebug>
 #include <windows.h>
+#include "DebugClient.h"
 
-// Note that this counter makes Agentclient non-thread-safe.
+// TODO: Note that this counter makes AgentClient non-thread-safe.
 int AgentClient::m_counter = 0;
 
 AgentClient::AgentClient(QObject *parent) :
     QObject(parent)
 {
     // Start a named pipe server.
-    m_socketServer = new QLocalServer(this);
+    QLocalServer *socketServer = new QLocalServer(this);
     QString serverName =
             "ConsoleAgent-" +
             QString::number(QCoreApplication::applicationPid()) + "-" +
             QString::number(++m_counter);
-    m_socketServer->listen(serverName);
+    socketServer->listen(serverName);
 
     // TODO: Improve this code.  If we're in the release subdirectory,
     // find the release Agent.  Look in the same directory first.
     QString agentProgram = QCoreApplication::applicationDirPath() + "\\..\\..\\Agent-build-desktop\\debug\\Agent.exe";
-    QString agentCmdLine = agentProgram + " " + m_socketServer->fullServerName();
+    QString agentCmdLine = agentProgram + " " + socketServer->fullServerName();
+
+    Trace("Starting Agent: [%s]", agentCmdLine.toStdString().c_str());
 
     // Start the agent.
     BOOL success;
@@ -37,6 +40,7 @@ AgentClient::AgentClient(QObject *parent) :
     m_agentProcess = new PROCESS_INFORMATION;
     QVector<wchar_t> cmdline(agentCmdLine.size() + 1);
     agentCmdLine.toWCharArray(cmdline.data());
+    cmdline[agentCmdLine.size()] = L'\0';
     success = CreateProcess(
         (LPCWSTR)agentProgram.utf16(),
         cmdline.data(),
@@ -49,10 +53,13 @@ AgentClient::AgentClient(QObject *parent) :
         qFatal("Could not start agent subprocess.");
     qDebug("New child process: PID %d", (int)m_agentProcess->dwProcessId);
 
-    if (!m_socketServer->waitForNewConnection(30000))
+    if (!socketServer->waitForNewConnection(30000))
         qFatal("Child process did not connect to parent pipe server.");
-    m_socket = m_socketServer->nextPendingConnection();
+    m_socket = socketServer->nextPendingConnection();
     Q_ASSERT(m_socket != NULL);
+    // TODO: security -- Do we need to verify that this pipe connection was
+    // made by the right client?  i.e. The Agent.exe process we just started?
+    socketServer->close();
 }
 
 /*
@@ -175,4 +182,9 @@ void AgentClient::startShell()
     CloseHandle(conin);
 
     FreeConsole();
+}
+
+QLocalSocket *AgentClient::getSocket()
+{
+    return m_socket;
 }

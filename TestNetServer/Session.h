@@ -18,6 +18,7 @@ public slots:
 
 private slots:
     void onSocketReadyRead();
+    void onAgentReadyRead();
 
 private:
     QTcpSocket *m_socket;

@@ -2,7 +2,6 @@
 #define AGENTCLIENT_H
 
 #include <QObject>
-//#include <QKeyEvent>
 
 class QLocalServer;
 class QLocalSocket;
@@ -19,13 +18,13 @@ public:
     int agentPid();
     void writeInputRecord(INPUT_RECORD *ir);
     void startShell();
+    QLocalSocket *getSocket();
 
 signals:
 
 public slots:
 
 private:
-    QLocalServer *m_socketServer;
     QLocalSocket *m_socket;
     PROCESS_INFORMATION *m_agentProcess;
     static int m_counter;

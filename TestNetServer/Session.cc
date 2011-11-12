@@ -1,5 +1,6 @@
 #include "Session.h"
 #include <QTcpSocket>
+#include <QLocalSocket>
 #include <QtDebug>
 #include "../Shared/AgentClient.h"
 #include "../Shared/DebugClient.h"
@@ -11,6 +12,7 @@ Session::Session(QTcpSocket *socket, QObject *parent) :
     m_agentClient = new AgentClient(this);
     connect(m_socket, SIGNAL(readyRead()), SLOT(onSocketReadyRead()));
     m_agentClient->startShell();
+    connect(m_agentClient->getSocket(), SIGNAL(readyRead()), SLOT(onAgentReadyRead()));
 }
 
 void Session::onSocketReadyRead()
@@ -37,4 +39,10 @@ void Session::onSocketReadyRead()
     }
 
     Trace("session: completed read", data.length());
+}
+
+void Session::onAgentReadyRead()
+{
+    QByteArray data = m_agentClient->getSocket()->readAll();
+    m_socket->write(data);
 }
