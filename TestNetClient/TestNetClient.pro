@@ -14,7 +14,9 @@ CONFIG   -= app_bundle
 TEMPLATE = app
 
 SOURCES += main.cc \
-    UnixClient.cc
+    UnixClient.cc \
+    UnixSignalHandler.cc
 
 HEADERS += \
-    UnixClient.h
+    UnixClient.h \
+    UnixSignalHandler.h

@@ -1,9 +1,12 @@
 #include "UnixClient.h"
+#include "UnixSignalHandler.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <QSocketNotifier>
 #include <QCoreApplication>
 #include <QTcpSocket>
@@ -28,6 +31,11 @@ UnixClient::UnixClient(QTcpSocket *socket, QObject *parent) :
     connect(socket, SIGNAL(readyRead()), SLOT(socketReadyRead()));
     connect(socket, SIGNAL(bytesWritten(qint64)), SLOT(socketBytesWritten()));
     connect(socket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
+
+    // Detect terminal resizing.
+    UnixSignalHandler *ush = new UnixSignalHandler(SIGWINCH, this);
+    connect(ush, SIGNAL(signaled(int)), SLOT(terminalResized()));
+    terminalResized();
 }
 
 UnixClient::~UnixClient()
@@ -70,6 +78,14 @@ void UnixClient::restoreTerminalMode(termios original)
 {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &original) < 0)
         qFatal("error restoring terminal mode");
+}
+
+void UnixClient::terminalResized()
+{
+    winsize sz;
+    ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
+    //printf("%d %d\r\n", sz.ws_col, sz.ws_row);
+    // TODO: Notify the server that the terminal has resized.
 }
 
 void UnixClient::socketDisconnected()
