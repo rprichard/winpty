@@ -1,12 +1,17 @@
 #define _WIN32_WINNT 0x0501
 #include "Agent.h"
 #include "../Shared/DebugClient.h"
+#include "../Shared/AgentMsg.h"
 #include <QCoreApplication>
 #include <QLocalSocket>
 #include <QtDebug>
 #include <QTimer>
 #include <string.h>
 #include <windows.h>
+
+const int BUFFER_LINE_COUNT = 5000;
+const int DEFAULT_WINDOW_COLS = 80;
+const int DEFAULT_WINDOW_ROWS = 25;
 
 Agent::Agent(const QString &socketServer, QObject *parent) : QObject(parent)
 {
@@ -22,6 +27,20 @@ Agent::Agent(const QString &socketServer, QObject *parent) : QObject(parent)
                 NULL, OPEN_EXISTING, 0, NULL);
     Q_ASSERT(m_conin != NULL);
     Q_ASSERT(m_conout != NULL);
+
+    // TODO: The agent should probably have an initial window size from the
+    // client/window, but it currently doesn't, so default to 80x25.
+    COORD bufferSize = { DEFAULT_WINDOW_COLS, BUFFER_LINE_COUNT };
+    SetConsoleScreenBufferSize(m_conout, bufferSize);
+    SMALL_RECT windowPos = {
+        0,
+        BUFFER_LINE_COUNT - DEFAULT_WINDOW_ROWS,
+        DEFAULT_WINDOW_COLS - 1,
+        BUFFER_LINE_COUNT - 1,
+    };
+    SetConsoleWindowInfo(m_conout, TRUE, &windowPos);
+    COORD initialCursorPos = { windowPos.Left, windowPos.Top };
+    SetConsoleCursorPosition(m_conout, initialCursorPos);
 
     // Connect to the named pipe.
     m_socket = new QLocalSocket(this);
@@ -51,17 +70,48 @@ Agent::~Agent()
 void Agent::socketReadyRead()
 {
     // TODO: This is an incomplete hack...
-    while (m_socket->bytesAvailable() >= sizeof(INPUT_RECORD)) {
-        INPUT_RECORD ir;
-        m_socket->read((char*)&ir, sizeof(ir));
-        DWORD dummy;
-        WriteConsoleInput(m_conin, &ir, 1, &dummy);
+    while (m_socket->bytesAvailable() >= sizeof(AgentMsg)) {
+        AgentMsg msg;
+        m_socket->read((char*)&msg, sizeof(msg));
+        switch (msg.type) {
+            case AgentMsg::InputRecord: {
+                DWORD dummy;
+                WriteConsoleInput(m_conin, &msg.u.inputRecord, 1, &dummy);
+                break;
+            }
+            case AgentMsg::WindowSize: {
+                resizeWindow(msg.u.windowSize.cols, msg.u.windowSize.rows);
+                break;
+            }
+        }
     }
 }
 
 void Agent::socketDisconnected()
 {
     QCoreApplication::exit(0);
+}
+
+void Agent::resizeWindow(unsigned short cols, unsigned short rows)
+{
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    GetConsoleScreenBufferInfo(m_conout, &info);
+
+    COORD bufferSize = { cols, BUFFER_LINE_COUNT };
+    SMALL_RECT windowPos = {
+        0,
+        BUFFER_LINE_COUNT - rows,
+        cols - 1,
+        BUFFER_LINE_COUNT - 1,
+    };
+    if (cols > info.dwSize.X) {
+        SetConsoleScreenBufferSize(m_conout, bufferSize);
+        SetConsoleWindowInfo(m_conout, TRUE, &windowPos);
+    } else {
+        SetConsoleWindowInfo(m_conout, TRUE, &windowPos);
+        SetConsoleScreenBufferSize(m_conout, bufferSize);
+    }
+    // Don't move the cursor, even if the cursor is now off the screen.
 }
 
 void Agent::pollTimeout()
@@ -119,8 +169,10 @@ void Agent::scrapeOutput()
             CHAR_INFO *pch = &readBuffer[y * size.X + x];
             *pwrite++ = pch->Char.AsciiChar;
         }
-        *pwrite++ = '\r';
-        *pwrite++ = '\n';
+        if (y < size.Y - 1) {
+            *pwrite++ = '\r';
+            *pwrite++ = '\n';
+        }
     }
     Trace("Agent poll -- writing %d bytes", pwrite - writeBuffer);
     m_socket->write(writeBuffer, pwrite - writeBuffer);

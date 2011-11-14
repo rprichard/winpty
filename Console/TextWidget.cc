@@ -1,5 +1,6 @@
 #include "TextWidget.h"
 #include "../Shared/AgentClient.h"
+#include "../Shared/AgentMsg.h"
 #include <QKeyEvent>
 #include <QtDebug>
 #include <windows.h>
@@ -21,8 +22,10 @@ void TextWidget::keyPressEvent(QKeyEvent *event)
     // to be portable across operating systems, so using
     // nativeVirtualKey is wrong.
     if (event->nativeVirtualKey() != 0) {
-        INPUT_RECORD ir;
-        memset(&ir, 0, sizeof(ir));
+        AgentMsg msg;
+        memset(&msg, 0, sizeof(msg));
+        msg.type = AgentMsg::InputRecord;
+        INPUT_RECORD &ir = msg.u.inputRecord;
         ir.EventType = KEY_EVENT;
         ir.Event.KeyEvent.bKeyDown = TRUE;
         ir.Event.KeyEvent.wVirtualKeyCode = event->nativeVirtualKey();
@@ -31,7 +34,7 @@ void TextWidget::keyPressEvent(QKeyEvent *event)
         ir.Event.KeyEvent.uChar.UnicodeChar =
                 event->text().isEmpty() ? L'\0' : event->text().at(0).unicode();
         ir.Event.KeyEvent.wRepeatCount = event->count();
-        m_agentClient->writeInputRecord(&ir);
+        m_agentClient->writeMsg(msg);
     }
 }
 

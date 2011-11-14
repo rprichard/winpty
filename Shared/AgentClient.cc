@@ -6,6 +6,7 @@
 #include <QtDebug>
 #include <windows.h>
 #include "DebugClient.h"
+#include "AgentMsg.h"
 
 // TODO: Note that this counter makes AgentClient non-thread-safe.
 int AgentClient::m_counter = 0;
@@ -88,9 +89,9 @@ void AgentClient::sendKeyRelease(QKeyEvent *event)
 }
 */
 
-void AgentClient::writeInputRecord(INPUT_RECORD *ir)
+void AgentClient::writeMsg(const AgentMsg &msg)
 {
-    m_socket->write((char*)ir, sizeof(*ir));
+    m_socket->write((char*)&msg, sizeof(msg));
 }
 
 int AgentClient::agentPid()

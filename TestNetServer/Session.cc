@@ -3,6 +3,7 @@
 #include <QLocalSocket>
 #include <QtDebug>
 #include "../Shared/AgentClient.h"
+#include "../Shared/AgentMsg.h"
 #include "../Shared/DebugClient.h"
 #include <windows.h>
 
@@ -24,20 +25,42 @@ void Session::onSocketReadyRead()
 
     Trace("session: read %d bytes", data.length());
 
-    for (int i = 0; i < data.size(); ++i) {
-        Trace("input: %02x", (unsigned char)data[i]);
+    for (int i = 0; i < data.size(); ) {
+        const int remaining = data.size() - i;
 
-        short vk = VkKeyScan((unsigned char)data[i]);
+        if (remaining >= 12 && !strncmp(data.constData(), "\x1B[:r", 4)) {
+            // Terminal resize.
+            char buf[9];
+            memcpy(buf, data.constData() + 4, 8);
+            i += 12;
+            buf[8] = '\0';
+            unsigned int dim = strtol(buf, NULL, 16);
+            AgentMsg msg;
+            memset(&msg, 0, sizeof(msg));
+            msg.type = AgentMsg::WindowSize;
+            msg.u.windowSize.cols = dim & 0xffff;
+            msg.u.windowSize.rows = dim >> 16;
+            Trace("resize: %d x %d", msg.u.windowSize.cols, msg.u.windowSize.rows);
+            m_agentClient->writeMsg(msg);
+            continue;
+        }
+
+        const unsigned char ch = data[i++];
+        const short vk = VkKeyScan(ch);
         if (vk != -1) {
-            INPUT_RECORD ir;
-            memset(&ir, 0, sizeof(ir));
+            Trace("input: %02x", ch);
+            AgentMsg msg;
+            memset(&msg, 0, sizeof(msg));
+            msg.type = AgentMsg::InputRecord;
+            INPUT_RECORD &ir = msg.u.inputRecord;
             ir.EventType = KEY_EVENT;
             ir.Event.KeyEvent.bKeyDown = TRUE;
             ir.Event.KeyEvent.wVirtualKeyCode = vk & 0xff;
             ir.Event.KeyEvent.wVirtualScanCode = 0;
-            ir.Event.KeyEvent.uChar.AsciiChar =  data[i];
+            ir.Event.KeyEvent.uChar.AsciiChar = ch;
             ir.Event.KeyEvent.wRepeatCount = 1;
-            m_agentClient->writeInputRecord(&ir);
+            m_agentClient->writeMsg(msg);
+            continue;
         }
     }
 

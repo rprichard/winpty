@@ -20,6 +20,7 @@ private slots:
     void socketReadyRead();
     //void socketReadFinished();
     void socketDisconnected();
+    void resizeWindow(unsigned short cols, unsigned short rows);
     void pollTimeout();
     void scrapeOutput();
 

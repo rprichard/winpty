@@ -5,6 +5,7 @@
 
 class QLocalServer;
 class QLocalSocket;
+class AgentMsg;
 typedef struct _PROCESS_INFORMATION PROCESS_INFORMATION;
 typedef struct _INPUT_RECORD INPUT_RECORD;
 
@@ -16,7 +17,7 @@ public:
     //void sendKeyPress(QKeyEvent *event);
     //void sendKeyRelease(QKeyEvent *event);
     int agentPid();
-    void writeInputRecord(INPUT_RECORD *ir);
+    void writeMsg(const AgentMsg &msg);
     void startShell();
     QLocalSocket *getSocket();
 

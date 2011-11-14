@@ -1,0 +1,12 @@
+Test programs
+-------------
+
+Cygwin
+  emacs
+  vim
+  mc     (Midnight Commander)
+  lynx
+  links
+  less
+  more
+  wget

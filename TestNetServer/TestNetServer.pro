@@ -23,6 +23,7 @@ SOURCES += main.cc \
 
 HEADERS += \
     ../Shared/AgentClient.h \
+    ../Shared/AgentMsg.h \
     ../Shared/DebugClient.h \
     Session.h \
     Server.h

@@ -18,6 +18,7 @@ SOURCES += main.cc \
 
 HEADERS  += ConsoleWindow.h \
     ../Shared/AgentClient.h \
+    ../Shared/AgentMsg.h \
     TextWidget.h
 
 FORMS    += ConsoleWindow.ui
