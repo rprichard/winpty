@@ -85,7 +85,12 @@ void UnixClient::terminalResized()
     winsize sz;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
     //printf("%d %d\r\n", sz.ws_col, sz.ws_row);
-    // TODO: Notify the server that the terminal has resized.
+
+    // I invented this escape sequence out of thin air for the "TestNet"
+    // protocol.
+    char cmd[16];
+    sprintf(cmd, "\x1B[:r%08x", (sz.ws_row << 16) | sz.ws_col);
+    socket->write(cmd);
 }
 
 void UnixClient::socketDisconnected()
