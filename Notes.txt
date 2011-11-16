@@ -10,3 +10,77 @@ Cygwin
   less
   more
   wget
+
+Capturing the console output
+----------------------------
+
+Initial idea:
+
+In the agent, keep track of the remote terminal state for N lines of
+(window+history).  Also keep track of the terminal size.  Regularly poll for
+changes to the console screen buffer, then use some number of edits to bring
+the remote terminal into sync with the console.
+
+This idea seems to have trouble when a Unix terminal is resized.  When the
+server receives a resize notification, it can have a hard time figuring out
+what the terminal did.  Race conditions might also be a problem.
+
+The behavior of the terminal can be tricky:
+
+ - When the window is expanded by one line, does the terminal add a blank line
+   to the bottom or move a line from the history into the top?
+
+ - When the window is shrunk by one line, does the terminal delete the topmost
+   or the bottommost line?  Can it delete the line with the cursor?
+
+Some popular behaviors for expanding:
+ - [all] If there are no history lines, then add a line at the bottom.
+ - [konsole] Always add a line at the bottom.
+ - [putty,xterm,rxvt] Pull in a history line from the top.
+ - [g-t] I can't tell.  It seems to add a blank line, until the program writes
+   to stdout or until I click the scroll bar, then the output "snaps" back down,
+   pulling lines out of the history.  I thought I saw different behavior
+   between Ubuntu 10.10 and 11.10, so maybe GNOME 3 changed something.  Avoid
+   using "bash" to test this behavior because "bash" apparently always writes
+   the prompt after terminal resize.
+
+Some popular behaviors for shrinking:
+ - [konsole,putty,xterm,rxvt] If the line at the bottom is blank, then delete
+   it.  Otherwise, move the topmost line into history.
+ - [g-t] If the line at the bottom has not been touched, then delete it.
+   Otherwise, move the topmost line into history.
+
+(TODO: I need to test my theories about the terminal behavior better still.
+It's interesting to see how g-t handles clear differently than every other
+terminal.)
+
+There is an ANSI escape sequence (DSR) that sends the current cursor location
+to the terminal's input.  One idea I had was to use this code to figure out how
+the terminal had handled a resize.  I currently think this idea won't work due
+to race conditions.
+
+Newer idea:
+
+Keep track of the last N lines that have been sent to the remote terminal.
+Poll for changes to console output.  When the output changes, send just the
+changed content to the terminal.  In particular:
+ - Don't send a cursor position (CUP) code.  Instead, if the line that's 3
+   steps up from the latest line changes, send a relative cursor up (CUU)
+   code.  It's OK to send an absolute column number code (CHA).
+ - At least in general, don't try to send complete screenshots of the current
+   console window.
+
+The idea is that sending just the changes should have good behavior for streams
+of output, even when those streams modify the output (e.g. an archiver, or
+maybe a downloader/packager/wget).  I need to think about whether this works
+for full-screen programs (e.g. emacs, less, lynx, the above list of programs).
+
+I noticed that console programs don't typically modify the window or buffer
+coordinates.  edit.com is an exception.
+
+I tested the pager in native Python (more?), and I verified that ENTER and SPACE
+both paid no attention to the location of the console window within the screen
+buffer.  This makes sense -- why would they care?  The Cygwin less, on the other
+hand, does care.  If I scroll the window up, then Cygwin less will write to a
+position within the window.  I didn't really expect this behavior, but it
+doesn't seem to be a problem.
