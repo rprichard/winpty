@@ -11,17 +11,19 @@ class Agent : public QObject
 {
     Q_OBJECT
 public:
-    explicit Agent(const QString &socketServer, QObject *parent = 0);
+    explicit Agent(const QString &socketServer,
+                   int initialCols, int initialRows,
+                   QObject *parent = 0);
     virtual ~Agent();
 
 signals:
 
 private slots:
     void socketReadyRead();
-    //void socketReadFinished();
     void socketDisconnected();
-    void resizeWindow(unsigned short cols, unsigned short rows);
     void pollTimeout();
+
+private:
     void scrapeOutput();
 
 private:

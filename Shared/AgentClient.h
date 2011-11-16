@@ -13,9 +13,7 @@ class AgentClient : public QObject
 {
     Q_OBJECT
 public:
-    explicit AgentClient(QObject *parent = 0);
-    //void sendKeyPress(QKeyEvent *event);
-    //void sendKeyRelease(QKeyEvent *event);
+    explicit AgentClient(int initialCols, int initialRows, QObject *parent = 0);
     int agentPid();
     void writeMsg(const AgentMsg &msg);
     void startShell();

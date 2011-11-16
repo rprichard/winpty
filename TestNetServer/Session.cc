@@ -8,15 +8,22 @@
 #include <windows.h>
 
 Session::Session(QTcpSocket *socket, QObject *parent) :
-    QObject(parent), m_socket(socket)
+    QObject(parent), m_socket(socket), m_agentClient(NULL)
 {
-    m_agentClient = new AgentClient(this);
     connect(m_socket, SIGNAL(readyRead()), SLOT(onSocketReadyRead()));
-    m_agentClient->startShell();
-    connect(m_agentClient->getSocket(), SIGNAL(readyRead()), SLOT(onAgentReadyRead()));
-
-    connect(m_agentClient->getSocket(), SIGNAL(disconnected()), SLOT(cleanup()));
     connect(m_socket, SIGNAL(disconnected()), SLOT(cleanup()));
+}
+
+void Session::initializeAgent(int cols, int rows)
+{
+    Q_ASSERT(m_agentClient == NULL);
+    m_agentClient = new AgentClient(cols, rows, this);
+    connect(m_agentClient->getSocket(), SIGNAL(readyRead()), SLOT(onAgentReadyRead()));
+    connect(m_agentClient->getSocket(), SIGNAL(disconnected()), SLOT(cleanup()));
+
+    // TODO: Remove this hack.  We need to wait until the agent has
+    // initialized the console before
+    m_agentClient->startShell();
 }
 
 void Session::onSocketReadyRead()
@@ -31,7 +38,7 @@ void Session::onSocketReadyRead()
         if (remaining >= 12 && !strncmp(data.constData(), "\x1B[:r", 4)) {
             // Terminal resize.
             char buf[9];
-            memcpy(buf, data.constData() + 4, 8);
+            memcpy(buf, data.constData() + i + 4, 8);
             i += 12;
             buf[8] = '\0';
             unsigned int dim = strtol(buf, NULL, 16);
@@ -41,7 +48,11 @@ void Session::onSocketReadyRead()
             msg.u.windowSize.cols = dim & 0xffff;
             msg.u.windowSize.rows = dim >> 16;
             Trace("resize: %d x %d", msg.u.windowSize.cols, msg.u.windowSize.rows);
-            m_agentClient->writeMsg(msg);
+            if (m_agentClient == NULL) {
+                initializeAgent(msg.u.windowSize.cols, msg.u.windowSize.rows);
+            } else {
+                m_agentClient->writeMsg(msg);
+            }
             continue;
         }
 
@@ -59,7 +70,8 @@ void Session::onSocketReadyRead()
             ir.Event.KeyEvent.wVirtualScanCode = 0;
             ir.Event.KeyEvent.uChar.AsciiChar = ch;
             ir.Event.KeyEvent.wRepeatCount = 1;
-            m_agentClient->writeMsg(msg);
+            if (m_agentClient != NULL)
+                m_agentClient->writeMsg(msg);
             continue;
         }
     }

@@ -22,6 +22,9 @@ private slots:
     void cleanup();
 
 private:
+    void initializeAgent(int cols, int rows);
+
+private:
     QTcpSocket *m_socket;
     AgentClient *m_agentClient;
 };

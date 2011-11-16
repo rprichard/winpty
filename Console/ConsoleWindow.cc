@@ -10,7 +10,7 @@ ConsoleWindow::ConsoleWindow(QWidget *parent) :
     ui(new Ui::ConsoleWindow)
 {
     ui->setupUi(this);
-    m_agentClient = new AgentClient(this);
+    m_agentClient = new AgentClient(80, 25, this);
     ui->widget->initWithAgent(m_agentClient);
     m_agentClient->startShell();
 }

@@ -11,7 +11,7 @@
 // TODO: Note that this counter makes AgentClient non-thread-safe.
 int AgentClient::m_counter = 0;
 
-AgentClient::AgentClient(QObject *parent) :
+AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
     QObject(parent)
 {
     // Start a named pipe server.
@@ -25,7 +25,10 @@ AgentClient::AgentClient(QObject *parent) :
     // TODO: Improve this code.  If we're in the release subdirectory,
     // find the release Agent.  Look in the same directory first.
     QString agentProgram = QCoreApplication::applicationDirPath() + "\\..\\..\\Agent-build-desktop\\debug\\Agent.exe";
-    QString agentCmdLine = agentProgram + " " + socketServer->fullServerName();
+    QString agentCmdLine =
+            QString("\"%1\" %2 %3 %4").arg(agentProgram,
+                                           socketServer->fullServerName())
+                                      .arg(initialCols).arg(initialRows);
 
     Trace("Starting Agent: [%s]", agentCmdLine.toStdString().c_str());
 
@@ -62,32 +65,6 @@ AgentClient::AgentClient(QObject *parent) :
     // made by the right client?  i.e. The Agent.exe process we just started?
     socketServer->close();
 }
-
-/*
-void AgentClient::sendKeyPress(QKeyEvent *event)
-{
-    // TODO: Flesh this out....  Also: this code is intended
-    // to be portable across operating systems, so using
-    // nativeVirtualKey is wrong.
-    if (event->nativeVirtualKey() != 0) {
-        INPUT_RECORD ir;
-        memset(&ir, 0, sizeof(ir));
-        ir.EventType = KEY_EVENT;
-        ir.Event.KeyEvent.bKeyDown = TRUE;
-        ir.Event.KeyEvent.wVirtualKeyCode = event->nativeVirtualKey();
-        ir.Event.KeyEvent.wVirtualScanCode = event->nativeScanCode();
-        ir.Event.KeyEvent.uChar.UnicodeChar =
-                event->text().isEmpty() ? L'\0' : event->text().at(0).unicode();
-        ir.Event.KeyEvent.wRepeatCount = event->count();
-        m_socket->write((char*)&ir, sizeof(ir));
-    }
-}
-
-void AgentClient::sendKeyRelease(QKeyEvent *event)
-{
-
-}
-*/
 
 void AgentClient::writeMsg(const AgentMsg &msg)
 {
