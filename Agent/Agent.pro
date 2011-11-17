@@ -19,8 +19,12 @@ TEMPLATE = app
 
 SOURCES += main.cc \
     Agent.cc \
-    ../Shared/DebugClient.cc
+    ../Shared/DebugClient.cc \
+    Win32Console.cc
 
 HEADERS += \
     Agent.h \
-    ../Shared/DebugClient.h
+    ../Shared/DebugClient.h \
+    Win32Console.h
+
+

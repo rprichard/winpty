@@ -4,6 +4,7 @@
 #include <QObject>
 #include <windows.h>
 
+class Win32Console;
 class QLocalSocket;
 class QTimer;
 
@@ -24,13 +25,13 @@ private slots:
     void pollTimeout();
 
 private:
+    void resizeWindow(int cols, int rows);
     void scrapeOutput();
 
 private:
+    Win32Console *m_console;
     QLocalSocket *m_socket;
     QTimer *m_timer;
-    HANDLE m_conin;
-    HANDLE m_conout;
 };
 
 #endif // AGENT_H

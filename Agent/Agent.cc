@@ -1,51 +1,18 @@
 #define _WIN32_WINNT 0x0501
 #include "Agent.h"
+#include "Win32Console.h"
 #include "../Shared/DebugClient.h"
 #include "../Shared/AgentMsg.h"
 #include <QCoreApplication>
 #include <QLocalSocket>
 #include <QtDebug>
 #include <QTimer>
+#include <QSize>
+#include <QRect>
 #include <string.h>
 #include <windows.h>
 
 const int BUFFER_LINE_COUNT = 5000;
-
-static void resizeWindow(HANDLE conout, unsigned short cols, unsigned short rows)
-{
-    // Windows has one API for resizing the screen buffer and a different one
-    // for resizing the window.  It seems that either API can fail if the
-    // window does not fit on the screen buffer.
-
-    CONSOLE_SCREEN_BUFFER_INFO originalInfo;
-    GetConsoleScreenBufferInfo(conout, &originalInfo);
-
-    COORD finalBufferSize = { cols, BUFFER_LINE_COUNT };
-    SMALL_RECT finalWindowRect = {
-        0,
-        BUFFER_LINE_COUNT - rows,
-        cols - 1,
-        BUFFER_LINE_COUNT - 1,
-    };
-
-    if (originalInfo.dwSize.Y != BUFFER_LINE_COUNT) {
-        // TODO: Is it really safe to resize the window down to 1x1?
-        // TODO: Is there a better way to do this?
-        SMALL_RECT smallestWindowRect = { 0, 0, 0, 0 };
-        SetConsoleWindowInfo(conout, TRUE, &smallestWindowRect);
-        SetConsoleScreenBufferSize(conout, finalBufferSize);
-        SetConsoleWindowInfo(conout, TRUE, &finalWindowRect);
-    } else {
-        if (cols > originalInfo.dwSize.X) {
-            SetConsoleScreenBufferSize(conout, finalBufferSize);
-            SetConsoleWindowInfo(conout, TRUE, &finalWindowRect);
-        } else {
-            SetConsoleWindowInfo(conout, TRUE, &finalWindowRect);
-            SetConsoleScreenBufferSize(conout, finalBufferSize);
-        }
-    }
-    // Don't move the cursor, even if the cursor is now off the screen.
-}
 
 Agent::Agent(const QString &socketServer,
              int initialCols,
@@ -53,22 +20,9 @@ Agent::Agent(const QString &socketServer,
              QObject *parent) :
     QObject(parent), m_timer(NULL)
 {
-    m_conin = CreateFile(
-                L"CONIN$",
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                NULL, OPEN_EXISTING, 0, NULL);
-    m_conout = CreateFile(
-                L"CONOUT$",
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                NULL, OPEN_EXISTING, 0, NULL);
-    Q_ASSERT(m_conin != NULL);
-    Q_ASSERT(m_conout != NULL);
-
-    resizeWindow(m_conout, initialCols, initialRows);
-    COORD initialCursorPos = { 0, BUFFER_LINE_COUNT - initialRows };
-    SetConsoleCursorPosition(m_conout, initialCursorPos);
+    m_console = new Win32Console(this);
+    resizeWindow(initialCols, initialRows);
+    m_console->setCursorPosition(QPoint(0, BUFFER_LINE_COUNT - initialRows));
 
     // Connect to the named pipe.
     m_socket = new QLocalSocket(this);
@@ -90,9 +44,7 @@ Agent::Agent(const QString &socketServer,
 
 Agent::~Agent()
 {
-    HWND hwnd = GetConsoleWindow();
-    if (hwnd != NULL)
-        PostMessage(hwnd, WM_CLOSE, 0, 0);
+    m_console->postCloseMessage();
 }
 
 void Agent::socketReadyRead()
@@ -104,8 +56,7 @@ void Agent::socketReadyRead()
         m_socket->read((char*)&msg, sizeof(msg));
         switch (msg.type) {
             case AgentMsg::InputRecord: {
-                DWORD dummy;
-                WriteConsoleInput(m_conin, &msg.u.inputRecord, 1, &dummy);
+                m_console->writeInput(&msg.u.inputRecord);
                 break;
             }
             case AgentMsg::WindowSize: {
@@ -120,7 +71,7 @@ void Agent::socketReadyRead()
                     continue;
                 }
                 Trace("resize started");
-                resizeWindow(m_conout, msg.u.windowSize.cols, msg.u.windowSize.rows);
+                resizeWindow(msg.u.windowSize.cols, msg.u.windowSize.rows);
                 Trace("resize done");
                 break;
             }
@@ -156,40 +107,28 @@ void Agent::pollTimeout()
     }
 }
 
+void Agent::resizeWindow(int cols, int rows)
+{
+    m_console->reposition(
+                QSize(cols, BUFFER_LINE_COUNT),
+                QRect(0, BUFFER_LINE_COUNT - rows, cols, rows));
+}
+
 void Agent::scrapeOutput()
 {
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        Trace("GetConsoleScreenBufferInfo failed");
-        return;
-    }
-
-    COORD size;
-    size.X = info.srWindow.Right - info.srWindow.Left + 1;
-    size.Y = info.srWindow.Bottom - info.srWindow.Top + 1;
-    COORD zeroPos = {0, 0};
-    SMALL_RECT readWindow = info.srWindow;
-
+    const QRect windowRect = m_console->windowRect();
     CHAR_INFO readBuffer[64 * 1024 / sizeof(CHAR_INFO)]; // TODO: buf overflow
-    if (!ReadConsoleOutput(m_conout, readBuffer, size, zeroPos, &readWindow)) {
-        Trace("ReadConsoleOutput failed");
-        return;
-    }
-
     char writeBuffer[sizeof(readBuffer) / sizeof(CHAR_INFO)]; // TODO: buf overflow
     char *pwrite = writeBuffer;
-    if (memcmp(&info.srWindow, &readWindow, sizeof(SMALL_RECT))) {
-        Trace("ReadConsoleOutput returned a different-sized buffer");
-        return;
-    }
+    m_console->read(windowRect, readBuffer);
 
     // Simplest algorithm -- just send the whole screen.
-    for (int y = 0; y < size.Y; ++y) {
-        for (int x = 0; x < size.X; ++x) {
-            CHAR_INFO *pch = &readBuffer[y * size.X + x];
+    for (int y = 0; y < windowRect.height(); ++y) {
+        for (int x = 0; x < windowRect.width(); ++x) {
+            CHAR_INFO *pch = &readBuffer[y * windowRect.width() + x];
             *pwrite++ = pch->Char.AsciiChar;
         }
-        if (y < size.Y - 1) {
+        if (y < windowRect.height() - 1) {
             *pwrite++ = '\r';
             *pwrite++ = '\n';
         }
