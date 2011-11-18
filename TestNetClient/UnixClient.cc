@@ -7,11 +7,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <errno.h>
 #include <QSocketNotifier>
 #include <QCoreApplication>
 #include <QTcpSocket>
 #include <QByteArray>
 
+
+const int INPUT_BUFFER_SIZE = 1024;
+const int SOCKET_BUFFER_SIZE = 32 * 1024;
+const int SCREEN_BUFFER_SIZE = 32 * 1024;
 
 UnixClient::UnixClient(QTcpSocket *socket, QObject *parent) :
     QObject(parent), socket(socket)
@@ -28,6 +33,7 @@ UnixClient::UnixClient(QTcpSocket *socket, QObject *parent) :
     connect(terminalWriteNotifier, SIGNAL(activated(int)), SLOT(terminalWriteActivated()));
 
     // Read from TCP.
+    socket->setReadBufferSize(SOCKET_BUFFER_SIZE);
     connect(socket, SIGNAL(readyRead()), SLOT(socketReadyRead()));
     connect(socket, SIGNAL(bytesWritten(qint64)), SLOT(socketBytesWritten()));
     connect(socket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
@@ -106,18 +112,18 @@ void UnixClient::terminalReadActivated()
 {
     terminalReadNotifier->setEnabled(false);
 
-    char buf[512];
+    char buf[INPUT_BUFFER_SIZE];
     int count = read(0, buf, sizeof(buf));
     Q_ASSERT(count > 0);
     qint64 actualWritten = socket->write(buf, count);
     Q_ASSERT(actualWritten == count);
 
-    terminalReadNotifier->setEnabled(socket->bytesToWrite() < 4096);
+    terminalReadNotifier->setEnabled(socket->bytesToWrite() < INPUT_BUFFER_SIZE);
 }
 
 void UnixClient::socketBytesWritten()
 {
-    terminalReadNotifier->setEnabled(socket->bytesToWrite() < 4096);
+    terminalReadNotifier->setEnabled(socket->bytesToWrite() < INPUT_BUFFER_SIZE);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -136,25 +142,32 @@ void UnixClient::terminalWriteActivated()
 
 void UnixClient::doServerToClient()
 {
+    bool did_something;
     do {
-        if (terminalWriteBuffer.size() < 4096) {
-            QByteArray data = socket->readAll();
+        did_something = false;
+        if (terminalWriteBuffer.size() < SCREEN_BUFFER_SIZE) {
+            QByteArray data = socket->read(SCREEN_BUFFER_SIZE - terminalWriteBuffer.size());
             if (data.size() > 0) {
                 terminalWriteBuffer.append(data);
-                continue;
+                did_something = true;
             }
         }
         if (!terminalWriteBuffer.isEmpty()) {
             int actual = write(STDOUT_FILENO,
                                terminalWriteBuffer.constData(),
                                terminalWriteBuffer.size());
-            Q_ASSERT(actual >= 0);
             if (actual > 0) {
+                did_something = true;
                 terminalWriteBuffer = terminalWriteBuffer.mid(actual);
-                continue;
+            } else if (actual == 0) {
+                fprintf(stderr, "error: stdout closed\n");
+                QCoreApplication::exit(1);
+            } else if (errno != EAGAIN) {
+                perror("error writing to stdout");
+                QCoreApplication::exit(1);
             }
         }
-    } while(0);
+    } while(did_something);
 
     terminalWriteNotifier->setEnabled(!terminalWriteBuffer.isEmpty());
 }
