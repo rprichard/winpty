@@ -38,7 +38,7 @@ AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
     memset(&sui, 0, sizeof(sui));
     sui.cb = sizeof(sui);
     sui.dwFlags = STARTF_USESHOWWINDOW;
-    sui.wShowWindow = SW_SHOW; // TODO: put this back --- SW_HIDE;
+    sui.wShowWindow = SW_SHOW; // TODO: change SW_SHOW to SW_HIDE
     PROCESS_INFORMATION pi;
     memset(&pi, 0, sizeof(pi));
     m_agentProcess = new PROCESS_INFORMATION;
