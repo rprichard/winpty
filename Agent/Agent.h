@@ -21,6 +21,9 @@ public:
                    QObject *parent = 0);
     virtual ~Agent();
 
+private:
+    void initTerminal();
+
 signals:
 
 private slots:

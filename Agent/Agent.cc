@@ -22,23 +22,17 @@ Agent::Agent(const QString &socketServer,
              QObject *parent) :
     QObject(parent),
     m_timer(NULL),
-    m_syncRow(-1),
-    m_syncCounter(0),
-    m_scrapedLineCount(0),
-    m_scrolledCount(0),
-    m_maxBufferedLine(-1),
-    m_dirtyWindowTop(-1),
-    m_dirtyLineCount(0),
-    m_remoteLine(0)
+    m_syncCounter(0)
 {
     m_bufferData = new CHAR_INFO[BUFFER_LINE_COUNT][MAX_CONSOLE_WIDTH];
-    memset(m_bufferData, 0, sizeof(CHAR_INFO) * BUFFER_LINE_COUNT * MAX_CONSOLE_WIDTH);
 
     m_console = new Win32Console(this);
     m_console->reposition(
                 QSize(initialCols, BUFFER_LINE_COUNT),
                 QRect(0, 0, initialCols, initialRows));
     m_console->setCursorPosition(QPoint(0, 0));
+
+    initTerminal();
 
     // Connect to the named pipe.
     m_socket = new QLocalSocket(this);
@@ -53,7 +47,7 @@ Agent::Agent(const QString &socketServer,
     m_timer = new QTimer(this);
     m_timer->setSingleShot(false);
     connect(m_timer, SIGNAL(timeout()), SLOT(pollTimeout()));
-    m_timer->start(25);
+    m_timer->start(500);
 
     Trace("agent starting...");
 }
@@ -62,6 +56,21 @@ Agent::~Agent()
 {
     m_console->postCloseMessage();
     delete [] m_bufferData;
+}
+
+// This function clears fields both at startup and whenever the sync marker
+// disappears.
+void Agent::initTerminal()
+{
+    memset(m_bufferData, 0, sizeof(CHAR_INFO) * BUFFER_LINE_COUNT * MAX_CONSOLE_WIDTH);
+    m_syncRow = -1;
+    m_scrapedLineCount = m_console->windowRect().top();
+    m_scrolledCount = 0;
+    m_maxBufferedLine = -1;
+    m_dirtyWindowTop = -1;
+    m_dirtyLineCount = 0;
+    m_lastCursor = QPoint();
+    m_remoteLine = m_scrapedLineCount;
 }
 
 void Agent::socketReadyRead()
@@ -213,24 +222,15 @@ void Agent::scrapeOutput()
 
     const QRect windowRect = m_console->windowRect();
 
-    // Update the dirty line count:
-    //  - If the window has moved, the entire window is dirty.
-    //  - Everything up to the cursor is dirty.
-    //  - All lines above the window are dirty.
-    //  - Any non-blank lines are dirty.
-    if (m_dirtyWindowTop != -1 && m_dirtyWindowTop < windowRect.top())
-        markEntireWindowDirty();
-    m_dirtyWindowTop = windowRect.top();
-    m_dirtyLineCount = std::max(m_dirtyLineCount, cursor.y() + 1);
-    m_dirtyLineCount = std::max(m_dirtyLineCount, windowRect.top());
-    scanForDirtyLines();
-
     if (m_syncRow != -1) {
         // If a synchronizing marker was placed into the history, look for it
         // and adjust the scroll count.
         int markerRow = findSyncMarker();
         if (markerRow == -1) {
-            // TODO: Something happened.  Reset the terminal....
+            // Something has happened.  Reset the terminal.
+            Trace("Sync marker has disappeared -- resetting the terminal");
+            initTerminal();
+            m_socket->write(CSI"1;1H"CSI"2J");
         } else if (markerRow != m_syncRow) {
             Q_ASSERT(markerRow < m_syncRow);
             m_scrolledCount += (m_syncRow - markerRow);
@@ -240,7 +240,28 @@ void Agent::scrapeOutput()
         }
     }
 
-    markEntireWindowDirty();
+    // Update the dirty line count:
+    //  - If the window has moved, the entire window is dirty.
+    //  - Everything up to the cursor is dirty.
+    //  - All lines above the window are dirty.
+    //  - Any non-blank lines are dirty.
+    if (m_dirtyWindowTop != -1) {
+        if (windowRect.top() > m_dirtyWindowTop) {
+            // The window has moved down, presumably as a result of scrolling.
+            markEntireWindowDirty();
+        } else if (windowRect.top() < m_dirtyWindowTop) {
+            // The window has moved upward.  This is generally not expected to
+            // but the CMD/PowerShell CMD command will move the window to the
+            // top as part of clearing everything else in the console.
+            Trace("Window moved upward -- resetting the terminal");
+            initTerminal();
+            m_socket->write(CSI"1;1H"CSI"2J");
+        }
+    }
+    m_dirtyWindowTop = windowRect.top();
+    m_dirtyLineCount = std::max(m_dirtyLineCount, cursor.y() + 1);
+    m_dirtyLineCount = std::max(m_dirtyLineCount, windowRect.top());
+    scanForDirtyLines();
 
     // Note that it's possible for all the lines on the current window to
     // be non-dirty.
@@ -269,6 +290,7 @@ void Agent::scrapeOutput()
                 hidCursor = true;
                 hideTerminalCursor();
             }
+            Trace("sent line %d", line);
             sendLineToTerminal(line, curLine, windowRect.width());
             memset(bufLine, 0, sizeof(bufLine));
             memcpy(bufLine, curLine, sizeof(CHAR_INFO) * w);
