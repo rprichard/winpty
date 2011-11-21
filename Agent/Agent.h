@@ -2,6 +2,7 @@
 #define AGENT_H
 
 #include <QObject>
+#include <QPoint>
 #include <windows.h>
 
 class Win32Console;
@@ -28,6 +29,8 @@ private slots:
     void pollTimeout();
 
 private:
+    void markEntireWindowDirty();
+    void scanForDirtyLines();
     void resizeWindow(int cols, int rows);
     void scrapeOutput();
     void freezeConsole();
@@ -53,6 +56,9 @@ private:
     int m_scrolledCount;
     int m_maxBufferedLine;
     CHAR_INFO (*m_bufferData)[MAX_CONSOLE_WIDTH];
+    int m_dirtyWindowTop;
+    int m_dirtyLineCount;
+    QPoint m_lastCursor;
 
     int m_remoteLine;
 };

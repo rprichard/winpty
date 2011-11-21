@@ -26,7 +26,9 @@ Agent::Agent(const QString &socketServer,
     m_syncCounter(0),
     m_scrapedLineCount(0),
     m_scrolledCount(0),
-    m_maxBufferedLine(0),
+    m_maxBufferedLine(-1),
+    m_dirtyWindowTop(-1),
+    m_dirtyLineCount(0),
     m_remoteLine(0)
 {
     m_bufferData = new CHAR_INFO[BUFFER_LINE_COUNT][MAX_CONSOLE_WIDTH];
@@ -122,6 +124,44 @@ void Agent::pollTimeout()
     }
 }
 
+// Detect window movement.  If the window moves down (presumably as a
+// result of scrolling), then assume that all screen buffer lines down to
+// the bottom of the window are dirty.
+void Agent::markEntireWindowDirty()
+{
+    QRect windowRect = m_console->windowRect();
+    m_dirtyLineCount = std::max(m_dirtyLineCount,
+                                windowRect.top() + windowRect.height());
+}
+
+// Scan the screen buffer and advance the dirty line count when we find
+// non-empty lines.
+void Agent::scanForDirtyLines()
+{
+    const QRect windowRect = m_console->windowRect();
+    CHAR_INFO prevChar;
+    if (m_dirtyLineCount >= 1) {
+        m_console->read(QRect(windowRect.width() - 1, m_dirtyLineCount - 1, 1, 1), &prevChar);
+    } else {
+        m_console->read(QRect(0, 0, 1, 1), &prevChar);
+    }
+    int attr = prevChar.Attributes;
+
+    for (int line = m_dirtyLineCount;
+         line < windowRect.top() + windowRect.height();
+         ++line) {
+        CHAR_INFO lineData[MAX_CONSOLE_WIDTH]; // TODO: bufoverflow
+        QRect lineRect(0, line, windowRect.width(), 1);
+        m_console->read(lineRect, lineData);
+        for (int col = 0; col < windowRect.width(); ++col) {
+            int newAttr = lineData[col].Attributes;
+            if (lineData[col].Char.AsciiChar != ' ' || attr!= newAttr)
+                m_dirtyLineCount = line + 1;
+            newAttr = attr;
+        }
+    }
+}
+
 void Agent::resizeWindow(int cols, int rows)
 {
     freezeConsole();
@@ -144,9 +184,18 @@ void Agent::resizeWindow(int cols, int rows)
         newWindowRect = QRect(0, windowRect.top(), cols, rows);
     }
 
+    if (m_dirtyWindowTop != -1 && m_dirtyWindowTop < windowRect.top())
+        markEntireWindowDirty();
+    m_dirtyWindowTop = newWindowRect.top();
+
+    // Move the window and set the buffer size.  Be careful not to shrink the
+    // buffer while the console is frozen, because the current freezing
+    // technique, marking, temporarily moves the cursor to the top-left.  If
+    // shrinking the buffer removes the column with the cursor, then normally,
+    // Windows repositions the cursor, but that doesn't work while the cursor
+    // temporarily out-of-place.
     QSize tempBufferSize = bufferSize;
     tempBufferSize.setWidth(std::max(bufferSize.width(), newBufferSize.width()));
-
     m_console->reposition(tempBufferSize, newWindowRect);
     unfreezeConsole();
     if (newBufferSize.width() != tempBufferSize.width())
@@ -158,10 +207,23 @@ void Agent::scrapeOutput()
     // Get the location of the console prior to freezing.  The current
     // freezing technique, marking, temporarily moves the cursor to the
     // top-left.  We need to know the real cursor position.
-    QPoint cursor = m_console->cursorPosition();
+    const QPoint cursor = m_console->cursorPosition();
 
     freezeConsole();
-    hideTerminalCursor();
+
+    const QRect windowRect = m_console->windowRect();
+
+    // Update the dirty line count:
+    //  - If the window has moved, the entire window is dirty.
+    //  - Everything up to the cursor is dirty.
+    //  - All lines above the window are dirty.
+    //  - Any non-blank lines are dirty.
+    if (m_dirtyWindowTop != -1 && m_dirtyWindowTop < windowRect.top())
+        markEntireWindowDirty();
+    m_dirtyWindowTop = windowRect.top();
+    m_dirtyLineCount = std::max(m_dirtyLineCount, cursor.y() + 1);
+    m_dirtyLineCount = std::max(m_dirtyLineCount, windowRect.top());
+    scanForDirtyLines();
 
     if (m_syncRow != -1) {
         // If a synchronizing marker was placed into the history, look for it
@@ -169,36 +231,53 @@ void Agent::scrapeOutput()
         int markerRow = findSyncMarker();
         if (markerRow == -1) {
             // TODO: Something happened.  Reset the terminal....
-        } else {
+        } else if (markerRow != m_syncRow) {
+            Q_ASSERT(markerRow < m_syncRow);
             m_scrolledCount += (m_syncRow - markerRow);
             m_syncRow = markerRow;
+            // If the buffer has scrolled, then the entire window is dirty.
+            markEntireWindowDirty();
         }
     }
 
-    QRect windowRect = m_console->windowRect();
+    markEntireWindowDirty();
+
+    // Note that it's possible for all the lines on the current window to
+    // be non-dirty.
 
     int firstLine = std::min(m_scrapedLineCount,
                              windowRect.top() + m_scrolledCount);
-    int lastLine = windowRect.top() + windowRect.height() - 1 + m_scrolledCount;
+    int stopLine = std::min(m_dirtyLineCount,
+                            windowRect.top() + windowRect.height()) +
+            m_scrolledCount;
 
-    for (int line = firstLine; line <= lastLine; ++line) {
-        CHAR_INFO lineData[500]; // TODO: bufoverflow
-        QRect lineRect(0, line - m_scrolledCount, windowRect.width(), 1);
-        m_console->read(lineRect, lineData);
+    bool hidCursor = false;
+    bool sawModifiedLine = false;
+
+    for (int line = firstLine; line < stopLine; ++line) {
+        CHAR_INFO curLine[MAX_CONSOLE_WIDTH]; // TODO: bufoverflow
+        const int w = windowRect.width();
+        m_console->read(QRect(0, line - m_scrolledCount, w, 1), curLine);
 
         // TODO: The memcpy can overflow the m_bufferData buffer.
-        if (line > m_maxBufferedLine ||
-                memcmp(lineData,
-                       m_bufferData[line % BUFFER_LINE_COUNT],
-                       sizeof(CHAR_INFO) * windowRect.width()) != 0) {
-            sendLineToTerminal(line, lineData, windowRect.width());
-            memset(m_bufferData[line % BUFFER_LINE_COUNT],
-                   0,
-                   sizeof(m_bufferData[line % BUFFER_LINE_COUNT]));
-            memcpy(m_bufferData[line % BUFFER_LINE_COUNT],
-                   lineData,
-                   sizeof(CHAR_INFO) * windowRect.width());
+        CHAR_INFO (&bufLine)[MAX_CONSOLE_WIDTH] =
+                m_bufferData[line % BUFFER_LINE_COUNT];
+        if (sawModifiedLine ||
+                line > m_maxBufferedLine ||
+                memcmp(curLine, bufLine, sizeof(CHAR_INFO) * w) != 0) {
+            if (!hidCursor) {
+                hidCursor = true;
+                hideTerminalCursor();
+            }
+            sendLineToTerminal(line, curLine, windowRect.width());
+            memset(bufLine, 0, sizeof(bufLine));
+            memcpy(bufLine, curLine, sizeof(CHAR_INFO) * w);
+            for (int col = w; col < MAX_CONSOLE_WIDTH; ++col) {
+                bufLine[col].Attributes = curLine[w - 1].Attributes;
+                bufLine[col].Char.AsciiChar = ' ';
+            }
             m_maxBufferedLine = std::max(m_maxBufferedLine, line);
+            sawModifiedLine = true;
         }
     }
 
@@ -208,8 +287,14 @@ void Agent::scrapeOutput()
         createSyncMarker(windowRect.top() - 200);
     }
 
-    showTerminalCursor(cursor.y() + m_scrolledCount, cursor.x());
+    if (m_lastCursor != cursor && !hidCursor) {
+        hidCursor = true;
+        hideTerminalCursor();
+    }
+    m_lastCursor = cursor;
 
+    if (hidCursor)
+        showTerminalCursor(cursor.y() + m_scrolledCount, cursor.x());
     unfreezeConsole();
 }
 
