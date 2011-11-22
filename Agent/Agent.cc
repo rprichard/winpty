@@ -13,6 +13,7 @@
 #include <windows.h>
 
 const int SC_CONSOLE_MARK = 0xFFF2;
+const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 const int SYNC_MARKER_LEN = 16;
 #define CSI "\x1b["
 
@@ -47,7 +48,7 @@ Agent::Agent(const QString &socketServer,
     m_timer = new QTimer(this);
     m_timer->setSingleShot(false);
     connect(m_timer, SIGNAL(timeout()), SLOT(pollTimeout()));
-    m_timer->start(500);
+    m_timer->start(25);
 
     Trace("agent starting...");
 }
@@ -322,7 +323,7 @@ void Agent::scrapeOutput()
 
 void Agent::freezeConsole()
 {
-    SendMessage(m_console->hwnd(), WM_SYSCOMMAND, SC_CONSOLE_MARK, 0);
+    SendMessage(m_console->hwnd(), WM_SYSCOMMAND, SC_CONSOLE_SELECT_ALL, 0);
 }
 
 void Agent::unfreezeConsole()
