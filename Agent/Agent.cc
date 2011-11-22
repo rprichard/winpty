@@ -1,6 +1,7 @@
 #define _WIN32_WINNT 0x0501
 #include "Agent.h"
 #include "Win32Console.h"
+#include "Terminal.h"
 #include "../Shared/DebugClient.h"
 #include "../Shared/AgentMsg.h"
 #include <QCoreApplication>
@@ -15,13 +16,13 @@
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 const int SYNC_MARKER_LEN = 16;
-#define CSI "\x1b["
 
 Agent::Agent(const QString &socketServer,
              int initialCols,
              int initialRows,
              QObject *parent) :
     QObject(parent),
+    m_terminal(NULL),
     m_timer(NULL),
     m_syncCounter(0)
 {
@@ -33,14 +34,15 @@ Agent::Agent(const QString &socketServer,
                 QRect(0, 0, initialCols, initialRows));
     m_console->setCursorPosition(QPoint(0, 0));
 
-    initTerminal();
-
     // Connect to the named pipe.
     m_socket = new QLocalSocket(this);
     m_socket->connectToServer(socketServer);
     if (!m_socket->waitForConnected())
         qFatal("Could not connect to %s", socketServer.toStdString().c_str());
     m_socket->setReadBufferSize(64*1024);
+    m_terminal = new Terminal(m_socket, this);
+
+    resetConsoleTracking(false);
 
     connect(m_socket, SIGNAL(readyRead()), SLOT(socketReadyRead()));
     connect(m_socket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
@@ -59,9 +61,7 @@ Agent::~Agent()
     delete [] m_bufferData;
 }
 
-// This function clears fields both at startup and whenever the sync marker
-// disappears.
-void Agent::initTerminal()
+void Agent::resetConsoleTracking(bool sendClear)
 {
     memset(m_bufferData, 0, sizeof(CHAR_INFO) * BUFFER_LINE_COUNT * MAX_CONSOLE_WIDTH);
     m_syncRow = -1;
@@ -70,8 +70,7 @@ void Agent::initTerminal()
     m_maxBufferedLine = -1;
     m_dirtyWindowTop = -1;
     m_dirtyLineCount = 0;
-    m_lastCursor = QPoint();
-    m_remoteLine = m_scrapedLineCount;
+    m_terminal->reset(sendClear, m_scrapedLineCount);
 }
 
 void Agent::socketReadyRead()
@@ -198,29 +197,15 @@ void Agent::resizeWindow(int cols, int rows)
         markEntireWindowDirty();
     m_dirtyWindowTop = newWindowRect.top();
 
-    // Move the window and set the buffer size.  Be careful not to shrink the
-    // buffer while the console is frozen, because the current freezing
-    // technique, marking, temporarily moves the cursor to the top-left.  If
-    // shrinking the buffer removes the column with the cursor, then normally,
-    // Windows repositions the cursor, but that doesn't work while the cursor
-    // temporarily out-of-place.
-    QSize tempBufferSize = bufferSize;
-    tempBufferSize.setWidth(std::max(bufferSize.width(), newBufferSize.width()));
-    m_console->reposition(tempBufferSize, newWindowRect);
+    m_console->reposition(newBufferSize, newWindowRect);
     unfreezeConsole();
-    if (newBufferSize.width() != tempBufferSize.width())
-        m_console->resizeBuffer(newBufferSize);
 }
 
 void Agent::scrapeOutput()
 {
-    // Get the location of the console prior to freezing.  The current
-    // freezing technique, marking, temporarily moves the cursor to the
-    // top-left.  We need to know the real cursor position.
-    const QPoint cursor = m_console->cursorPosition();
-
     freezeConsole();
 
+    const QPoint cursor = m_console->cursorPosition();
     const QRect windowRect = m_console->windowRect();
 
     if (m_syncRow != -1) {
@@ -230,8 +215,7 @@ void Agent::scrapeOutput()
         if (markerRow == -1) {
             // Something has happened.  Reset the terminal.
             Trace("Sync marker has disappeared -- resetting the terminal");
-            initTerminal();
-            m_socket->write(CSI"1;1H"CSI"2J");
+            resetConsoleTracking();
         } else if (markerRow != m_syncRow) {
             Q_ASSERT(markerRow < m_syncRow);
             m_scrolledCount += (m_syncRow - markerRow);
@@ -255,8 +239,7 @@ void Agent::scrapeOutput()
             // but the CMD/PowerShell CMD command will move the window to the
             // top as part of clearing everything else in the console.
             Trace("Window moved upward -- resetting the terminal");
-            initTerminal();
-            m_socket->write(CSI"1;1H"CSI"2J");
+            resetConsoleTracking();
         }
     }
     m_dirtyWindowTop = windowRect.top();
@@ -273,7 +256,6 @@ void Agent::scrapeOutput()
                             windowRect.top() + windowRect.height()) +
             m_scrolledCount;
 
-    bool hidCursor = false;
     bool sawModifiedLine = false;
 
     for (int line = firstLine; line < stopLine; ++line) {
@@ -287,12 +269,8 @@ void Agent::scrapeOutput()
         if (sawModifiedLine ||
                 line > m_maxBufferedLine ||
                 memcmp(curLine, bufLine, sizeof(CHAR_INFO) * w) != 0) {
-            if (!hidCursor) {
-                hidCursor = true;
-                hideTerminalCursor();
-            }
             Trace("sent line %d", line);
-            sendLineToTerminal(line, curLine, windowRect.width());
+            m_terminal->sendLine(line, curLine, windowRect.width());
             memset(bufLine, 0, sizeof(bufLine));
             memcpy(bufLine, curLine, sizeof(CHAR_INFO) * w);
             for (int col = w; col < MAX_CONSOLE_WIDTH; ++col) {
@@ -310,14 +288,8 @@ void Agent::scrapeOutput()
         createSyncMarker(windowRect.top() - 200);
     }
 
-    if (m_lastCursor != cursor && !hidCursor) {
-        hidCursor = true;
-        hideTerminalCursor();
-    }
-    m_lastCursor = cursor;
+    m_terminal->finishOutput(cursor + QPoint(0, m_scrolledCount));
 
-    if (hidCursor)
-        showTerminalCursor(cursor.y() + m_scrolledCount, cursor.x());
     unfreezeConsole();
 }
 
@@ -372,60 +344,4 @@ void Agent::createSyncMarker(int row)
     m_syncRow = row;
     QRect markerRect(0, m_syncRow, 1, SYNC_MARKER_LEN);
     m_console->write(markerRect, marker);
-}
-
-void Agent::moveTerminalToLine(int line)
-{
-    // Do not use CPL or CNL.  Konsole 2.5.4 does not support Cursor Previous
-    // Line (CPL) -- there are "Undecodable sequence" errors.  gnome-terminal
-    // 2.32.0 does handle it.  Cursor Next Line (CNL) does nothing if the
-    // cursor is on the last line already.
-
-    if (line < m_remoteLine) {
-        // Cursor Horizontal Absolute (CHA) -- move to column 1.
-        // CUrsor Up (CUU)
-        char buffer[32];
-        sprintf(buffer, CSI"1G"CSI"%dA", m_remoteLine - line);
-        m_socket->write(buffer);
-        m_remoteLine = line;
-    } else if (line > m_remoteLine) {
-        while (line > m_remoteLine) {
-            m_socket->write("\r\n");
-            m_remoteLine++;
-        }
-    } else {
-        // Cursor Horizontal Absolute -- move to column 1.
-        m_socket->write(CSI"1G");
-    }
-}
-
-void Agent::sendLineToTerminal(int line, CHAR_INFO *lineData, int width)
-{
-    moveTerminalToLine(line);
-
-    // Erase in Line -- erase entire line.
-    m_socket->write(CSI"2K");
-
-    char buffer[512];
-    int length = 0;
-    for (int i = 0; i < width; ++i) {
-        buffer[i] = lineData[i].Char.AsciiChar;
-        if (buffer[i] != ' ')
-            length = i + 1;
-    }
-
-    m_socket->write(buffer, length);
-}
-
-void Agent::hideTerminalCursor()
-{
-    m_socket->write(CSI"?25l");
-}
-
-void Agent::showTerminalCursor(int line, int column)
-{
-    moveTerminalToLine(line);
-    char buffer[32];
-    sprintf(buffer, CSI"%dG"CSI"?25h", column + 1);
-    m_socket->write(buffer);
 }

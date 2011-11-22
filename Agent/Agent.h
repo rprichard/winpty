@@ -7,6 +7,7 @@
 
 class Win32Console;
 class QLocalSocket;
+class Terminal;
 class QTimer;
 
 const int BUFFER_LINE_COUNT = 3000; // TODO: Use something like 9000.
@@ -22,7 +23,7 @@ public:
     virtual ~Agent();
 
 private:
-    void initTerminal();
+    void resetConsoleTracking(bool sendClear = true);
 
 signals:
 
@@ -50,6 +51,7 @@ private:
 private:
     Win32Console *m_console;
     QLocalSocket *m_socket;
+    Terminal *m_terminal;
     QTimer *m_timer;
 
     int m_syncRow;
@@ -61,9 +63,6 @@ private:
     CHAR_INFO (*m_bufferData)[MAX_CONSOLE_WIDTH];
     int m_dirtyWindowTop;
     int m_dirtyLineCount;
-    QPoint m_lastCursor;
-
-    int m_remoteLine;
 };
 
 #endif // AGENT_H
