@@ -25,6 +25,7 @@ private:
     int m_remoteLine;
     bool m_cursorHidden;
     QPoint m_cursorPos;
+    int m_remoteColor;
 };
 
 #endif // TERMINAL_H

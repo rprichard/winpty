@@ -1,3 +1,4 @@
+#define _WIN32_WINNT 0x0501
 #include "Terminal.h"
 #include <QIODevice>
 #include <windows.h>
@@ -5,11 +6,34 @@
 
 #define CSI "\x1b["
 
+#ifndef COMMON_LVB_REVERSE_VIDEO
+#define COMMON_LVB_REVERSE_VIDEO 0x4000
+#endif
+
+const int COLOR_ATTRIBUTE_MASK =
+        FOREGROUND_BLUE |
+        FOREGROUND_GREEN |
+        FOREGROUND_RED |
+        FOREGROUND_INTENSITY |
+        BACKGROUND_BLUE |
+        BACKGROUND_GREEN |
+        BACKGROUND_RED |
+        BACKGROUND_INTENSITY |
+        COMMON_LVB_REVERSE_VIDEO;
+
+const int TERMINAL_RED   = 1;
+const int TERMINAL_GREEN = 2;
+const int TERMINAL_BLUE  = 4;
+
+const int TERMINAL_FOREGROUND = 30;
+const int TERMINAL_BACKGROUND = 40;
+
 Terminal::Terminal(QIODevice *output, QObject *parent) :
     QObject(parent),
     m_output(output),
     m_remoteLine(0),
-    m_cursorHidden(false)
+    m_cursorHidden(false),
+    m_remoteColor(-1)
 {
 }
 
@@ -20,6 +44,7 @@ void Terminal::reset(bool sendClearFirst, int newLine)
     m_remoteLine = newLine;
     m_cursorHidden = false;
     m_cursorPos = QPoint(0, newLine);
+    m_remoteColor = -1;
 }
 
 void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
@@ -30,15 +55,46 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     // Erase in Line -- erase entire line.
     m_output->write(CSI"2K");
 
-    char buffer[512];
+    QByteArray termLine;
+    termLine.reserve(width + 32);
+
     int length = 0;
     for (int i = 0; i < width; ++i) {
-        buffer[i] = lineData[i].Char.AsciiChar;
-        if (buffer[i] != ' ')
-            length = i + 1;
+        int color = lineData[i].Attributes & COLOR_ATTRIBUTE_MASK;
+        if (color != m_remoteColor) {
+            int fore = 0;
+            int back = 0;
+            if (color & FOREGROUND_RED)   fore |= TERMINAL_RED;
+            if (color & FOREGROUND_GREEN) fore |= TERMINAL_GREEN;
+            if (color & FOREGROUND_BLUE)  fore |= TERMINAL_BLUE;
+            if (color & BACKGROUND_RED)   back |= TERMINAL_RED;
+            if (color & BACKGROUND_GREEN) back |= TERMINAL_GREEN;
+            if (color & BACKGROUND_BLUE)  back |= TERMINAL_BLUE;
+            char buffer[128];
+            sprintf(buffer, CSI"0;%d;%d",
+                    TERMINAL_FOREGROUND + fore,
+                    TERMINAL_BACKGROUND + back);
+            if (color & FOREGROUND_INTENSITY)
+                strcat(buffer, ";1");
+            if (color & COMMON_LVB_REVERSE_VIDEO)
+                strcat(buffer, ";7");
+            strcat(buffer, "m");
+            termLine.append(buffer);
+            length = termLine.size();
+            m_remoteColor = color;
+        }
+        // TODO: Unicode
+        char ch = lineData[i].Char.AsciiChar;
+        if (ch == ' ') {
+            termLine.append(' ');
+        } else {
+            termLine.append(isprint(ch) ? ch : '?');
+            length = termLine.size();
+        }
     }
 
-    m_output->write(buffer, length);
+    termLine.truncate(length);
+    m_output->write(termLine);
 }
 
 void Terminal::finishOutput(QPoint newCursorPos)
