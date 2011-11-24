@@ -35,7 +35,7 @@ Agent::Agent(const QString &socketServer, QObject *parent) : QObject(parent)
     m_timer = new QTimer(this);
     m_timer->setSingleShot(false);
     connect(m_timer, SIGNAL(timeout()), SLOT(pollTimeout()));
-    m_timer->start(100);
+    m_timer->start(500);
 
     Trace("agent starting...");
 }
@@ -44,7 +44,6 @@ void Agent::socketReadyRead()
 {
     // TODO: This is an incomplete hack...
     while (m_socket->bytesAvailable() >= sizeof(INPUT_RECORD)) {
-        Trace("reading a word...");
         INPUT_RECORD ir;
         m_socket->read((char*)&ir, sizeof(ir));
         DWORD dummy;
@@ -60,5 +59,6 @@ void Agent::socketClosed()
 
 void Agent::pollTimeout()
 {
+    //Trace("poll");
     // TODO: ... scan the console and write it to the socket.
 }

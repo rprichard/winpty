@@ -1,5 +1,6 @@
 CMakeCache.txt
 CMakeLists.txt.user
+CMakeLists.txt.user.2.3pre1
 CMakeFiles
 Makefile
 *.exe
@@ -7,4 +8,5 @@ build.sh
 Scrape.cbp
 cmake_install.cmake
 *.pro.user
+*.pro.user.2.3pre1
 *-build-desktop

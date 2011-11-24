@@ -11,12 +11,12 @@ TEMPLATE = app
 
 
 SOURCES += main.cc \
-        ConsoleWindow.cc \
-    AgentClient.cc \
+    ConsoleWindow.cc \
+    ../Shared/AgentClient.cc \
     TextWidget.cc
 
 HEADERS  += ConsoleWindow.h \
-    AgentClient.h \
+    ../Shared/AgentClient.h \
     TextWidget.h
 
 FORMS    += ConsoleWindow.ui

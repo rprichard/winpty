@@ -18,9 +18,6 @@ public:
     ~ConsoleWindow();
 
 private:
-    void startShell();
-
-private:
     Ui::ConsoleWindow *ui;
     AgentClient *m_agentClient;
 };
