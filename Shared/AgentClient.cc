@@ -3,6 +3,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QCoreApplication>
+#include <QDir>
 #include <QtDebug>
 #include <windows.h>
 #include "DebugClient.h"
@@ -22,9 +23,25 @@ AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
             QString::number(++m_counter);
     socketServer->listen(serverName);
 
-    // TODO: Improve this code.  If we're in the release subdirectory,
-    // find the release Agent.  Look in the same directory first.
-    QString agentProgram = QCoreApplication::applicationDirPath() + "\\..\\..\\Agent-build-desktop\\debug\\Agent.exe";
+    QDir progDir(QCoreApplication::applicationDirPath());
+    QString agentProgram;
+    if (progDir.exists("Agent.exe")) {
+        // The agent might be in the same directory as the server when it's
+        // installed.
+        agentProgram = progDir.filePath("Agent.exe");
+    } else {
+        // The development directory structure looks like this:
+        //     root/
+        //         Agent-build-desktop/
+        //             debug/
+        //                 Agent.exe
+        //         TestNetServer-build-desktop/
+        //             debug/
+        //                 Agent.exe
+        agentProgram = progDir.filePath("../../Agent-build-desktop/" + progDir.dirName() + "/Agent.exe");
+    }
+    agentProgram = QDir(agentProgram).canonicalPath();
+
     QString agentCmdLine =
             QString("\"%1\" %2 %3 %4").arg(agentProgram,
                                            socketServer->fullServerName())

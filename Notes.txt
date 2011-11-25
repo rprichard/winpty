@@ -84,3 +84,29 @@ buffer.  This makes sense -- why would they care?  The Cygwin less, on the other
 hand, does care.  If I scroll the window up, then Cygwin less will write to a
 position within the window.  I didn't really expect this behavior, but it
 doesn't seem to be a problem.
+
+Setting up a TestNetServer service
+----------------------------------
+
+First run the deploy.sh script to copy files into deploy.  Make sure
+TestNetServer.exe will run in a bare environment (no MinGW or Qt in the path).
+
+Install the Windows Server 2003 Resource Kit.  It will have two programs in it,
+instsrv and srvany.
+
+Run:
+
+  InstSrv TestNetServer <path-to-srvany>\srvany.exe
+
+This creates a service named "TestNetServer" that uses the Microsoft service
+wrapper.  To configure the new service to run TestNetServer, set a registry
+value:
+
+  [HKLM\SYSTEM\CurrentControlSet\Services\TestNetServer\Parameters]
+  Application=<full-path>\TestNetServer.exe
+
+Also see http://www.iopus.com/guides/srvany.htm.
+
+To remove the service, run:
+
+  InstSrv TestNetServer REMOVE
