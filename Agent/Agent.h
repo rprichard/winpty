@@ -54,6 +54,8 @@ private:
     Terminal *m_terminal;
     QTimer *m_timer;
 
+    bool m_autoShutDown;
+
     int m_syncRow;
     int m_syncCounter;
 

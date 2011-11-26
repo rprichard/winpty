@@ -20,9 +20,6 @@ void Session::initializeAgent(int cols, int rows)
     m_agentClient = new AgentClient(cols, rows, this);
     connect(m_agentClient->getSocket(), SIGNAL(readyRead()), SLOT(onAgentReadyRead()));
     connect(m_agentClient->getSocket(), SIGNAL(disconnected()), SLOT(cleanup()));
-
-    // TODO: Remove this hack.  We need to wait until the agent has
-    // initialized the console before
     m_agentClient->startShell();
 }
 

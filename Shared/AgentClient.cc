@@ -95,8 +95,10 @@ int AgentClient::agentPid()
 
 void AgentClient::startShell()
 {
-    FreeConsole();
-    AttachConsole(agentPid());
+    if (!FreeConsole())
+        Trace("FreeConsole failed");
+    if (!AttachConsole(agentPid()))
+        Trace("AttachConsole to pid %d failed", agentPid());
 
     HANDLE conout1, conout2, conin;
 
@@ -167,9 +169,10 @@ void AgentClient::startShell()
                     NULL,
                     &sui,
                     &pi);
-        if (!success) {
-            qDebug("Could not start shell");
-        }
+        if (success)
+            Trace("Started shell pid %d", pi.dwProcessId);
+        else
+            Trace("Could not start shell");
     }
 
     CloseHandle(conout1);
@@ -177,6 +180,14 @@ void AgentClient::startShell()
     CloseHandle(conin);
 
     FreeConsole();
+
+    // Now that the shell is started, tell the agent to shutdown when the
+    // console has no more programs using it.
+    AgentMsg msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.type = AgentMsg::SetAutoShutDownFlag;
+    msg.u.flag = TRUE;
+    writeMsg(msg);
 }
 
 QLocalSocket *AgentClient::getSocket()

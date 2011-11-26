@@ -8,7 +8,8 @@ class AgentMsg
 public:
     enum Type {
         InputRecord,
-        WindowSize
+        WindowSize,
+        SetAutoShutDownFlag
     };
 
     Type type;
@@ -18,6 +19,7 @@ public:
             unsigned short cols;
             unsigned short rows;
         } windowSize;
+        BOOL flag;
     } u;
 };
 

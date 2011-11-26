@@ -24,6 +24,7 @@ Agent::Agent(const QString &socketServer,
     QObject(parent),
     m_terminal(NULL),
     m_timer(NULL),
+    m_autoShutDown(false),
     m_syncCounter(0)
 {
     m_bufferData = new CHAR_INFO[BUFFER_LINE_COUNT][MAX_CONSOLE_WIDTH];
@@ -101,6 +102,9 @@ void Agent::socketReadyRead()
                 Trace("resize done");
                 break;
             }
+            case AgentMsg::SetAutoShutDownFlag:
+                m_autoShutDown = msg.u.flag;
+                break;
         }
     }
     Trace("socketReadyRead -- exited");
@@ -118,7 +122,7 @@ void Agent::pollTimeout()
         int count = GetConsoleProcessList(&dummy, 1);
         Q_ASSERT(count >= 1);
         scrapeOutput();
-        if (count == 1) {
+        if (m_autoShutDown && count == 1) {
             // TODO: This approach doesn't seem to work when I run edit.com
             // in a console.  I see an NTVDM.EXE process running after exiting
             // cmd.exe.  Maybe NTVDM.EXE is doing the same thing I am -- it
