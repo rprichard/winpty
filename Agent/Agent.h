@@ -43,11 +43,6 @@ private:
     int findSyncMarker();
     void createSyncMarker(int row);
 
-    void moveTerminalToLine(int line);
-    void sendLineToTerminal(int line, CHAR_INFO *lineData, int width);
-    void hideTerminalCursor();
-    void showTerminalCursor(int line, int column);
-
 private:
     Win32Console *m_console;
     QLocalSocket *m_socket;
