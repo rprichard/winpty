@@ -10,11 +10,15 @@
 #include "AgentMsg.h"
 
 // TODO: Note that this counter makes AgentClient non-thread-safe.
+// TODO: So does the various API calls that change the process state.
+// TODO: (e.g. AttachConsole, FreeConsole)
 int AgentClient::m_counter = 0;
 
 AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
     QObject(parent)
 {
+    BOOL success;
+
     // Start a named pipe server.
     QLocalServer *socketServer = new QLocalServer(this);
     QString serverName =
@@ -49,13 +53,29 @@ AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
 
     Trace("Starting Agent: [%s]", agentCmdLine.toStdString().c_str());
 
+    // Get a non-interactive window station for the agent.
+    // TODO: review security w.r.t. windowstation and desktop.
+    HWINSTA originalStation = GetProcessWindowStation();
+    HWINSTA station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
+    success = SetProcessWindowStation(station);
+    Q_ASSERT(success);
+    HDESK desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
+    Q_ASSERT(originalStation != NULL);
+    Q_ASSERT(station != NULL);
+    Q_ASSERT(desktop != NULL);
+    wchar_t stationNameWStr[256];
+    success = GetUserObjectInformation(station, UOI_NAME,
+                                       stationNameWStr, sizeof(stationNameWStr),
+                                       NULL);
+    Q_ASSERT(success);
+    QString stationName = QString::fromWCharArray(stationNameWStr);
+    QString startupDesktop = stationName + "\\Default";
+
     // Start the agent.
-    BOOL success;
     STARTUPINFO sui;
     memset(&sui, 0, sizeof(sui));
     sui.cb = sizeof(sui);
-    sui.dwFlags = STARTF_USESHOWWINDOW;
-    sui.wShowWindow = SW_HIDE; // TODO: change SW_SHOW to SW_HIDE
+    sui.lpDesktop = (LPWSTR)startupDesktop.utf16();
     PROCESS_INFORMATION pi;
     memset(&pi, 0, sizeof(pi));
     m_agentProcess = new PROCESS_INFORMATION;
@@ -81,6 +101,14 @@ AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
     // TODO: security -- Do we need to verify that this pipe connection was
     // made by the right client?  i.e. The Agent.exe process we just started?
     socketServer->close();
+
+    // Restore the original window station.
+    success = SetProcessWindowStation(originalStation);
+    Q_ASSERT(success);
+    success = CloseDesktop(desktop);
+    Q_ASSERT(success);
+    success = CloseWindowStation(station);
+    Q_ASSERT(success);
 }
 
 void AgentClient::writeMsg(const AgentMsg &msg)
