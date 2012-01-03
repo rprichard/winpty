@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Run with native CPython3.  Needs pywin32 extensions.
+# Run with native CPython.  Needs pywin32 extensions.
 
 import win32pipe
 import win32api
@@ -33,5 +33,8 @@ while True:
     # think the DisconnectNamedPipe call aborts the client's CallNamedPipe
     # call normally.
 
-    #win32file.WriteFile(serverPipe, b'OK')
+    try:
+        win32file.WriteFile(serverPipe, b'OK')
+    except:
+        pass
     win32pipe.DisconnectNamedPipe(serverPipe)
