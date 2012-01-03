@@ -273,7 +273,7 @@ void Agent::scrapeOutput()
         if (sawModifiedLine ||
                 line > m_maxBufferedLine ||
                 memcmp(curLine, bufLine, sizeof(CHAR_INFO) * w) != 0) {
-            Trace("sent line %d", line);
+            //Trace("sent line %d", line);
             m_terminal->sendLine(line, curLine, windowRect.width());
             memset(bufLine, 0, sizeof(bufLine));
             memcpy(bufLine, curLine, sizeof(CHAR_INFO) * w);
