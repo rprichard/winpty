@@ -27,8 +27,6 @@ int consoleStartShell(Console *console,
 PSEUDOCONSOLE_DLLEXPORT
 void consoleCancelIo(Console *console);
 
-// The size parameter has type "int" rather than "size_t" because JNA lacks
-// a "size_t" type.
 PSEUDOCONSOLE_DLLEXPORT
 int consoleRead(Console *console, void *buffer, int size);
 
