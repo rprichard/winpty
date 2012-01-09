@@ -76,8 +76,6 @@ AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
     memset(&sui, 0, sizeof(sui));
     sui.cb = sizeof(sui);
     sui.lpDesktop = (LPWSTR)startupDesktop.utf16();
-    PROCESS_INFORMATION pi;
-    memset(&pi, 0, sizeof(pi));
     m_agentProcess = new PROCESS_INFORMATION;
     QVector<wchar_t> cmdline(agentCmdLine.size() + 1);
     agentCmdLine.toWCharArray(cmdline.data());
