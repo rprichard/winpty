@@ -12,5 +12,6 @@ cd deploy
 
 cp ../TestNetServer-build-desktop/debug/TestNetServer.exe .
 cp ../Agent-build-desktop/debug/Agent.exe .
+cp ../PseudoConsole-build-desktop/debug/PseudoConsole.dll .
 cp $(dirname $(which mingw32-make))/{mingwm10.dll,libgcc_s_dw2-1.dll} .
 cp $(dirname $(which qmake))/{QtCored4.dll,QtNetworkd4.dll} .
