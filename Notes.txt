@@ -110,3 +110,82 @@ Also see http://www.iopus.com/guides/srvany.htm.
 To remove the service, run:
 
   InstSrv TestNetServer REMOVE
+
+TODO
+----
+
+Agent: When resizing the console, consider whether to add lines to the top
+or bottom.  I remember thinking the current behavior was wrong for some
+application, but I forgot which one.
+
+Make the font as small as possible.  The console window dimensions are limited by
+the screen size, so making the font small reduces an unnecessary limitation on the
+PseudoConsole size.  There's a documented Vista/Win7 API for this
+(SetCurrentConsoleFontEx), and apparently WinXP has an undocumented API
+(SetConsoleFont):
+    http://blogs.microsoft.co.il/blogs/pavely/archive/2009/07/23/changing-console-fonts.aspx
+
+Make the agent work with DOS programs like edit and qbasic.
+ - Detect that the terminal program has resized the window/buffer and enter a
+   simple just-scrape-and-dont-resize mode.  Track the client window size and
+   send the intersection of the console and the agent's client.
+ - I also need to generate keyboard scan codes.
+ - Solve the NTVDM.EXE console shutdown problem, probably by ignoring NTVDM.EXE
+   when it appears on the GetConsoleProcessList list.
+
+Rename the agent?  Is the term "proxy" more accurate?
+
+Optimize the polling.  e.g. Use a longer poll interval when the console is idle.
+Do a minimal poll that checks whether the sync marker or window has moved.
+
+Increase the console buffer size to ~9000 lines.  Beware making it so big that
+reading the sync column exhausts the 32KB conhost<->agent heap.
+
+Reduce the memory overhead of the agent.  The agent's m_bufferData array can
+be small (a few hundred lines?) relative to the console buffer size.
+
+Try to handle console background color better.
+    Unix terminal emulators have a user-configurable foreground and background
+color, and for best results, the agent really needs to avoid changing the colors,
+especially the background color.  It's undesirable/ugly to SSH into a machine
+and see the command prompt change the colors.  It's especially ugly that the
+terminal retains its original colors and only drawn cells get the new colors.
+(e.g. Resizing the window to the right uses the local terminal colors rather
+than the remote colors.)  It's especially ugly in gnome-terminal, which draws
+user-configurable black as black, but VT100 black as dark-gray.
+    If there were a way to query the terminal emulator's colors, then I could
+match the console's colors to the terminal and everything would just work.  As
+far as I know, that's not possible.
+    I thought of a kludge that might work.  Instead of translating console white
+and black to VT/100 white and black, I would translate them to "reset" and
+"invert".  I'd translate other colors normally.  This approach should produce
+ideal results for command-line work and tolerable results for full-screen
+programs without configuration.  Configuring the agent for black-on-white or
+white-on-black would produce ideal results in all situations.
+    This kludge only really applies to the SSH application.  For a Win32 Konsole
+application, it should be easy to get the colors right all the time.
+
+Try using the screen reader API:
+ - To eliminate polling.
+ - To detect when a line wraps.  When a line wraps, it'd be nice not to send a
+   CRLF to the terminal emulator so copy-and-paste works better.
+ - To detect hard tabs with Cygwin.
+
+Implement VT100/ANSI escape sequence recognition for input.  Decide where this
+functionality belongs.  PseudoConsole.dll?  Disambiguating ESC from an escape
+sequence might be tricky.  For the SSH server, I was thinking that when a small
+SSH payload ended with an ESC character, I could assume the character was really
+an ESC keypress, on the assumption that if it were an escape sequence, the
+payload would probably contain the whole sequence.  I'm not sure this works,
+especially if there's a lot of other traffic multiplexed on the SSH socket.
+
+Support Unicode.
+ - Some DOS programs draw using line/box characters.  Can these characters be
+   translated to the Unicode equivalents?
+
+Create automated tests.
+
+Experiment with the Terminator emulator, an emulator that doesn't wrap lines.
+How many columns does it report having?  What column does it report the cursor
+in as it's writing past the right end of the window?  Will Terminator be a
+problem if I implement line wrapping detection in the agent?
