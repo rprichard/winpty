@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!python -u
 # Run with native CPython.  Needs pywin32 extensions.
 
 import win32pipe

@@ -1,11 +1,9 @@
-#include <QtCore/QCoreApplication>
 #include <windows.h>
 #include <stdio.h>
+#include <ctype.h>
 
 int main(int argc, char *argv[])
 {
-    QCoreApplication a(argc, argv);
-
     HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
     while (true) {
         DWORD count;
