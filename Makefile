@@ -1,7 +1,7 @@
 all :
-	cd Agent && $(MAKE)
+	cd agent && $(MAKE)
 	cd libpconsole && $(MAKE)
 
 clean :
-	cd Agent && $(MAKE) clean
+	cd agent && $(MAKE) clean
 	cd libpconsole && $(MAKE) clean
