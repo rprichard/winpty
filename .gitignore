@@ -1,4 +1,9 @@
 *.pro.user
 *.pro.user.*
 *-build-desktop
+*.o
+*.d
+*.exe
+*.dll
+moc_*.cc
 deploy
