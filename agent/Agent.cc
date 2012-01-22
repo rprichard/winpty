@@ -1,4 +1,3 @@
-#define _WIN32_WINNT 0x0501
 #include "Agent.h"
 #include "Win32Console.h"
 #include "Terminal.h"
