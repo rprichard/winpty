@@ -9,6 +9,8 @@
 
 // TODO: Error handling, handle out-of-memory.
 
+#define AGENT_EXE L"pconsole-agent.exe"
+
 static volatile LONG consoleCounter;
 
 struct Console {
@@ -79,18 +81,16 @@ Console *consoleOpen(int cols, int rows)
     // Look for the Agent executable.
     std::wstring progDir = dirname(getModuleFileName(getCurrentModule()));
     std::wstring agentProgram;
-    if (pathExists(progDir + L"\\Agent.exe")) {
-        agentProgram = progDir + L"\\Agent.exe";
+    if (pathExists(progDir + L"\\"AGENT_EXE)) {
+        agentProgram = progDir + L"\\"AGENT_EXE;
     } else {
         // The development directory structure looks like this:
         //     root/
-        //         Agent-build-desktop/
-        //             debug/
-        //                 Agent.exe
-        //         TestNetServer-build-desktop/
-        //             debug/
-        //                 Agent.exe
-        agentProgram = dirname(dirname(progDir)) + L"\\Agent-build-desktop\\" + basename(progDir) + L"\\Agent.exe";
+        //         agent/
+        //             pconsole-agent.exe
+        //         libpconsole/
+        //             pconsole.dll
+        agentProgram = dirname(progDir) + L"\\agent\\"AGENT_EXE;
         if (!pathExists(agentProgram)) {
             assert(false);
         }
@@ -98,7 +98,7 @@ Console *consoleOpen(int cols, int rows)
 
     // Start a named pipe server.
     std::wstringstream serverNameStream;
-    serverNameStream << L"\\\\.\\pipe\\PseudoConsole-" << GetCurrentProcessId()
+    serverNameStream << L"\\\\.\\pipe\\pconsole-" << GetCurrentProcessId()
                      << L"-" << InterlockedIncrement(&consoleCounter);
     std::wstring serverName = serverNameStream.str();
     console->pipe = CreateNamedPipe(serverName.c_str(),
