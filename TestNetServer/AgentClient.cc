@@ -1,4 +1,3 @@
-#define WINVER 0x501
 #include "AgentClient.h"
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -6,8 +5,10 @@
 #include <QDir>
 #include <QtDebug>
 #include <windows.h>
-#include "DebugClient.h"
-#include "AgentMsg.h"
+#include "../Shared/DebugClient.h"
+#include "../Shared/AgentMsg.h"
+
+#define AGENT_EXE "pconsole-agent.exe"
 
 // TODO: Note that this counter makes AgentClient non-thread-safe.
 // TODO: So does the various API calls that change the process state.
@@ -22,27 +23,25 @@ AgentClient::AgentClient(int initialCols, int initialRows, QObject *parent) :
     // Start a named pipe server.
     QLocalServer *socketServer = new QLocalServer(this);
     QString serverName =
-            "ConsoleAgent-" +
+            "pconsole-" +
             QString::number(QCoreApplication::applicationPid()) + "-" +
             QString::number(++m_counter);
     socketServer->listen(serverName);
 
     QDir progDir(QCoreApplication::applicationDirPath());
     QString agentProgram;
-    if (progDir.exists("Agent.exe")) {
+    if (progDir.exists(AGENT_EXE)) {
         // The agent might be in the same directory as the server when it's
         // installed.
-        agentProgram = progDir.filePath("Agent.exe");
+        agentProgram = progDir.filePath(AGENT_EXE);
     } else {
         // The development directory structure looks like this:
         //     root/
-        //         Agent-build-desktop/
-        //             debug/
-        //                 Agent.exe
-        //         TestNetServer-build-desktop/
-        //             debug/
-        //                 Agent.exe
-        agentProgram = progDir.filePath("../../Agent-build-desktop/" + progDir.dirName() + "/Agent.exe");
+        //         agent/
+        //             pconsole-agent.exe
+        //         TestNetServer/
+        //             testnet-server.exe
+        agentProgram = progDir.filePath("../agent/"AGENT_EXE);
     }
     agentProgram = QDir(agentProgram).canonicalPath();
 

@@ -2,7 +2,7 @@
 #include <QTcpSocket>
 #include <QLocalSocket>
 #include <QtDebug>
-#include "../Shared/AgentClient.h"
+#include "AgentClient.h"
 #include "../Shared/AgentMsg.h"
 #include "../Shared/DebugClient.h"
 #include <windows.h>
