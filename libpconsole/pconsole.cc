@@ -13,8 +13,8 @@
 
 static volatile LONG consoleCounter;
 
-struct Console {
-    Console();
+struct pconsole_s {
+    pconsole_s();
     HANDLE pipe;
     int agentPid;
     HANDLE cancelEvent;
@@ -22,7 +22,7 @@ struct Console {
     HANDLE writeEvent;
 };
 
-Console::Console() : pipe(NULL), agentPid(-1)
+pconsole_s::pconsole_s() : pipe(NULL), agentPid(-1)
 {
 }
 
@@ -71,12 +71,12 @@ static bool pathExists(const std::wstring &path)
     return GetFileAttributes(path.c_str()) != 0xFFFFFFFF;
 }
 
-PSEUDOCONSOLE_DLLEXPORT
-Console *consoleOpen(int cols, int rows)
+PCONSOLE_API
+pconsole_s *pconsole_open(int cols, int rows)
 {
     BOOL success;
 
-    Console *console = new Console;
+    pconsole_s *pconsole = new pconsole_s;
 
     // Look for the Agent executable.
     std::wstring progDir = dirname(getModuleFileName(getCurrentModule()));
@@ -101,7 +101,7 @@ Console *consoleOpen(int cols, int rows)
     serverNameStream << L"\\\\.\\pipe\\pconsole-" << GetCurrentProcessId()
                      << L"-" << InterlockedIncrement(&consoleCounter);
     std::wstring serverName = serverNameStream.str();
-    console->pipe = CreateNamedPipe(serverName.c_str(),
+    pconsole->pipe = CreateNamedPipe(serverName.c_str(),
                     /*dwOpenMode=*/PIPE_ACCESS_DUPLEX |
                                         FILE_FLAG_FIRST_PIPE_INSTANCE |
                                         FILE_FLAG_OVERLAPPED,
@@ -111,7 +111,7 @@ Console *consoleOpen(int cols, int rows)
                     /*nInBufferSize=*/0,
                     /*nDefaultTimeOut=*/3000,
                     NULL);
-    if (console->pipe == INVALID_HANDLE_VALUE)
+    if (pconsole->pipe == INVALID_HANDLE_VALUE)
         return NULL;
 
     std::wstringstream agentCmdLineStream;
@@ -163,7 +163,7 @@ Console *consoleOpen(int cols, int rows)
         // qFatal("Could not start agent subprocess.");
         assert(false);
     }
-    console->agentPid = pi.dwProcessId;
+    pconsole->agentPid = pi.dwProcessId;
     //qDebug("New child process: PID %d", (int)m_agentProcess->dwProcessId);
 
     // Connect the named pipe.
@@ -171,10 +171,10 @@ Console *consoleOpen(int cols, int rows)
     memset(&over, 0, sizeof(over));
     over.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     assert(over.hEvent != NULL);
-    success = ConnectNamedPipe(console->pipe, &over);
+    success = ConnectNamedPipe(pconsole->pipe, &over);
     if (!success && GetLastError() == ERROR_IO_PENDING) {
         DWORD actual;
-        success = GetOverlappedResult(console->pipe, &over, &actual, TRUE);
+        success = GetOverlappedResult(pconsole->pipe, &over, &actual, TRUE);
     }
     if (!success && GetLastError() == ERROR_PIPE_CONNECTED)
         success = TRUE;
@@ -197,19 +197,31 @@ Console *consoleOpen(int cols, int rows)
     CloseWindowStation(station);
 
     // Create events.
-    console->cancelEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    console->readEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    console->writeEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    pconsole->cancelEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    pconsole->readEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    pconsole->writeEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-    return console;
+    return pconsole;
 }
 
-PSEUDOCONSOLE_DLLEXPORT
-int consoleStartShell(Console *console,
-                      const wchar_t *program,
-                      const wchar_t *cmdline,
-                      const wchar_t *cwd)
+PCONSOLE_API void pconsole_set_io_cb(pconsole_t *pconsole, pconsole_io_cb cb)
 {
+    // TODO: implement
+}
+
+PCONSOLE_API void pconsole_set_process_exit_cb(pconsole_t *pconsole,
+					       pconsole_process_exit_cb cb)
+{
+    // TODO: implement
+}
+
+PCONSOLE_API int pconsole_start_process(pconsole_t *pconsole,
+					const wchar_t *program,
+					const wchar_t *cmdline,
+					const wchar_t *cwd,
+					const wchar_t *const *env)
+{
+#if 0
     int ret = -1;
 
     if (!FreeConsole())
@@ -312,17 +324,12 @@ int consoleStartShell(Console *console,
     msg.u.flag = TRUE;
     writeMsg(msg);
     */
-
     return ret;
+#endif
+    return 0;
 }
 
-// Once I/O is canceled, read/write attempts return immediately.
-PSEUDOCONSOLE_DLLEXPORT
-void consoleCancelIo(Console *console)
-{
-    SetEvent(console->cancelEvent);
-}
-
+#if 0
 static int consoleIo(Console *console, void *buffer, int size, bool isRead)
 {
     HANDLE event = isRead ? console->readEvent : console->writeEvent;
@@ -352,25 +359,41 @@ static int consoleIo(Console *console, void *buffer, int size, bool isRead)
     }
     return success ? (int)actual : -1;
 }
+#endif
 
-PSEUDOCONSOLE_DLLEXPORT
-int consoleRead(Console *console, void *buffer, int size)
+PCONSOLE_API int pconsole_read(pconsole_s *pconsole, void *buffer, int size)
 {
-    return consoleIo(console, buffer, size, true);
+    // TODO: implement
+    //return consoleIo(console, buffer, size, true);
+    return 0;
 }
 
-PSEUDOCONSOLE_DLLEXPORT
-int consoleWrite(Console *console, const void *buffer, int size)
+PCONSOLE_API int pconsole_write(pconsole_s *pconsole,
+				const void *buffer,
+				int size)
 {
-    return consoleIo(console, (void*)buffer, size, false);
+    // TODO: implement
+    //return consoleIo(console, (void*)buffer, size, false);
+    return 0;
 }
 
-PSEUDOCONSOLE_DLLEXPORT
-void consoleFree(Console *console)
+PCONSOLE_API int pconsole_set_size(pconsole_s *pconsole, int cols, int rows)
 {
-    CloseHandle(console->pipe);
-    CloseHandle(console->cancelEvent);
-    CloseHandle(console->readEvent);
-    CloseHandle(console->writeEvent);
-    delete console;
+    // TODO: implement
+    return 0;
+}
+
+PCONSOLE_API int pconsole_get_output_queue_size(pconsole_s *pconsole)
+{
+    // TODO: implement
+    return 0;
+}
+
+PCONSOLE_API void pconsole_close(pconsole_s *pconsole)
+{
+    CloseHandle(pconsole->pipe);
+    CloseHandle(pconsole->cancelEvent);
+    CloseHandle(pconsole->readEvent);
+    CloseHandle(pconsole->writeEvent);
+    delete pconsole;
 }

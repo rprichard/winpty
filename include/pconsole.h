@@ -63,19 +63,16 @@ PCONSOLE_API void pconsole_set_process_exit_cb(pconsole_t *pconsole,
  * be NULL.  cwd and env may be NULL.  env is a pointer to a NULL-terminated
  * array of strings.
  *
- * All the strings are in UTF-8 format.  They are converted to UTF-16 in Win32
- * API calls.
- *
  * This function never modifies the cmdline, unlike CreateProcess.
  *
  * Only one child process may be started.  After the child process exits, the
  * agent will flush and close its output buffer.
  */
 PCONSOLE_API int pconsole_start_process(pconsole_t *pconsole,
-					const char *program,
-					const char *cmdline,
-					const char *cwd,
-					const char *const *env);
+					const wchar_t *program,
+					const wchar_t *cmdline,
+					const wchar_t *cwd,
+					const wchar_t *const *env);
 
 /*
  * Reads pty-like input.  Returns -1 if no data available, 0 if the pipe

@@ -10,7 +10,7 @@ CXXFLAGS += \
 	-DUNICODE \
 	-D_UNICODE \
 	-D_WIN32_WINNT=0x0501 \
-	-DPSEUDOCONSOLE \
+	-DPCONSOLE \
 	-fno-exceptions \
 	-fno-rtti
 
