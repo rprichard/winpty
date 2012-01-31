@@ -12,17 +12,36 @@
 #define AGENT_EXE L"pconsole-agent.exe"
 
 static volatile LONG consoleCounter;
+const int bufSize = 4096;
+
+static WINAPI DWORD serviceThread(void *threadParam);
 
 struct pconsole_s {
     pconsole_s();
-    HANDLE pipe;
+    HANDLE dataPipe;
     int agentPid;
-    HANDLE cancelEvent;
-    HANDLE readEvent;
-    HANDLE writeEvent;
+
+    char dataWriteBuffer[bufSize];
+    int dataWriteAmount;
+    char dataReadBuffer[bufSize];
+    int dataReadStart;
+    int dataReadAmount;
+    OVERLAPPED dataReadOver;
+    OVERLAPPED dataWriteOver;
+    HANDLE dataReadEvent;
+    HANDLE dataWriteEvent;
+    bool dataReadPending;
+    bool dataWritePending;
+
+    DWORD serviceThreadId;
+    HANDLE ioEvent;
+    bool ioCallbackFlag;
+    pconsole_io_cb ioCallback;
+
+    CRITICAL_SECTION lock;
 };
 
-pconsole_s::pconsole_s() : pipe(NULL), agentPid(-1)
+pconsole_s::pconsole_s() : dataPipe(NULL), agentPid(-1)
 {
 }
 
@@ -101,7 +120,7 @@ pconsole_s *pconsole_open(int cols, int rows)
     serverNameStream << L"\\\\.\\pipe\\pconsole-" << GetCurrentProcessId()
                      << L"-" << InterlockedIncrement(&consoleCounter);
     std::wstring serverName = serverNameStream.str();
-    pconsole->pipe = CreateNamedPipe(serverName.c_str(),
+    pconsole->dataPipe = CreateNamedPipe(serverName.c_str(),
                     /*dwOpenMode=*/PIPE_ACCESS_DUPLEX |
                                         FILE_FLAG_FIRST_PIPE_INSTANCE |
                                         FILE_FLAG_OVERLAPPED,
@@ -111,7 +130,7 @@ pconsole_s *pconsole_open(int cols, int rows)
                     /*nInBufferSize=*/0,
                     /*nDefaultTimeOut=*/3000,
                     NULL);
-    if (pconsole->pipe == INVALID_HANDLE_VALUE)
+    if (pconsole->dataPipe == INVALID_HANDLE_VALUE)
         return NULL;
 
     std::wstringstream agentCmdLineStream;
@@ -171,10 +190,10 @@ pconsole_s *pconsole_open(int cols, int rows)
     memset(&over, 0, sizeof(over));
     over.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
     assert(over.hEvent != NULL);
-    success = ConnectNamedPipe(pconsole->pipe, &over);
+    success = ConnectNamedPipe(pconsole->dataPipe, &over);
     if (!success && GetLastError() == ERROR_IO_PENDING) {
         DWORD actual;
-        success = GetOverlappedResult(pconsole->pipe, &over, &actual, TRUE);
+        success = GetOverlappedResult(pconsole->dataPipe, &over, &actual, TRUE);
     }
     if (!success && GetLastError() == ERROR_PIPE_CONNECTED)
         success = TRUE;
@@ -197,23 +216,31 @@ pconsole_s *pconsole_open(int cols, int rows)
     CloseWindowStation(station);
 
     // Create events.
-    pconsole->cancelEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    pconsole->readEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    pconsole->writeEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    pconsole->ioEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    pconsole->dataReadEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    pconsole->dataWriteEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+    InitializeCriticalSection(&pconsole->lock);
+
+    CreateThread(NULL, 0, serviceThread, pconsole, 0, &pconsole->serviceThreadId);
 
     return pconsole;
 }
 
-PCONSOLE_API void pconsole_set_io_cb(pconsole_t *pconsole, pconsole_io_cb cb)
+PCONSOLE_API void pconsole_set_io_cb(pconsole_t *pc, pconsole_io_cb cb)
 {
-    // TODO: implement
+    EnterCriticalSection(&pc->lock);
+    pc->ioCallback = cb;
+    LeaveCriticalSection(&pc->lock);
 }
 
+/*
 PCONSOLE_API void pconsole_set_process_exit_cb(pconsole_t *pconsole,
 					       pconsole_process_exit_cb cb)
 {
     // TODO: implement
 }
+*/
 
 PCONSOLE_API int pconsole_start_process(pconsole_t *pconsole,
 					const wchar_t *program,
@@ -329,52 +356,181 @@ PCONSOLE_API int pconsole_start_process(pconsole_t *pconsole,
     return 0;
 }
 
-#if 0
-static int consoleIo(Console *console, void *buffer, int size, bool isRead)
+// The lock should be acquired by the caller.
+static void completeRead(pconsole_s *pc, DWORD amount)
 {
-    HANDLE event = isRead ? console->readEvent : console->writeEvent;
-    OVERLAPPED over;
-    memset(&over, 0, sizeof(over));
-    over.hEvent = event;
-    DWORD actual;
-    BOOL success;
-    if (isRead)
-        success = ReadFile(console->pipe, buffer, size, &actual, &over);
-    else
-        success = WriteFile(console->pipe, buffer, size, &actual, &over);
-    if (!success && GetLastError() == ERROR_IO_PENDING) {
-        HANDLE handles[2] = { event, console->cancelEvent };
-        int waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE) -
-                WAIT_OBJECT_0;
-        if (waitResult == 0) {
-            success = GetOverlappedResult(console->pipe, &over, &actual, TRUE);
-        } else if (waitResult == 1) {
-            CancelIo(console->pipe);
-            GetOverlappedResult(console->pipe, &over, &actual, TRUE);
-            success = FALSE;
+    pc->dataReadAmount += amount;
+    pc->ioCallbackFlag = true;
+    SetEvent(pc->ioEvent);
+}
+
+// The lock should be acquired by the caller.
+static void pumpReadIo(pconsole_s *pc)
+{
+    while (!pc->dataReadPending && pc->dataReadAmount < bufSize / 2) {
+        if (pc->dataReadStart > 0) {
+            if (pc->dataReadAmount > 0) {
+                memmove(pc->dataReadBuffer,
+                        pc->dataReadBuffer + pc->dataReadStart,
+                        pc->dataReadAmount);
+            }
+            pc->dataReadStart = 0;
+        }
+        memset(&pc->dataReadOver, 0, sizeof(pc->dataReadOver));
+        pc->dataReadOver.hEvent = pc->dataReadEvent;
+        DWORD amount;
+        BOOL ret = ReadFile(pc->dataPipe,
+                            pc->dataReadBuffer + pc->dataReadAmount,
+                            bufSize - pc->dataReadAmount,
+                            &amount,
+                            &pc->dataReadOver);
+        if (ret) {
+            completeRead(pc, amount);
+        } else if (GetLastError() == ERROR_IO_PENDING) {
+            pc->dataReadPending = true;
         } else {
-            assert(false);
-            success = FALSE;
+            // TODO: The pipe is broken.
         }
     }
-    return success ? (int)actual : -1;
 }
-#endif
 
-PCONSOLE_API int pconsole_read(pconsole_s *pconsole, void *buffer, int size)
+// The lock should be acquired by the caller.
+static void completeWrite(pconsole_s *pc, DWORD amount)
 {
-    // TODO: implement
-    //return consoleIo(console, buffer, size, true);
+    if (amount < pc->dataWriteAmount) {
+        memmove(pc->dataWriteBuffer,
+                pc->dataWriteBuffer + amount,
+                pc->dataWriteAmount - amount);
+    }
+    pc->dataWriteAmount -= amount;
+    pc->ioCallbackFlag = true;
+    SetEvent(pc->ioEvent);
+}
+
+// The lock should be acquired by the caller.
+static void pumpWriteIo(pconsole_s *pc)
+{
+    while (!pc->dataWritePending && pc->dataWriteAmount > 0) {
+        memset(&pc->dataWriteOver, 0, sizeof(pc->dataWriteOver));
+        pc->dataWriteOver.hEvent = pc->dataWriteEvent;
+        DWORD amount;
+        BOOL ret = WriteFile(pc->dataPipe,
+                             pc->dataWriteBuffer,
+                             pc->dataWriteAmount,
+                             &amount,
+                             &pc->dataWriteOver);
+        if (ret) {
+            completeWrite(pc, amount);
+        } else if (GetLastError() == ERROR_IO_PENDING) {
+            pc->dataWritePending = true;
+        } else {
+            // TODO: The pipe is broken.
+        }
+    }
+}
+
+static WINAPI DWORD serviceThread(void *threadParam)
+{
+    pconsole_s *pc = (pconsole_s*)threadParam;
+    HANDLE events[] = { pc->dataReadEvent, pc->dataWriteEvent, pc->ioEvent };
+    while (true) {
+        EnterCriticalSection(&pc->lock);
+
+        if (pc->dataReadPending) {
+            DWORD amount;
+            BOOL ret = GetOverlappedResult(pc->dataPipe, &pc->dataReadOver,
+                                           &amount, FALSE);
+            if (!ret && GetLastError() == ERROR_IO_INCOMPLETE) {
+                // Keep waiting.
+            } else if (!ret) {
+                // TODO: Something is wrong.
+            } else {
+                completeRead(pc, amount);
+                pc->dataReadPending = false;
+                ResetEvent(pc->dataReadEvent);
+            }
+        }
+
+        if (pc->dataWritePending) {
+            DWORD amount;
+            BOOL ret = GetOverlappedResult(pc->dataPipe, &pc->dataWriteOver,
+                                           &amount, FALSE);
+            if (!ret && GetLastError() == ERROR_IO_INCOMPLETE) {
+                // Keep waiting.
+            } else if (!ret) {
+                // TODO: Something is wrong.
+            } else {
+                completeWrite(pc, amount);
+                pc->dataWritePending = false;
+                ResetEvent(pc->dataWriteEvent);
+            }
+        }
+
+        pumpReadIo(pc);
+        pumpWriteIo(pc);
+
+        ResetEvent(pc->ioEvent);
+        pconsole_io_cb iocb = pc->ioCallbackFlag ? pc->ioCallback : NULL;
+        pc->ioCallbackFlag = false;
+
+        LeaveCriticalSection(&pc->lock);
+
+        if (iocb) {
+            // Should this callback happen with the lock acquired?  With the
+            // lock unacquired, then a library user could change the callback
+            // function and still see a call to the old callback function.
+            // With the lock acquired, a deadlock could happen if the user
+            // acquires a lock in the callback.  In practice, I expect that
+            // the callback routine will be NULL until it is initialized, and
+            // it will only be initialized once.
+            iocb(pc);
+        }
+
+        WaitForMultipleObjects(sizeof(events) / sizeof(events[0]), events,
+                               FALSE, INFINITE);
+    }
     return 0;
+}
+
+PCONSOLE_API int pconsole_read(pconsole_s *pconsole,
+			       void *buffer,
+			       int size)
+{
+    int ret;
+    EnterCriticalSection(&pconsole->lock);
+    int amount = std::min(size, pconsole->dataReadAmount);
+    if (amount == 0) {
+        ret = -1;
+    } else {
+        memcpy(buffer, pconsole->dataReadBuffer + pconsole->dataReadStart, amount);
+        pconsole->dataReadStart += amount;
+        pconsole->dataReadAmount -= amount;
+        ret = amount;
+        pumpReadIo(pconsole);
+    }
+    LeaveCriticalSection(&pconsole->lock);
+    return ret;
 }
 
 PCONSOLE_API int pconsole_write(pconsole_s *pconsole,
 				const void *buffer,
 				int size)
 {
-    // TODO: implement
-    //return consoleIo(console, (void*)buffer, size, false);
-    return 0;
+    int ret;
+    EnterCriticalSection(&pconsole->lock);
+    int amount = std::min(size, bufSize - pconsole->dataWriteAmount);
+    if (amount == 0) {
+        ret = -1;
+    } else {
+        memcpy(pconsole->dataWriteBuffer + pconsole->dataWriteAmount,
+               buffer,
+               amount);
+        pconsole->dataWriteAmount += amount;
+        ret = amount;
+        pumpWriteIo(pconsole);
+    }
+    LeaveCriticalSection(&pconsole->lock);
+    return ret;
 }
 
 PCONSOLE_API int pconsole_set_size(pconsole_s *pconsole, int cols, int rows)
@@ -383,17 +539,19 @@ PCONSOLE_API int pconsole_set_size(pconsole_s *pconsole, int cols, int rows)
     return 0;
 }
 
+/*
 PCONSOLE_API int pconsole_get_output_queue_size(pconsole_s *pconsole)
 {
-    // TODO: implement
+    // TODO: replace this API...
     return 0;
 }
+*/
 
 PCONSOLE_API void pconsole_close(pconsole_s *pconsole)
 {
-    CloseHandle(pconsole->pipe);
-    CloseHandle(pconsole->cancelEvent);
-    CloseHandle(pconsole->readEvent);
-    CloseHandle(pconsole->writeEvent);
+    CloseHandle(pconsole->dataPipe);
+    //CloseHandle(pconsole->cancelEvent);
+    CloseHandle(pconsole->dataReadEvent);
+    CloseHandle(pconsole->dataWriteEvent);
     delete pconsole;
 }
