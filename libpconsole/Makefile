@@ -21,3 +21,5 @@ $(LIBRARY) : $(OBJECTS)
 .PHONY : clean
 clean :
 	rm -f $(LIBRARY) *.o *.d
+
+-include $(OBJECTS:.o=.d)

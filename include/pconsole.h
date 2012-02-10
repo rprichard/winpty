@@ -2,6 +2,7 @@
 #define PCONSOLE_H
 
 #include <stdlib.h>
+#include <windows.h>
 
 #ifdef PCONSOLE
 #define PCONSOLE_API __declspec(dllexport)
@@ -45,20 +46,6 @@ typedef void (*pconsole_process_exit_cb)(pconsole_t *pconsole,
 PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows);
 
 /*
- * Sets the I/O callback, which may be NULL.  The callback is called:
- *  - after new data is available for reading, AND
- *  - after the output queue size decreases
- */
-PCONSOLE_API void pconsole_set_io_cb(pconsole_t *pconsole, pconsole_io_cb cb);
-
-/*
- * Sets the process exit callback, which may be NULL.  The callback is
- * called when a process started with pconsole_start_process exits.
- */
-PCONSOLE_API void pconsole_set_process_exit_cb(pconsole_t *pconsole,
-					       pconsole_process_exit_cb cb);
-
-/*
  * Start a child process.  Either (but not both) of program and cmdline may
  * be NULL.  cwd and env may be NULL.  env is a pointer to a NULL-terminated
  * array of strings.
@@ -66,43 +53,33 @@ PCONSOLE_API void pconsole_set_process_exit_cb(pconsole_t *pconsole,
  * This function never modifies the cmdline, unlike CreateProcess.
  *
  * Only one child process may be started.  After the child process exits, the
- * agent will flush and close its output buffer.
+ * agent will flush and close the data pipe.
  */
-PCONSOLE_API int pconsole_start_process(pconsole_t *pconsole,
+PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
 					const wchar_t *program,
 					const wchar_t *cmdline,
 					const wchar_t *cwd,
 					const wchar_t *const *env);
 
-/*
- * Reads pty-like input.  Returns -1 if no data available, 0 if the pipe
- * is closed, and the amount of data read otherwise.
- */
-PCONSOLE_API int pconsole_read(pconsole_t *pconsole, void *buffer, int size);
+PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc);
+
+PCONSOLE_API int pconsole_flush_and_close(pconsole_t *pc);
 
 /*
- * Write input to the Win32 console.  This input will be translated into
- * INPUT_RECORD objects.  (TODO: What about Ctrl-C and ESC?)
+ * Returns an overlapped-mode pipe handle that can be read and written
+ * like a Unix terminal.
  */
-PCONSOLE_API int pconsole_write(pconsole_t *pconsole,
-				const void *buffer,
-				int size);
+PCONSOLE_API HANDLE pconsole_get_data_pipe(pconsole_t *pc);
 
 /*
  * Change the size of the Windows console.
  */
-PCONSOLE_API int pconsole_set_size(pconsole_t *pconsole, int cols, int rows);
-
-/*
- * Gets the amount of data queued for output to the pconsole.  Use this API to
- * limit the size of the output buffer.
- */
-PCONSOLE_API int pconsole_get_output_queue_size(pconsole_t *pconsole);
+PCONSOLE_API int pconsole_set_size(pconsole_t *pc, int cols, int rows);
 
 /*
  * Closes the pconsole.
  */
-PCONSOLE_API void pconsole_close(pconsole_t *pconsole);
+PCONSOLE_API void pconsole_close(pconsole_t *pc);
 
 #ifdef __cplusplus
 }

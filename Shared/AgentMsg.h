@@ -3,24 +3,12 @@
 
 #include <windows.h>
 
-class AgentMsg
+struct AgentMsg
 {
-public:
     enum Type {
-        InputRecord,
-        WindowSize,
-        SetAutoShutDownFlag
+        StartProcess,
+        SetSize
     };
-
-    Type type;
-    union {
-        INPUT_RECORD inputRecord;
-        struct {
-            unsigned short cols;
-            unsigned short rows;
-        } windowSize;
-        BOOL flag;
-    } u;
 };
 
 #endif // AGENTMSG_H
