@@ -14,7 +14,6 @@
 #define AGENT_EXE L"pconsole-agent.exe"
 
 static volatile LONG consoleCounter;
-const int bufSize = 4096;
 
 struct pconsole_s {
     pconsole_s();
@@ -186,9 +185,9 @@ static void startAgentProcess(std::wstring &controlPipeName,
     CloseWindowStation(station);
 }
 
-PCONSOLE_API pconsole_s *pconsole_open(int cols, int rows)
+PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
 {
-    pconsole_s *pc = new pconsole_s;
+    pconsole_t *pc = new pconsole_t;
 
     // Start pipes.
     std::wstringstream pipeName;
@@ -220,7 +219,7 @@ PCONSOLE_API pconsole_s *pconsole_open(int cols, int rows)
     return pc;
 }
 
-static void writePacket(pconsole_s *pc, const WriteBuffer &packet)
+static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
 {
     std::string payload = packet.str();
     int payloadSize = payload.size();
@@ -253,7 +252,12 @@ PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
     writePacket(pc, packet);
 }
 
-PCONSOLE_API int pconsole_set_size(pconsole_s *pc, int cols, int rows)
+PCONSOLE_API HANDLE pconsole_get_data_pipe(pconsole_t *pc)
+{
+    return pc->dataPipe;
+}
+
+PCONSOLE_API int pconsole_set_size(pconsole_t *pc, int cols, int rows)
 {
     WriteBuffer packet;
     packet.putInt(AgentMsg::SetSize);
@@ -262,7 +266,7 @@ PCONSOLE_API int pconsole_set_size(pconsole_s *pc, int cols, int rows)
     writePacket(pc, packet);
 }
 
-PCONSOLE_API void pconsole_close(pconsole_s *pc)
+PCONSOLE_API void pconsole_close(pconsole_t *pc)
 {
     CloseHandle(pc->controlPipe);
     CloseHandle(pc->dataPipe);

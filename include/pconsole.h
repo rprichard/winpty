@@ -15,29 +15,9 @@ extern "C" {
 #endif
 
 typedef struct pconsole_s pconsole_t;
-typedef void (*pconsole_io_cb)(pconsole_t *pconsole);
-typedef void (*pconsole_process_exit_cb)(pconsole_t *pconsole,
-					 int pid,
-					 int exitcode);
 
 /*
  * pconsole API.
- *
- * This library provides non-blocking I/O APIs that communicate with a pconsole
- * agent process over Win32 named pipes.
- *
- * Most I/O is transferred with the pconsole_read and pconsole_write functions.
- * The format is the same as a Unix pty (i.e. escape sequences).
- *
- * A pconsole_t instance has an internal write buffer that grows on-demand to
- * an arbitrary size.  A pconsole client should use the
- * pconsole_get_output_queue_size API to limit the size of the output buffer.
- * (TODO: This isn't a practical concern, though, is it?)  The internal read
- * buffer is statically-sized -- if the client does not read available data
- * using pconsole_read, then the pipe will eventually block.
- *
- * The library uses callbacks to notify the client.  A callback function is
- * always called on a worker thread that the pconsole library handles.
  */
 
 /*

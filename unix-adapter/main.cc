@@ -8,7 +8,9 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <errno.h>
+#include <pthread.h>
 #include <pconsole.h>
+
 
 static int signalWriteFd;
 
@@ -25,6 +27,7 @@ static termios setRawTerminalMode()
 	exit(1);
     }
 
+/*
     // This code makes the terminal output non-blocking.
     int flags = fcntl(STDOUT_FILENO, F_GETFL, 0);
     if (flags == -1) {
@@ -35,6 +38,7 @@ static termios setRawTerminalMode()
         perror("fcntl F_SETFL on stdout failed");
 	exit(1);
     }
+*/
 
     termios buf;
     if (tcgetattr(STDIN_FILENO, &buf) < 0) {
@@ -47,7 +51,7 @@ static termios setRawTerminalMode()
     buf.c_cflag &= ~(CSIZE | PARENB);
     buf.c_cflag |= CS8;
     buf.c_oflag &= ~OPOST;
-    buf.c_cc[VMIN] = 0;
+    buf.c_cc[VMIN] = 1;  // blocking read
     buf.c_cc[VTIME] = 0;
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &buf) < 0) {
 	fprintf(stderr, "tcsetattr failed\n");
@@ -64,17 +68,117 @@ static void restoreTerminalMode(termios original)
     }
 }
 
-static void terminalResized(int signo)
+static void writeToSignalFd()
 {
     char dummy = 0;
     write(signalWriteFd, &dummy, 1);
 }
 
-static void pconsoleIo(pconsole_t *pconsole)
+static void terminalResized(int signo)
 {
-    char dummy = 0;
-    write(signalWriteFd, &dummy, 1);
+    writeToSignalFd();
 }
+
+// Create a manual reset, initially unset event.
+static HANDLE createEvent()
+{
+    return CreateEvent(NULL, TRUE, FALSE, NULL);
+}
+
+
+// Connect pconsole overlapped I/O to Cygwin blocking STDOUT_FILENO.
+class OutputHandler {
+public:
+    OutputHandler(HANDLE pconsole);
+    pthread_t getThread() { return thread; }
+private:
+    static void *threadProc(void *pvthis);
+    HANDLE pconsole;
+    pthread_t thread;
+};
+
+OutputHandler::OutputHandler(HANDLE pconsole) : pconsole(pconsole)
+{
+    pthread_create(&thread, NULL, OutputHandler::threadProc, this);
+}
+
+// TODO: See whether we can make the pipe non-overlapped if we still use
+// an OVERLAPPED structure in the ReadFile/WriteFile calls.
+void *OutputHandler::threadProc(void *pvthis)
+{
+    OutputHandler *pthis = (OutputHandler*)pvthis;
+    HANDLE event = createEvent();
+    OVERLAPPED over;
+    const int bufferSize = 4096;
+    char *buffer = new char[bufferSize];
+    while (true) {
+        DWORD amount;
+        memset(&over, 0, sizeof(over));
+        over.hEvent = event;
+        BOOL ret = ReadFile(pthis->pconsole,
+                            buffer, bufferSize,
+                            &amount,
+                            &over);
+        if (!ret && GetLastError() == ERROR_IO_PENDING)
+            ret = GetOverlappedResult(pthis->pconsole, &over, &amount, TRUE);
+        if (!ret || amount == 0)
+            break;
+        // TODO: partial writes?
+        int written = write(STDOUT_FILENO, buffer, amount);
+        if (written != amount)
+            break;
+    }
+    delete [] buffer;
+    CloseHandle(event);
+    return NULL;
+}
+
+
+// Connect Cygwin non-blocking STDIN_FILENO to pconsole overlapped I/O.
+class InputHandler {
+public:
+    InputHandler(HANDLE pconsole);
+    pthread_t getThread() { return thread; }
+private:
+    static void *threadProc(void *pvthis);
+    HANDLE pconsole;
+    pthread_t thread;
+};
+
+InputHandler::InputHandler(HANDLE pconsole) : pconsole(pconsole)
+{
+    pthread_create(&thread, NULL, InputHandler::threadProc, this);
+}
+
+void *InputHandler::threadProc(void *pvthis)
+{
+    InputHandler *pthis = (InputHandler*)pvthis;
+    HANDLE event = createEvent();
+    const int bufferSize = 4096;
+    char *buffer = new char[bufferSize];
+    while (true) {
+        int amount = read(STDIN_FILENO, buffer, bufferSize);
+        if (amount <= 0)
+            break;
+        DWORD written;
+        OVERLAPPED over;
+        memset(&over, 0, sizeof(over));
+        over.hEvent = event;
+        BOOL ret = WriteFile(pthis->pconsole,
+                             buffer, amount,
+                             &written,
+                             &over);
+        if (!ret && GetLastError() == ERROR_IO_PENDING)
+            ret = GetOverlappedResult(pthis->pconsole, &over, &written, TRUE);
+        // TODO: partial writes?
+        if (!ret || written != amount)
+            break;
+    }
+    delete [] buffer;
+    CloseHandle(event);
+    return NULL;
+}
+
 
 int main()
 {
@@ -87,8 +191,6 @@ int main()
 	exit(1);
     }
 
-    pconsole_set_io_cb(pconsole, pconsoleIo);
-
     {
 	struct sigaction resizeSigAct;
 	memset(&resizeSigAct, 0, sizeof(resizeSigAct));
@@ -100,12 +202,6 @@ int main()
     termios mode = setRawTerminalMode();
     int signalReadFd;
 
-    const int bufSize = 4096;
-    char writeBuf[bufSize];
-    int writeBufAmount;
-    char buf[bufSize];
-    int amount;
-
     {
 	int pipeFd[2];
 	if (pipe2(pipeFd, O_NONBLOCK) != 0) {
@@ -116,18 +212,14 @@ int main()
 	signalWriteFd = pipeFd[1];
     }
 
-    while (true) {
-	fd_set readfds;
-	fd_set writefds;
-	FD_ZERO(&readfds);
-	FD_ZERO(&writefds);
-	FD_SET(signalReadFd, &readfds);
-	if (pconsole_get_output_queue_size(pconsole) < bufSize)
-	    FD_SET(STDIN_FILENO, &readfds);
-	if (writeBufAmount > 0)
-	    FD_SET(STDOUT_FILENO, &writefds);
+    OutputHandler outputHandler(pconsole_get_data_pipe(pconsole));
+    InputHandler inputHandler(pconsole_get_data_pipe(pconsole));
 
-	if (select(signalReadFd + 1, &readfds, &writefds, NULL, NULL) < 0) {
+    while (true) {
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(signalReadFd, &readfds);
+	if (select(signalReadFd + 1, &readfds, NULL, NULL, NULL) < 0) {
 	    perror("select failed");
 	    exit(1);
 	}
@@ -143,49 +235,11 @@ int main()
 	}
 
 	// Discard any data in the signal pipe.
-	amount = read(signalReadFd, buf, bufSize);
+        char tmpBuf[256];
+	int amount = read(signalReadFd, tmpBuf, sizeof(tmpBuf));
 	if (amount == 0 || amount < 0 && errno != EAGAIN) {
 	    perror("error reading internal signal fd");
 	    exit(1);
-	}
-
-	// Read from the pty and write to the pconsole.
-	amount = bufSize - pconsole_get_output_queue_size(pconsole);
-	if (amount > 0) {
-	    amount = read(STDIN_FILENO, buf, amount);
-	    if (amount == 0) {
-		break;
-	    } else if (amount < 0 && errno != EAGAIN) {
-		perror("error reading from pty");
-		exit(1);
-	    } else if (amount > 0) {
-		pconsole_write(pconsole, buf, amount);
-	    }
-	}
-
-	// Read from the pconsole.
-	amount = bufSize - writeBufAmount;
-	if (amount > 0) {
-	    amount = pconsole_read(pconsole, buf + writeBufAmount, amount);
-	    if (amount == 0)
-		break;
-	    else if (amount > 0)
-		writeBufAmount += amount;
-	}
-
-	// Write to the pty.
-	if (writeBufAmount > 0) {
-	    amount = write(STDOUT_FILENO, writeBuf, writeBufAmount);
-	    if (amount == 0) {
-		break;
-	    } else if (amount < 0 && errno != EAGAIN) {
-		perror("error writing to pty");
-	    } else if (amount > 0) {
-		int remaining = writeBufAmount - amount;
-		if (amount < writeBufAmount)
-		    memmove(writeBuf, writeBuf + amount, remaining);
-		writeBufAmount = remaining;
-	    }
 	}
     }
 
