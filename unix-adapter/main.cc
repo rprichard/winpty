@@ -280,5 +280,6 @@ int main()
     int exitCode = pconsole_get_exit_code(pconsole);
 
     restoreTerminalMode(mode);
+    // TODO: Call pconsole_close?  Shut down one or both I/O threads?
     return exitCode;
 }

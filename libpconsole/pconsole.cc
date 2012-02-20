@@ -222,6 +222,12 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     // Start the agent.
     startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
 
+    // TODO: Frequently, I see the CreateProcess call return successfully,
+    // but the agent immediately dies (e.g. because it can't locate one of
+    // the Qt DLLs).  The following pipe connect calls then hang.  These
+    // calls should probably timeout.  Maybe this code could also poll the
+    // agent process handle?
+
     // Connect the pipes.
     bool success;
     success = connectNamedPipe(pc->controlPipe, false);
@@ -266,6 +272,9 @@ static int32_t readInt32(pconsole_t *pc)
     return result;
 }
 
+// TODO: We also need to control what desktop the child process is started with.
+// I think the right default is for this pconsole.dll function to query the
+// current desktop and send that to the agent.
 PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
 					const wchar_t *appname,
 					const wchar_t *cmdline,
