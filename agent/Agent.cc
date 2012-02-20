@@ -3,6 +3,7 @@
 #include "Terminal.h"
 #include "../Shared/DebugClient.h"
 #include "../Shared/AgentMsg.h"
+#include "../Shared/Buffer.h"
 #include <QCoreApplication>
 #include <QLocalSocket>
 #include <QtDebug>
@@ -11,12 +12,14 @@
 #include <QRect>
 #include <string.h>
 #include <windows.h>
+#include <vector>
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 const int SYNC_MARKER_LEN = 16;
 
-Agent::Agent(const QString &socketServer,
+Agent::Agent(const QString &controlPipeName,
+             const QString &dataPipeName,
              int initialCols,
              int initialRows,
              QObject *parent) :
@@ -34,18 +37,14 @@ Agent::Agent(const QString &socketServer,
                 QRect(0, 0, initialCols, initialRows));
     m_console->setCursorPosition(QPoint(0, 0));
 
-    // Connect to the named pipe.
-    m_socket = new QLocalSocket(this);
-    m_socket->connectToServer(socketServer);
-    if (!m_socket->waitForConnected())
-        qFatal("Could not connect to %s", socketServer.toStdString().c_str());
-    m_socket->setReadBufferSize(64*1024);
-    m_terminal = new Terminal(m_socket, this);
+    m_controlSocket = makeSocket(controlPipeName);
+    m_dataSocket = makeSocket(dataPipeName);
+    m_terminal = new Terminal(m_dataSocket, this);
 
     resetConsoleTracking(false);
 
-    connect(m_socket, SIGNAL(readyRead()), SLOT(socketReadyRead()));
-    connect(m_socket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
+    connect(m_controlSocket, SIGNAL(readyRead()), SLOT(controlSocketReadyRead()));
+    connect(m_dataSocket, SIGNAL(readyRead()), SLOT(dataSocketReadyRead()));
 
     m_timer = new QTimer(this);
     m_timer->setSingleShot(false);
@@ -61,6 +60,18 @@ Agent::~Agent()
     delete [] m_bufferData;
 }
 
+QLocalSocket *Agent::makeSocket(const QString &pipeName)
+{
+    // Connect to the named pipe.
+    QLocalSocket *socket = new QLocalSocket(this);
+    socket->connectToServer(pipeName);
+    if (!socket->waitForConnected())
+        qFatal("Could not connect to %s", pipeName.toStdString().c_str());
+    socket->setReadBufferSize(64 * 1024);
+    connect(socket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
+    return socket;
+}
+
 void Agent::resetConsoleTracking(bool sendClear)
 {
     memset(m_bufferData, 0, sizeof(CHAR_INFO) * BUFFER_LINE_COUNT * MAX_CONSOLE_WIDTH);
@@ -73,40 +84,102 @@ void Agent::resetConsoleTracking(bool sendClear)
     m_terminal->reset(sendClear, m_scrapedLineCount);
 }
 
-void Agent::socketReadyRead()
+void Agent::controlSocketReadyRead()
+{
+    while (true) {
+        int32_t packetSize;
+        int size = m_controlSocket->peek((char*)&packetSize, sizeof(int32_t));
+        if (size < (int)sizeof(int32_t))
+            break;
+        int32_t totalSize = sizeof(int32_t) + packetSize;
+        if (m_controlSocket->bytesAvailable() < totalSize) {
+            if (m_controlSocket->readBufferSize() < totalSize)
+                m_controlSocket->setReadBufferSize(totalSize);
+            break;
+        }
+        QByteArray packetData = m_controlSocket->read(totalSize);
+        Q_ASSERT(packetData.length() == totalSize);
+        ReadBuffer buffer(std::string(packetData.constData() + 4, packetSize));
+        Trace("read packet of %d total bytes", totalSize);
+        handlePacket(buffer);
+    }
+}
+
+void Agent::handlePacket(ReadBuffer &packet)
+{
+    int type = packet.getInt();
+    switch (type) {
+    case AgentMsg::StartProcess:
+        handleStartProcessPacket(packet);
+        break;
+    case AgentMsg::SetSize:
+        handleSetSizePacket(packet);
+        break;
+    }
+}
+
+void Agent::handleStartProcessPacket(ReadBuffer &packet)
+{
+    std::wstring program = packet.getWString();
+    std::wstring cmdline = packet.getWString();
+    std::wstring cwd = packet.getWString();
+    std::wstring env = packet.getWString();
+    packet.assertEof();
+
+    LPCWSTR programArg = program.empty() ? NULL : program.c_str();
+    std::vector<wchar_t> cmdlineCopy;
+    LPWSTR cmdlineArg = NULL;
+    if (!cmdline.empty()) {
+        cmdlineCopy.resize(cmdline.size() + 1);
+        cmdline.copy(&cmdlineCopy[0], cmdline.size());
+        cmdlineCopy[cmdline.size()] = L'\0';
+        cmdlineArg = &cmdlineCopy[0];
+    }
+    LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
+    LPCWSTR envArg = env.empty() ? NULL : env.data();
+    STARTUPINFO sui;
+    PROCESS_INFORMATION pi;
+    memset(&sui, 0, sizeof(sui));
+    memset(&pi, 0, sizeof(pi));
+    sui.cb = sizeof(STARTUPINFO);
+
+    BOOL ret = CreateProcess(programArg, cmdlineArg, NULL, NULL,
+                             /*bInheritHandles=*/FALSE,
+                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT,
+                             (LPVOID)envArg, cwdArg, &sui, &pi);
+
+    Trace("cp: %s %d", (ret ? "success" : "fail"), (int)pi.dwProcessId);
+    // TODO: report success/failure to client
+}
+
+void Agent::handleSetSizePacket(ReadBuffer &packet)
+{
+    int cols = packet.getInt();
+    int rows = packet.getInt();
+    packet.assertEof();
+    resizeWindow(cols, rows);
+}
+
+void Agent::dataSocketReadyRead()
 {
     // TODO: This is an incomplete hack...
-    Trace("socketReadyRead -- %d bytes available", m_socket->bytesAvailable());
-    while (m_socket->bytesAvailable() >= sizeof(AgentMsg)) {
-        AgentMsg msg;
-        m_socket->read((char*)&msg, sizeof(msg));
-        switch (msg.type) {
-            case AgentMsg::InputRecord: {
-                m_console->writeInput(&msg.u.inputRecord);
-                break;
-            }
-            case AgentMsg::WindowSize: {
-                AgentMsg nextMsg;
-                if (m_socket->peek((char*)&nextMsg, sizeof(nextMsg)) == sizeof(nextMsg) &&
-                        nextMsg.type == AgentMsg::WindowSize) {
-                    // Two consecutive window resize requests.  Windows seems
-                    // to be really slow at resizing a console, so ignore the
-                    // first resize operation.  This idea didn't work as well
-                    // as I'd hoped it would, but I suppose I'll leave it in.
-                    Trace("skipping");
-                    continue;
-                }
-                Trace("resize started");
-                resizeWindow(msg.u.windowSize.cols, msg.u.windowSize.rows);
-                Trace("resize done");
-                break;
-            }
-            case AgentMsg::SetAutoShutDownFlag:
-                m_autoShutDown = msg.u.flag;
-                break;
+    Trace("socketReadyRead -- %d bytes available", m_dataSocket->bytesAvailable());
+    QByteArray data = m_dataSocket->readAll();
+    for (int i = 0; i < data.length(); ++i) {
+        char ch = data[i];
+        const short vk = VkKeyScan(ch);
+        if (vk != -1) {
+            INPUT_RECORD ir;
+            memset(&ir, 0, sizeof(ir));
+            ir.EventType = KEY_EVENT;
+            ir.Event.KeyEvent.bKeyDown = TRUE;
+            ir.Event.KeyEvent.wVirtualKeyCode = vk & 0xff;
+            ir.Event.KeyEvent.wVirtualScanCode = 0;
+            ir.Event.KeyEvent.uChar.AsciiChar = ch;
+            ir.Event.KeyEvent.wRepeatCount = 1;
+            m_console->writeInput(&ir);
         }
     }
-    Trace("socketReadyRead -- exited");
 }
 
 void Agent::socketDisconnected()
@@ -116,24 +189,7 @@ void Agent::socketDisconnected()
 
 void Agent::pollTimeout()
 {
-    if (m_socket->state() == QLocalSocket::ConnectedState) {
-        DWORD dummy;
-        int count = GetConsoleProcessList(&dummy, 1);
-        Q_ASSERT(count >= 1);
-        scrapeOutput();
-        if (m_autoShutDown && count == 1) {
-            // TODO: This approach doesn't seem to work when I run edit.com
-            // in a console.  I see an NTVDM.EXE process running after exiting
-            // cmd.exe.  Maybe NTVDM.EXE is doing the same thing I am -- it
-            // sees that there's still another process in the console process
-            // list, so it stays running.
-
-            Trace("No real processes in Console -- start shut down");
-            m_socket->disconnectFromServer();
-        }
-    } else {
-        m_timer->stop();
-    }
+    scrapeOutput();
 }
 
 // Detect window movement.  If the window moves down (presumably as a

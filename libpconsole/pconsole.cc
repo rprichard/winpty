@@ -128,41 +128,61 @@ static HANDLE createNamedPipe(const std::wstring &name, bool overlapped)
                            NULL);
 }
 
-static void startAgentProcess(std::wstring &controlPipeName, 
+struct BackgroundDesktop {
+    HWINSTA originalStation;
+    HWINSTA station;
+    HDESK desktop;
+    std::wstring desktopName;
+};
+
+// Get a non-interactive window station for the agent.
+// TODO: review security w.r.t. windowstation and desktop.
+static BackgroundDesktop setupBackgroundDesktop()
+{
+    BackgroundDesktop ret;
+    ret.originalStation = GetProcessWindowStation();
+    ret.station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
+    bool success = SetProcessWindowStation(ret.station);
+    assert(success);
+    ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
+    assert(ret.originalStation != NULL);
+    assert(ret.station != NULL);
+    assert(ret.desktop != NULL);
+    wchar_t stationNameWStr[256];
+    success = GetUserObjectInformation(ret.station, UOI_NAME,
+                                       stationNameWStr, sizeof(stationNameWStr),
+                                       NULL);
+    assert(success);
+    ret.desktopName = std::wstring(stationNameWStr) + L"\\Default";
+    return ret;
+}
+
+static void restoreOriginalDesktop(const BackgroundDesktop &desktop)
+{
+    SetProcessWindowStation(desktop.originalStation);
+    CloseDesktop(desktop.desktop);
+    CloseWindowStation(desktop.station);
+}
+
+static void startAgentProcess(const BackgroundDesktop &desktop,
+                              std::wstring &controlPipeName,
                               std::wstring &dataPipeName, 
                               int cols, int rows)
 {
     bool success;
-    
+
     std::wstring agentProgram = findAgentProgram();
     std::wstringstream agentCmdLineStream;
     agentCmdLineStream << L"\"" << agentProgram << L"\" "
-                       << controlPipeName << dataPipeName << " "
+                       << controlPipeName << " " << dataPipeName << " "
                        << cols << " " << rows;
     std::wstring agentCmdLine = agentCmdLineStream.str();
-
-    // Get a non-interactive window station for the agent.
-    // TODO: review security w.r.t. windowstation and desktop.
-    HWINSTA originalStation = GetProcessWindowStation();
-    HWINSTA station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
-    success = SetProcessWindowStation(station);
-    assert(success);
-    HDESK desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
-    assert(originalStation != NULL);
-    assert(station != NULL);
-    assert(desktop != NULL);
-    wchar_t stationNameWStr[256];
-    success = GetUserObjectInformation(station, UOI_NAME,
-                                       stationNameWStr, sizeof(stationNameWStr),
-                                       NULL);
-    assert(success);
-    std::wstring startupDesktop = std::wstring(stationNameWStr) + L"\\Default";
 
     // Start the agent.
     STARTUPINFO sui;
     memset(&sui, 0, sizeof(sui));
     sui.cb = sizeof(sui);
-    sui.lpDesktop = (LPWSTR)startupDesktop.c_str();
+    sui.lpDesktop = (LPWSTR)desktop.desktopName.c_str();
     PROCESS_INFORMATION pi;
     memset(&pi, 0, sizeof(pi));
     std::vector<wchar_t> cmdline(agentCmdLine.size() + 1);
@@ -178,11 +198,9 @@ static void startAgentProcess(std::wstring &controlPipeName,
     if (!success) {
         assert(false);
     }
+
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    SetProcessWindowStation(originalStation);
-    CloseDesktop(desktop);
-    CloseWindowStation(station);
 }
 
 PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
@@ -198,8 +216,11 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     pc->controlPipe = createNamedPipe(controlPipeName, false);
     pc->dataPipe = createNamedPipe(dataPipeName, true);
 
+    // Setup a background desktop for the agent.
+    BackgroundDesktop desktop = setupBackgroundDesktop();
+
     // Start the agent.
-    startAgentProcess(controlPipeName, dataPipeName, cols, rows);
+    startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
 
     // Connect the pipes.
     bool success;
@@ -207,6 +228,12 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     assert(success);
     success = connectNamedPipe(pc->dataPipe, true);
     assert(success);
+
+    // Close handles to the background desktop and restore the original window
+    // station.  This must wait until we know the agent is running -- if we
+    // close these handles too soon, then the desktop and windowstation will be
+    // destroyed before the agent can connect with them.
+    restoreOriginalDesktop(desktop);
 
     // TODO: Review security w.r.t. the named pipe.  Ensure that we're really
     // connected to the agent we just started.  (e.g. Block network
@@ -222,34 +249,37 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
 static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
 {
     std::string payload = packet.str();
-    int payloadSize = payload.size();
+    int32_t payloadSize = payload.size();
     DWORD actual;
-    BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int), &actual, NULL);
-    assert(success && actual == sizeof(int));
+    BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int32_t), &actual, NULL);
+    assert(success && actual == sizeof(int32_t));
     success = WriteFile(pc->controlPipe, payload.c_str(), payloadSize, &actual, NULL);
     assert(success && actual == payloadSize);
 }
 
 PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
-					const wchar_t *program,
+					const wchar_t *appname,
 					const wchar_t *cmdline,
 					const wchar_t *cwd,
-					const wchar_t *const *env)
+					const wchar_t *env)
 {
     WriteBuffer packet;
     packet.putInt(AgentMsg::StartProcess);
-    packet.putWString(program ? program : L"");
+    packet.putWString(appname ? appname : L"");
     packet.putWString(cmdline ? cmdline : L"");
     packet.putWString(cwd ? cwd : L"");
-    int envCount = 0;
+    std::wstring envStr;
     if (env != NULL) {
-        while (env[envCount] != NULL)
-            envCount++;
+        const wchar_t *p = env;
+        while (*p != L'\0') {
+            p += wcslen(p) + 1;
+        }
+        p++;
+        envStr.assign(env, p);
     }
-    packet.putInt(envCount);
-    for (int envIndex = 0; envIndex < envCount; ++envIndex)
-        packet.putWString(env[envIndex]);
+    packet.putWString(envStr);
     writePacket(pc, packet);
+    // TODO: return success/fail...
 }
 
 PCONSOLE_API HANDLE pconsole_get_data_pipe(pconsole_t *pc)

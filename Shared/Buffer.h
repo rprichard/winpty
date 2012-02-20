@@ -5,7 +5,7 @@
 #include <iostream>
 #include <assert.h>
 
-struct WriteBuffer
+class WriteBuffer
 {
 private:
     std::stringstream ss;
@@ -39,7 +39,7 @@ inline std::string WriteBuffer::str() const
     return ss.str();
 }
 
-struct ReadBuffer
+class ReadBuffer
 {
 private:
     std::stringstream ss;

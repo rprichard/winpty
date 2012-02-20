@@ -1,7 +1,7 @@
 include ../config.mk
 
 PROGRAM = pconsole
-OBJECTS = main.o
+OBJECTS = main.o Shared.o
 CXXFLAGS += -I../include
 LDFLAGS += ../libpconsole/pconsole.dll
 

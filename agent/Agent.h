@@ -9,6 +9,7 @@ class Win32Console;
 class QLocalSocket;
 class Terminal;
 class QTimer;
+class ReadBuffer;
 
 const int BUFFER_LINE_COUNT = 3000; // TODO: Use something like 9000.
 const int MAX_CONSOLE_WIDTH = 500;
@@ -17,18 +18,24 @@ class Agent : public QObject
 {
     Q_OBJECT
 public:
-    explicit Agent(const QString &socketServer,
+    explicit Agent(const QString &controlPipeName,
+                   const QString &dataPipeName,
                    int initialCols, int initialRows,
                    QObject *parent = 0);
     virtual ~Agent();
 
 private:
+    QLocalSocket *makeSocket(const QString &pipeName);
     void resetConsoleTracking(bool sendClear = true);
 
 signals:
 
 private slots:
-    void socketReadyRead();
+    void controlSocketReadyRead();
+    void handlePacket(ReadBuffer &packet);
+    void handleStartProcessPacket(ReadBuffer &packet);
+    void handleSetSizePacket(ReadBuffer &packet);
+    void dataSocketReadyRead();
     void socketDisconnected();
     void pollTimeout();
 
@@ -45,7 +52,8 @@ private:
 
 private:
     Win32Console *m_console;
-    QLocalSocket *m_socket;
+    QLocalSocket *m_controlSocket;
+    QLocalSocket *m_dataSocket;
     Terminal *m_terminal;
     QTimer *m_timer;
 

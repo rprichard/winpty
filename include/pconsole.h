@@ -26,9 +26,9 @@ typedef struct pconsole_s pconsole_t;
 PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows);
 
 /*
- * Start a child process.  Either (but not both) of program and cmdline may
- * be NULL.  cwd and env may be NULL.  env is a pointer to a NULL-terminated
- * array of strings.
+ * Start a child process.  Either (but not both) of appname and cmdline may
+ * be NULL.  cwd and env may be NULL.  env is a pointer to an environment
+ * block like that passed to CreateProcess.
  *
  * This function never modifies the cmdline, unlike CreateProcess.
  *
@@ -36,10 +36,10 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows);
  * agent will flush and close the data pipe.
  */
 PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
-					const wchar_t *program,
+					const wchar_t *appname,
 					const wchar_t *cmdline,
 					const wchar_t *cwd,
-					const wchar_t *const *env);
+					const wchar_t *env);
 
 PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc);
 

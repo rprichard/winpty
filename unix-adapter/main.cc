@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <pconsole.h>
+#include "../Shared/DebugClient.h"
 
 
 static int signalWriteFd;
@@ -190,6 +191,9 @@ int main()
 	fprintf(stderr, "Error creating pconsole.\n");
 	exit(1);
     }
+
+    // TODO: start the appropriate child process...
+    pconsole_start_process(pconsole, L"c:\\cygwin\\bin\\bash.exe", NULL, NULL, NULL);
 
     {
 	struct sigaction resizeSigAct;
