@@ -1,5 +1,5 @@
-CFLAGS += -MD
-CXXFLAGS += -MD
+CFLAGS += -MMD
+CXXFLAGS += -MMD
 
 # Use gmake -n to see the command-lines gmake would run.
 
