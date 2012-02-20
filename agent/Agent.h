@@ -33,8 +33,8 @@ signals:
 private slots:
     void controlSocketReadyRead();
     void handlePacket(ReadBuffer &packet);
-    void handleStartProcessPacket(ReadBuffer &packet);
-    void handleSetSizePacket(ReadBuffer &packet);
+    int handleStartProcessPacket(ReadBuffer &packet);
+    int handleSetSizePacket(ReadBuffer &packet);
     void dataSocketReadyRead();
     void socketDisconnected();
     void pollTimeout();
@@ -56,8 +56,8 @@ private:
     QLocalSocket *m_dataSocket;
     Terminal *m_terminal;
     QTimer *m_timer;
-
-    bool m_autoShutDown;
+    HANDLE m_childProcess;
+    int m_childExitCode;
 
     int m_syncRow;
     int m_syncCounter;

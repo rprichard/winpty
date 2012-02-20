@@ -26,7 +26,8 @@ Agent::Agent(const QString &controlPipeName,
     QObject(parent),
     m_terminal(NULL),
     m_timer(NULL),
-    m_autoShutDown(false),
+    m_childProcess(NULL),
+    m_childExitCode(-1),
     m_syncCounter(0)
 {
     m_bufferData = new CHAR_INFO[BUFFER_LINE_COUNT][MAX_CONSOLE_WIDTH];
@@ -44,6 +45,7 @@ Agent::Agent(const QString &controlPipeName,
     resetConsoleTracking(false);
 
     connect(m_controlSocket, SIGNAL(readyRead()), SLOT(controlSocketReadyRead()));
+    connect(m_controlSocket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
     connect(m_dataSocket, SIGNAL(readyRead()), SLOT(dataSocketReadyRead()));
 
     m_timer = new QTimer(this);
@@ -68,7 +70,6 @@ QLocalSocket *Agent::makeSocket(const QString &pipeName)
     if (!socket->waitForConnected())
         qFatal("Could not connect to %s", pipeName.toStdString().c_str());
     socket->setReadBufferSize(64 * 1024);
-    connect(socket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
     return socket;
 }
 
@@ -108,18 +109,25 @@ void Agent::controlSocketReadyRead()
 void Agent::handlePacket(ReadBuffer &packet)
 {
     int type = packet.getInt();
+    int32_t result = -1;
     switch (type) {
     case AgentMsg::StartProcess:
-        handleStartProcessPacket(packet);
+        result = handleStartProcessPacket(packet);
         break;
     case AgentMsg::SetSize:
-        handleSetSizePacket(packet);
+        result = handleSetSizePacket(packet);
         break;
+    case AgentMsg::GetExitCode:
+        packet.assertEof();
+        result = m_childExitCode;
     }
+    m_controlSocket->write((char*)&result, sizeof(result));
 }
 
-void Agent::handleStartProcessPacket(ReadBuffer &packet)
+int Agent::handleStartProcessPacket(ReadBuffer &packet)
 {
+    assert(m_childProcess == NULL);
+
     std::wstring program = packet.getWString();
     std::wstring cmdline = packet.getWString();
     std::wstring cwd = packet.getWString();
@@ -149,15 +157,23 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
                              (LPVOID)envArg, cwdArg, &sui, &pi);
 
     Trace("cp: %s %d", (ret ? "success" : "fail"), (int)pi.dwProcessId);
+
+    if (ret) {
+        CloseHandle(pi.hThread);
+        m_childProcess = pi.hProcess;
+    }
+
     // TODO: report success/failure to client
+    return ret ? 0 : GetLastError();
 }
 
-void Agent::handleSetSizePacket(ReadBuffer &packet)
+int Agent::handleSetSizePacket(ReadBuffer &packet)
 {
     int cols = packet.getInt();
     int rows = packet.getInt();
     packet.assertEof();
     resizeWindow(cols, rows);
+    return 0;
 }
 
 void Agent::dataSocketReadyRead()
@@ -189,7 +205,19 @@ void Agent::socketDisconnected()
 
 void Agent::pollTimeout()
 {
-    scrapeOutput();
+    if (m_dataSocket->state() == QLocalSocket::ConnectedState)
+        scrapeOutput();
+
+    if (m_childProcess != NULL) {
+        if (WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
+            DWORD exitCode;
+            if (GetExitCodeProcess(m_childProcess, &exitCode))
+                m_childExitCode = exitCode;
+            CloseHandle(m_childProcess);
+            m_childProcess = NULL;
+            m_dataSocket->disconnectFromServer();
+        }
+    }
 }
 
 // Detect window movement.  If the window moves down (presumably as a

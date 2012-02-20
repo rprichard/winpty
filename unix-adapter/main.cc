@@ -14,6 +14,7 @@
 
 
 static int signalWriteFd;
+static volatile bool ioHandlerDied;
 
 
 // Put the input terminal into non-blocking non-canonical mode.
@@ -125,12 +126,19 @@ void *OutputHandler::threadProc(void *pvthis)
         if (!ret || amount == 0)
             break;
         // TODO: partial writes?
-        int written = write(STDOUT_FILENO, buffer, amount);
+        // I don't know if this write can be interrupted or not, but handle it
+        // just in case.
+        int written;
+        do {
+            written = write(STDOUT_FILENO, buffer, amount);
+        } while (written == -1 && errno == EINTR);
         if (written != amount)
             break;
     }
     delete [] buffer;
     CloseHandle(event);
+    ioHandlerDied = true;
+    writeToSignalFd();
     return NULL;
 }
 
@@ -159,6 +167,11 @@ void *InputHandler::threadProc(void *pvthis)
     char *buffer = new char[bufferSize];
     while (true) {
         int amount = read(STDIN_FILENO, buffer, bufferSize);
+        if (amount == -1 && errno == EINTR) {
+            // Apparently, this read is interrupted on Cygwin 1.7 by a SIGWINCH
+            // signal even though I set the SA_RESTART flag on the handler.
+            continue;
+        }
         if (amount <= 0)
             break;
         DWORD written;
@@ -177,6 +190,8 @@ void *InputHandler::threadProc(void *pvthis)
     }
     delete [] buffer;
     CloseHandle(event);
+    ioHandlerDied = true;
+    writeToSignalFd();
     return NULL;
 }
 
@@ -223,10 +238,21 @@ int main()
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(signalReadFd, &readfds);
-	if (select(signalReadFd + 1, &readfds, NULL, NULL, NULL) < 0) {
+	if (select(signalReadFd + 1, &readfds, NULL, NULL, NULL) < 0 &&
+                errno != EINTR) {
 	    perror("select failed");
 	    exit(1);
 	}
+
+	// Discard any data in the signal pipe.
+        {
+            char tmpBuf[256];
+            int amount = read(signalReadFd, tmpBuf, sizeof(tmpBuf));
+            if (amount == 0 || amount < 0 && errno != EAGAIN) {
+                perror("error reading internal signal fd");
+                exit(1);
+            }
+        }
 
 	// Check for terminal resize.
 	{
@@ -238,17 +264,14 @@ int main()
 	    }
 	}
 
-	// Discard any data in the signal pipe.
-        char tmpBuf[256];
-	int amount = read(signalReadFd, tmpBuf, sizeof(tmpBuf));
-	if (amount == 0 || amount < 0 && errno != EAGAIN) {
-	    perror("error reading internal signal fd");
-	    exit(1);
-	}
+        // Check for an I/O handler shutting down (possibly indicating that the
+        // child process has exited).
+        if (ioHandlerDied)
+            break;
     }
 
-    // TODO: Get the pconsole child exit code and exit with it.
+    int exitCode = pconsole_get_exit_code(pconsole);
 
     restoreTerminalMode(mode);
-    return 0;
+    return exitCode;
 }

@@ -257,6 +257,15 @@ static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
     assert(success && actual == payloadSize);
 }
 
+static int32_t readInt32(pconsole_t *pc)
+{
+    int32_t result;
+    DWORD actual;
+    BOOL success = ReadFile(pc->controlPipe, &result, sizeof(int32_t), &actual, NULL);
+    assert(success && actual == sizeof(int32_t));
+    return result;
+}
+
 PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
 					const wchar_t *appname,
 					const wchar_t *cmdline,
@@ -279,7 +288,15 @@ PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
     }
     packet.putWString(envStr);
     writePacket(pc, packet);
-    // TODO: return success/fail...
+    return readInt32(pc);
+}
+
+PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc)
+{
+    WriteBuffer packet;
+    packet.putInt(AgentMsg::GetExitCode);
+    writePacket(pc, packet);
+    return readInt32(pc);
 }
 
 PCONSOLE_API HANDLE pconsole_get_data_pipe(pconsole_t *pc)
@@ -294,6 +311,7 @@ PCONSOLE_API int pconsole_set_size(pconsole_t *pc, int cols, int rows)
     packet.putInt(cols);
     packet.putInt(rows);
     writePacket(pc, packet);
+    return readInt32(pc);
 }
 
 PCONSOLE_API void pconsole_close(pconsole_t *pc)

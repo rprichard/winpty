@@ -5,7 +5,8 @@ struct AgentMsg
 {
     enum Type {
         StartProcess,
-        SetSize
+        SetSize,
+        GetExitCode
     };
 };
 
