@@ -1,4 +1,5 @@
 include ../config.mk
+include ../config-unix.mk
 
 PROGRAM = pconsole
 OBJECTS = main.o Shared.o

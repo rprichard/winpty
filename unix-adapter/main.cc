@@ -195,6 +195,11 @@ void *InputHandler::threadProc(void *pvthis)
     return NULL;
 }
 
+static void setFdNonBlock(int fd)
+{
+    int status = fcntl(fd, F_GETFL);
+    fcntl(fd, F_SETFL, status | O_NONBLOCK);
+}
 
 int main()
 {
@@ -223,12 +228,14 @@ int main()
 
     {
 	int pipeFd[2];
-	if (pipe2(pipeFd, O_NONBLOCK) != 0) {
+	if (pipe(pipeFd) != 0) {
 	    perror("Could not create pipe");
 	    exit(1);
 	}
-	signalReadFd = pipeFd[0];
-	signalWriteFd = pipeFd[1];
+        setFdNonBlock(pipeFd[0]);
+        setFdNonBlock(pipeFd[1]);
+        signalReadFd = pipeFd[0];
+        signalWriteFd = pipeFd[1];
     }
 
     OutputHandler outputHandler(pconsole_get_data_pipe(pconsole));
