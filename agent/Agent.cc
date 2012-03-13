@@ -32,11 +32,11 @@ Agent::Agent(const QString &controlPipeName,
 {
     m_bufferData = new CHAR_INFO[BUFFER_LINE_COUNT][MAX_CONSOLE_WIDTH];
 
-    m_console = new Win32Console(this);
+    m_console = new Win32Console;
     m_console->reposition(
-                QSize(initialCols, BUFFER_LINE_COUNT),
-                QRect(0, 0, initialCols, initialRows));
-    m_console->setCursorPosition(QPoint(0, 0));
+                Coord(initialCols, BUFFER_LINE_COUNT),
+                SmallRect(0, 0, initialCols, initialRows));
+    m_console->setCursorPosition(Coord(0, 0));
 
     m_controlSocket = makeSocket(controlPipeName);
     m_dataSocket = makeSocket(dataPipeName);
@@ -59,6 +59,8 @@ Agent::Agent(const QString &controlPipeName,
 Agent::~Agent()
 {
     m_console->postCloseMessage();
+
+    delete m_console;
     delete [] m_bufferData;
 }
 
@@ -225,7 +227,7 @@ void Agent::pollTimeout()
 // the bottom of the window are dirty.
 void Agent::markEntireWindowDirty()
 {
-    QRect windowRect = m_console->windowRect();
+    SmallRect windowRect = m_console->windowRect();
     m_dirtyLineCount = std::max(m_dirtyLineCount,
                                 windowRect.top() + windowRect.height());
 }
@@ -234,12 +236,15 @@ void Agent::markEntireWindowDirty()
 // non-empty lines.
 void Agent::scanForDirtyLines()
 {
-    const QRect windowRect = m_console->windowRect();
+    const SmallRect windowRect = m_console->windowRect();
     CHAR_INFO prevChar;
     if (m_dirtyLineCount >= 1) {
-        m_console->read(QRect(windowRect.width() - 1, m_dirtyLineCount - 1, 1, 1), &prevChar);
+        m_console->read(SmallRect(windowRect.width() - 1,
+                                  m_dirtyLineCount - 1,
+                                  1, 1),
+                        &prevChar);
     } else {
-        m_console->read(QRect(0, 0, 1, 1), &prevChar);
+        m_console->read(SmallRect(0, 0, 1, 1), &prevChar);
     }
     int attr = prevChar.Attributes;
 
@@ -247,7 +252,7 @@ void Agent::scanForDirtyLines()
          line < windowRect.top() + windowRect.height();
          ++line) {
         CHAR_INFO lineData[MAX_CONSOLE_WIDTH]; // TODO: bufoverflow
-        QRect lineRect(0, line, windowRect.width(), 1);
+        SmallRect lineRect(0, line, windowRect.width(), 1);
         m_console->read(lineRect, lineData);
         for (int col = 0; col < windowRect.width(); ++col) {
             int newAttr = lineData[col].Attributes;
@@ -262,22 +267,22 @@ void Agent::resizeWindow(int cols, int rows)
 {
     freezeConsole();
 
-    QSize bufferSize = m_console->bufferSize();
-    QRect windowRect = m_console->windowRect();
-    QSize newBufferSize(cols, bufferSize.height());
-    QRect newWindowRect;
+    Coord bufferSize = m_console->bufferSize();
+    SmallRect windowRect = m_console->windowRect();
+    Coord newBufferSize(cols, bufferSize.Y);
+    SmallRect newWindowRect;
 
     // This resize behavior appears to match what happens when I resize the
     // console window by hand.
-    if (windowRect.top() + windowRect.height() == bufferSize.height() ||
-            windowRect.top() + rows >= bufferSize.height()) {
+    if (windowRect.top() + windowRect.height() == bufferSize.Y ||
+            windowRect.top() + rows >= bufferSize.Y) {
         // Lock the bottom of the new window to the bottom of the buffer if either
         //  - the window was already at the bottom of the buffer, OR
         //  - there isn't enough room.
-        newWindowRect = QRect(0, newBufferSize.height() - rows, cols, rows);
+        newWindowRect = SmallRect(0, newBufferSize.Y - rows, cols, rows);
     } else {
         // Keep the top of the window where it is.
-        newWindowRect = QRect(0, windowRect.top(), cols, rows);
+        newWindowRect = SmallRect(0, windowRect.top(), cols, rows);
     }
 
     if (m_dirtyWindowTop != -1 && m_dirtyWindowTop < windowRect.top())
@@ -292,8 +297,8 @@ void Agent::scrapeOutput()
 {
     freezeConsole();
 
-    const QPoint cursor = m_console->cursorPosition();
-    const QRect windowRect = m_console->windowRect();
+    const Coord cursor = m_console->cursorPosition();
+    const SmallRect windowRect = m_console->windowRect();
 
     if (m_syncRow != -1) {
         // If a synchronizing marker was placed into the history, look for it
@@ -330,8 +335,8 @@ void Agent::scrapeOutput()
         }
     }
     m_dirtyWindowTop = windowRect.top();
-    m_dirtyLineCount = std::max(m_dirtyLineCount, cursor.y() + 1);
-    m_dirtyLineCount = std::max(m_dirtyLineCount, windowRect.top());
+    m_dirtyLineCount = std::max(m_dirtyLineCount, cursor.Y + 1);
+    m_dirtyLineCount = std::max(m_dirtyLineCount, (int)windowRect.top());
     scanForDirtyLines();
 
     // Note that it's possible for all the lines on the current window to
@@ -348,7 +353,7 @@ void Agent::scrapeOutput()
     for (int line = firstLine; line < stopLine; ++line) {
         CHAR_INFO curLine[MAX_CONSOLE_WIDTH]; // TODO: bufoverflow
         const int w = windowRect.width();
-        m_console->read(QRect(0, line - m_scrolledCount, w, 1), curLine);
+        m_console->read(SmallRect(0, line - m_scrolledCount, w, 1), curLine);
 
         // TODO: The memcpy can overflow the m_bufferData buffer.
         CHAR_INFO (&bufLine)[MAX_CONSOLE_WIDTH] =
@@ -375,7 +380,7 @@ void Agent::scrapeOutput()
         createSyncMarker(windowRect.top() - 200);
     }
 
-    m_terminal->finishOutput(cursor + QPoint(0, m_scrolledCount));
+    m_terminal->finishOutput(cursor + Coord(0, m_scrolledCount));
 
     unfreezeConsole();
 }
@@ -407,7 +412,7 @@ int Agent::findSyncMarker()
     CHAR_INFO marker[SYNC_MARKER_LEN];
     CHAR_INFO column[BUFFER_LINE_COUNT];
     syncMarkerText(marker);
-    QRect rect(0, 0, 1, m_syncRow + SYNC_MARKER_LEN);
+    SmallRect rect(0, 0, 1, m_syncRow + SYNC_MARKER_LEN);
     m_console->read(rect, column);
     int i;
     for (i = m_syncRow; i >= 0; --i) {
@@ -429,6 +434,6 @@ void Agent::createSyncMarker(int row)
     CHAR_INFO marker[SYNC_MARKER_LEN];
     syncMarkerText(marker);
     m_syncRow = row;
-    QRect markerRect(0, m_syncRow, 1, SYNC_MARKER_LEN);
+    SmallRect markerRect(0, m_syncRow, 1, SYNC_MARKER_LEN);
     m_console->write(markerRect, marker);
 }

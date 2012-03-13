@@ -42,7 +42,7 @@ void Terminal::reset(bool sendClearFirst, int newLine)
         m_output->write(CSI"1;1H"CSI"2J");
     m_remoteLine = newLine;
     m_cursorHidden = false;
-    m_cursorPos = QPoint(0, newLine);
+    m_cursorPos = Coord(0, newLine);
     m_remoteColor = -1;
 }
 
@@ -96,14 +96,14 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     m_output->write(termLine);
 }
 
-void Terminal::finishOutput(QPoint newCursorPos)
+void Terminal::finishOutput(const Coord &newCursorPos)
 {
     if (newCursorPos != m_cursorPos)
         hideTerminalCursor();
     if (m_cursorHidden) {
-        moveTerminalToLine(newCursorPos.y());
+        moveTerminalToLine(newCursorPos.Y);
         char buffer[32];
-        sprintf(buffer, CSI"%dG"CSI"?25h", newCursorPos.x() + 1);
+        sprintf(buffer, CSI"%dG"CSI"?25h", newCursorPos.X + 1);
         m_output->write(buffer);
         m_cursorHidden = false;
     }

@@ -1,18 +1,15 @@
 #ifndef WIN32CONSOLE_H
 #define WIN32CONSOLE_H
 
-#include <QObject>
-#include <QSize>
-#include <QRect>
-#include <QPoint>
 #include <windows.h>
+#include "Coord.h"
+#include "SmallRect.h"
 
-class Win32Console : public QObject
+class Win32Console
 {
-    Q_OBJECT
 public:
-    explicit Win32Console(QObject *parent = 0);
-    virtual ~Win32Console();
+    Win32Console();
+    ~Win32Console();
 
     HANDLE conin();
     HANDLE conout();
@@ -20,26 +17,22 @@ public:
     void postCloseMessage();
 
     // Buffer and window sizes.
-    QSize bufferSize();
-    QRect windowRect();
-    void resizeBuffer(const QSize &size);
-    void moveWindow(const QRect &rect);
-    void reposition(const QSize &bufferSize, const QRect &windowRect);
+    Coord bufferSize();
+    SmallRect windowRect();
+    void resizeBuffer(const Coord &size);
+    void moveWindow(const SmallRect &rect);
+    void reposition(const Coord &bufferSize, const SmallRect &windowRect);
 
     // Cursor.
-    QPoint cursorPosition();
-    void setCursorPosition(const QPoint &point);
+    Coord cursorPosition();
+    void setCursorPosition(const Coord &point);
 
     // Input stream.
     void writeInput(const INPUT_RECORD *ir, int count=1);
 
     // Screen content.
-    void read(const QRect &rect, CHAR_INFO *data);
-    void write(const QRect &rect, const CHAR_INFO *data);
-
-signals:
-
-public slots:
+    void read(const SmallRect &rect, CHAR_INFO *data);
+    void write(const SmallRect &rect, const CHAR_INFO *data);
 
 private:
     HANDLE m_conin;

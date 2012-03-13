@@ -1,20 +1,8 @@
 #include "Win32Console.h"
-#include <QSize>
-#include <QRect>
 #include <windows.h>
+#include <assert.h>
 
-static inline SMALL_RECT smallRectFromQRect(const QRect &rect)
-{
-    SMALL_RECT smallRect = { rect.left(),
-                             rect.top(),
-                             rect.left() + rect.width() - 1,
-                             rect.top() + rect.height() - 1 };
-    return smallRect;
-
-}
-
-Win32Console::Win32Console(QObject *parent) :
-    QObject(parent)
+Win32Console::Win32Console()
 {
     m_conin = CreateFile(
                 L"CONIN$",
@@ -26,8 +14,8 @@ Win32Console::Win32Console(QObject *parent) :
                 GENERIC_READ | GENERIC_WRITE,
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
                 NULL, OPEN_EXISTING, 0, NULL);
-    Q_ASSERT(m_conin != NULL);
-    Q_ASSERT(m_conout != NULL);
+    assert(m_conin != NULL);
+    assert(m_conout != NULL);
 }
 
 Win32Console::~Win32Console()
@@ -58,59 +46,55 @@ void Win32Console::postCloseMessage()
         PostMessage(h, WM_CLOSE, 0, 0);
 }
 
-QSize Win32Console::bufferSize()
+Coord Win32Console::bufferSize()
 {
     CONSOLE_SCREEN_BUFFER_INFO info;
     GetConsoleScreenBufferInfo(m_conout, &info);
     // TODO: error handling
-    return QSize(info.dwSize.X, info.dwSize.Y);
+    return info.dwSize;
 }
 
-QRect Win32Console::windowRect()
+SmallRect Win32Console::windowRect()
 {
     CONSOLE_SCREEN_BUFFER_INFO info;
     GetConsoleScreenBufferInfo(m_conout, &info);
     // TODO: error handling
-    return QRect(info.srWindow.Left,
-                 info.srWindow.Top,
-                 info.srWindow.Right - info.srWindow.Left + 1,
-                 info.srWindow.Bottom - info.srWindow.Top + 1);
+    return info.srWindow;
 }
 
-void Win32Console::resizeBuffer(const QSize &size)
+void Win32Console::resizeBuffer(const Coord &size)
 {
-    COORD bufferSize = { size.width(), size.height() };
-    SetConsoleScreenBufferSize(m_conout, bufferSize);
+    SetConsoleScreenBufferSize(m_conout, size);
     // TODO: error handling
 }
 
-void Win32Console::moveWindow(const QRect &rect)
+void Win32Console::moveWindow(const SmallRect &rect)
 {
-    SMALL_RECT windowRect = smallRectFromQRect(rect);
-    SetConsoleWindowInfo(m_conout, TRUE, &windowRect);
+    SetConsoleWindowInfo(m_conout, TRUE, &rect);
     // TODO: error handling
 }
 
-void Win32Console::reposition(const QSize &newBufferSize, const QRect &newWindowRect)
+void Win32Console::reposition(const Coord &newBufferSize,
+                              const SmallRect &newWindowRect)
 {
     // Windows has one API for resizing the screen buffer and a different one
     // for resizing the window.  It seems that either API can fail if the
     // window does not fit on the screen buffer.
 
-    const QRect origWindowRect(windowRect());
-    const QRect origBufferRect(QPoint(), bufferSize());
+    const SmallRect origWindowRect(windowRect());
+    const SmallRect origBufferRect(Coord(), bufferSize());
 
-    Q_ASSERT(!newBufferSize.isEmpty());
-    QRect bufferRect(QPoint(), newBufferSize);
-    Q_ASSERT(bufferRect.contains(newWindowRect));
+    assert(!newBufferSize.isEmpty());
+    SmallRect bufferRect(Coord(), newBufferSize);
+    assert(bufferRect.contains(newWindowRect));
 
-    QRect tempWindowRect = origWindowRect.intersected(bufferRect);
+    SmallRect tempWindowRect = origWindowRect.intersected(bufferRect);
     if (tempWindowRect.width() <= 0) {
-        tempWindowRect.setLeft(newBufferSize.width() - 1);
+        tempWindowRect.setLeft(newBufferSize.X - 1);
         tempWindowRect.setWidth(1);
     }
     if (tempWindowRect.height() <= 0) {
-        tempWindowRect.setTop(newBufferSize.height() - 1);
+        tempWindowRect.setTop(newBufferSize.Y - 1);
         tempWindowRect.setHeight(1);
     }
 
@@ -126,17 +110,16 @@ void Win32Console::reposition(const QSize &newBufferSize, const QRect &newWindow
         moveWindow(newWindowRect);
 }
 
-QPoint Win32Console::cursorPosition()
+Coord Win32Console::cursorPosition()
 {
     CONSOLE_SCREEN_BUFFER_INFO info;
     GetConsoleScreenBufferInfo(m_conout, &info);
     // TODO: error handling
-    return QPoint(info.dwCursorPosition.X, info.dwCursorPosition.Y);
+    return info.dwCursorPosition;
 }
 
-void Win32Console::setCursorPosition(const QPoint &point)
+void Win32Console::setCursorPosition(const Coord &coord)
 {
-    COORD coord = { point.x(), point.y() };
     SetConsoleCursorPosition(m_conout, coord);
     // TODO: error handling
 }
@@ -148,20 +131,16 @@ void Win32Console::writeInput(const INPUT_RECORD *ir, int count)
     // TODO: error handling
 }
 
-void Win32Console::read(const QRect &rect, CHAR_INFO *data)
+void Win32Console::read(const SmallRect &rect, CHAR_INFO *data)
 {
-    COORD bufferSize = { rect.width(), rect.height() };
-    COORD zeroCoord = { 0, 0 };
-    SMALL_RECT smallRect = smallRectFromQRect(rect);
-    ReadConsoleOutput(m_conout, data, bufferSize, zeroCoord, &smallRect);
+    SmallRect tmp(rect);
+    ReadConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp);
     // TODO: error handling
 }
 
-void Win32Console::write(const QRect &rect, const CHAR_INFO *data)
+void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
 {
-    COORD bufferSize = { rect.width(), rect.height() };
-    COORD zeroCoord = { 0, 0 };
-    SMALL_RECT smallRect = smallRectFromQRect(rect);
-    WriteConsoleOutput(m_conout, data, bufferSize, zeroCoord, &smallRect);
+    SmallRect tmp(rect);
+    WriteConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp);
     // TODO: error handling
 }
