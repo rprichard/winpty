@@ -1,7 +1,9 @@
 #include "Terminal.h"
-#include <QIODevice>
+#include "NamedPipe.h"
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
+#include <string>
 
 #define CSI "\x1b["
 
@@ -27,8 +29,7 @@ const int TERMINAL_BLUE  = 4;
 const int TERMINAL_FOREGROUND = 30;
 const int TERMINAL_BACKGROUND = 40;
 
-Terminal::Terminal(QIODevice *output, QObject *parent) :
-    QObject(parent),
+Terminal::Terminal(NamedPipe *output) :
     m_output(output),
     m_remoteLine(0),
     m_cursorHidden(false),
@@ -54,7 +55,7 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     // Erase in Line -- erase entire line.
     m_output->write(CSI"2K");
 
-    QByteArray termLine;
+    std::string termLine;
     termLine.reserve(width + 32);
 
     int length = 0;
@@ -85,15 +86,14 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
         // TODO: Unicode
         char ch = lineData[i].Char.AsciiChar;
         if (ch == ' ') {
-            termLine.append(' ');
+            termLine.push_back(' ');
         } else {
-            termLine.append(isprint(ch) ? ch : '?');
+            termLine.push_back(isprint(ch) ? ch : '?');
             length = termLine.size();
         }
     }
 
-    termLine.truncate(length);
-    m_output->write(termLine);
+    m_output->write(termLine.data(), termLine.size());
 }
 
 void Terminal::finishOutput(const Coord &newCursorPos)

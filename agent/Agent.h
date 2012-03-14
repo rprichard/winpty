@@ -4,31 +4,30 @@
 #include <QObject>
 #include <QPoint>
 #include <windows.h>
+#include "EventLoop.h"
 
 class Win32Console;
 class QLocalSocket;
 class Terminal;
 class QTimer;
 class ReadBuffer;
+class NamedPipe;
 
 const int BUFFER_LINE_COUNT = 3000; // TODO: Use something like 9000.
 const int MAX_CONSOLE_WIDTH = 500;
 
-class Agent : public QObject
+class Agent : public EventLoop
 {
-    Q_OBJECT
 public:
-    explicit Agent(const QString &controlPipeName,
-                   const QString &dataPipeName,
-                   int initialCols, int initialRows,
-                   QObject *parent = 0);
-    virtual ~Agent();
+    Agent(LPCWSTR controlPipeName,
+          LPCWSTR dataPipeName,
+          int initialCols,
+          int initialRows);
+    ~Agent();
 
 private:
-    QLocalSocket *makeSocket(const QString &pipeName);
+    NamedPipe *makeSocket(LPCWSTR pipeName);
     void resetConsoleTracking(bool sendClear = true);
-
-signals:
 
 private slots:
     void controlSocketReadyRead();
@@ -37,7 +36,10 @@ private slots:
     int handleSetSizePacket(ReadBuffer &packet);
     void dataSocketReadyRead();
     void socketDisconnected();
-    void pollTimeout();
+
+protected:
+    virtual void onPollTimeout();
+    virtual void onPipeIo();
 
 private:
     void markEntireWindowDirty();
@@ -52,8 +54,8 @@ private:
 
 private:
     Win32Console *m_console;
-    QLocalSocket *m_controlSocket;
-    QLocalSocket *m_dataSocket;
+    NamedPipe *m_controlSocket;
+    NamedPipe *m_dataSocket;
     Terminal *m_terminal;
     QTimer *m_timer;
     HANDLE m_childProcess;

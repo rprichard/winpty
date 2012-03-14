@@ -1,29 +1,25 @@
 #include "Agent.h"
 #include "Win32Console.h"
 #include "Terminal.h"
+#include "NamedPipe.h"
 #include "../Shared/DebugClient.h"
 #include "../Shared/AgentMsg.h"
 #include "../Shared/Buffer.h"
-#include <QCoreApplication>
-#include <QLocalSocket>
-#include <QtDebug>
-#include <QTimer>
-#include <QSize>
-#include <QRect>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <windows.h>
 #include <vector>
+#include <string>
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 const int SYNC_MARKER_LEN = 16;
 
-Agent::Agent(const QString &controlPipeName,
-             const QString &dataPipeName,
+Agent::Agent(LPCWSTR controlPipeName,
+             LPCWSTR dataPipeName,
              int initialCols,
-             int initialRows,
-             QObject *parent) :
-    QObject(parent),
+             int initialRows) :
     m_terminal(NULL),
     m_timer(NULL),
     m_childProcess(NULL),
@@ -40,39 +36,43 @@ Agent::Agent(const QString &controlPipeName,
 
     m_controlSocket = makeSocket(controlPipeName);
     m_dataSocket = makeSocket(dataPipeName);
-    m_terminal = new Terminal(m_dataSocket, this);
+    m_terminal = new Terminal(m_dataSocket);
 
     resetConsoleTracking(false);
 
-    connect(m_controlSocket, SIGNAL(readyRead()), SLOT(controlSocketReadyRead()));
-    connect(m_controlSocket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
-    connect(m_dataSocket, SIGNAL(readyRead()), SLOT(dataSocketReadyRead()));
+    //connect(m_controlSocket, SIGNAL(readyRead()), SLOT(controlSocketReadyRead()));
+    //connect(m_controlSocket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
+    //connect(m_dataSocket, SIGNAL(readyRead()), SLOT(dataSocketReadyRead()));
 
-    m_timer = new QTimer(this);
-    m_timer->setSingleShot(false);
-    connect(m_timer, SIGNAL(timeout()), SLOT(pollTimeout()));
-    m_timer->start(25);
+    //m_timer = new QTimer(this);
+    //m_timer->setSingleShot(false);
+    //connect(m_timer, SIGNAL(timeout()), SLOT(pollTimeout()));
+    //m_timer->start(25);
+    setPollInterval(25);
 
     Trace("agent starting...");
 }
 
 Agent::~Agent()
 {
+    // TODO: review how shut down and cleanup work.
+
     m_console->postCloseMessage();
 
-    delete m_console;
     delete [] m_bufferData;
+    delete m_console;
+    delete m_terminal;
 }
 
-QLocalSocket *Agent::makeSocket(const QString &pipeName)
+NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
 {
-    // Connect to the named pipe.
-    QLocalSocket *socket = new QLocalSocket(this);
-    socket->connectToServer(pipeName);
-    if (!socket->waitForConnected())
-        qFatal("Could not connect to %s", pipeName.toStdString().c_str());
-    socket->setReadBufferSize(64 * 1024);
-    return socket;
+    NamedPipe *pipe = createNamedPipe();
+    if (!pipe->connectToServer(pipeName)) {
+        Trace("error: could not connect to %ls", pipeName);
+        ::exit(1);
+    }
+    pipe->setReadBufferSize(64 * 1024);
+    return pipe;
 }
 
 void Agent::resetConsoleTracking(bool sendClear)
@@ -87,6 +87,16 @@ void Agent::resetConsoleTracking(bool sendClear)
     m_terminal->reset(sendClear, m_scrapedLineCount);
 }
 
+void Agent::onPipeIo()
+{
+    controlSocketReadyRead();
+    dataSocketReadyRead();
+
+    // TODO: Is it possible that one or more pipe has closed when this
+    // function returns?  Will the agent shut down correctly?  I don't see any
+    // calls to EventLoop::exit.
+}
+
 void Agent::controlSocketReadyRead()
 {
     while (true) {
@@ -94,15 +104,16 @@ void Agent::controlSocketReadyRead()
         int size = m_controlSocket->peek((char*)&packetSize, sizeof(int32_t));
         if (size < (int)sizeof(int32_t))
             break;
-        int32_t totalSize = sizeof(int32_t) + packetSize;
+        int totalSize = sizeof(int32_t) + packetSize;
         if (m_controlSocket->bytesAvailable() < totalSize) {
             if (m_controlSocket->readBufferSize() < totalSize)
                 m_controlSocket->setReadBufferSize(totalSize);
             break;
         }
-        QByteArray packetData = m_controlSocket->read(totalSize);
-        Q_ASSERT(packetData.length() == totalSize);
-        ReadBuffer buffer(std::string(packetData.constData() + 4, packetSize));
+        std::string packetData = m_controlSocket->read(totalSize);
+        assert((int)packetData.size() == totalSize);
+        ReadBuffer buffer(packetData);
+        buffer.getInt(); // Discard the size.
         Trace("read packet of %d total bytes", totalSize);
         handlePacket(buffer);
     }
@@ -122,6 +133,8 @@ void Agent::handlePacket(ReadBuffer &packet)
     case AgentMsg::GetExitCode:
         packet.assertEof();
         result = m_childExitCode;
+    default:
+        Trace("Unrecognized message, id:%d", type);
     }
     m_controlSocket->write((char*)&result, sizeof(result));
 }
@@ -171,6 +184,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
 
 int Agent::handleSetSizePacket(ReadBuffer &packet)
 {
+    Trace("SetSize msg");
     int cols = packet.getInt();
     int rows = packet.getInt();
     packet.assertEof();
@@ -182,8 +196,8 @@ void Agent::dataSocketReadyRead()
 {
     // TODO: This is an incomplete hack...
     Trace("socketReadyRead -- %d bytes available", m_dataSocket->bytesAvailable());
-    QByteArray data = m_dataSocket->readAll();
-    for (int i = 0; i < data.length(); ++i) {
+    std::string data = m_dataSocket->readAll();
+    for (size_t i = 0; i < data.size(); ++i) {
         char ch = data[i];
         const short vk = VkKeyScan(ch);
         if (vk != -1) {
@@ -202,12 +216,12 @@ void Agent::dataSocketReadyRead()
 
 void Agent::socketDisconnected()
 {
-    QCoreApplication::exit(0);
+    //QCoreApplication::exit(0);
 }
 
-void Agent::pollTimeout()
+void Agent::onPollTimeout()
 {
-    if (m_dataSocket->state() == QLocalSocket::ConnectedState)
+    if (/*TODO: stop scraping as we're shutting down*/true)
         scrapeOutput();
 
     if (m_childProcess != NULL) {
@@ -217,7 +231,9 @@ void Agent::pollTimeout()
                 m_childExitCode = exitCode;
             CloseHandle(m_childProcess);
             m_childProcess = NULL;
-            m_dataSocket->disconnectFromServer();
+            // TODO: review how exiting/disconnecting work...
+            //m_dataSocket->disconnectFromServer();
+            m_dataSocket->closePipe();
         }
     }
 }
@@ -309,7 +325,7 @@ void Agent::scrapeOutput()
             Trace("Sync marker has disappeared -- resetting the terminal");
             resetConsoleTracking();
         } else if (markerRow != m_syncRow) {
-            Q_ASSERT(markerRow < m_syncRow);
+            assert(markerRow < m_syncRow);
             m_scrolledCount += (m_syncRow - markerRow);
             m_syncRow = markerRow;
             // If the buffer has scrolled, then the entire window is dirty.
@@ -408,7 +424,7 @@ void Agent::syncMarkerText(CHAR_INFO *output)
 
 int Agent::findSyncMarker()
 {
-    Q_ASSERT(m_syncRow >= 0);
+    assert(m_syncRow >= 0);
     CHAR_INFO marker[SYNC_MARKER_LEN];
     CHAR_INFO column[BUFFER_LINE_COUNT];
     syncMarkerText(marker);

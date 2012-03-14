@@ -3,8 +3,8 @@ include ../config-mingw.mk
 include ../config-qt.mk
 
 PROGRAM = pconsole-agent
-HEADERS = Agent.h Terminal.h
-OBJECTS = Agent.o Terminal.o Win32Console.o AgentDebugClient.o main.o
+HEADERS =
+OBJECTS = EventLoop.o NamedPipe.o Agent.o Terminal.o Win32Console.o AgentDebugClient.o main.o
 
 OBJECTS += $(patsubst %.h,moc_%.o,$(HEADERS))
 CXXFLAGS += -I$(QT_INCLUDE)/QtNetwork -D_WIN32_WINNT=0x0501

@@ -1,18 +1,15 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
-#include <QObject>
-#include <QPoint>
 #include <windows.h>
 #include "Coord.h"
 
-class QIODevice;
+class NamedPipe;
 
-class Terminal : public QObject
+class Terminal
 {
-    Q_OBJECT
 public:
-    explicit Terminal(QIODevice *output, QObject *parent = 0);
+    explicit Terminal(NamedPipe *output);
     void reset(bool sendClearFirst, int newLine);
     void sendLine(int line, CHAR_INFO *lineData, int width);
     void finishOutput(const Coord &newCursorPos);
@@ -22,7 +19,7 @@ private:
     void moveTerminalToLine(int line);
 
 private:
-    QIODevice *m_output;
+    NamedPipe *m_output;
     int m_remoteLine;
     bool m_cursorHidden;
     Coord m_cursorPos;
