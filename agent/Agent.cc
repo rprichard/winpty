@@ -21,7 +21,7 @@ Agent::Agent(LPCWSTR controlPipeName,
              int initialCols,
              int initialRows) :
     m_terminal(NULL),
-    m_timer(NULL),
+    //m_timer(NULL),
     m_childProcess(NULL),
     m_childExitCode(-1),
     m_syncCounter(0)

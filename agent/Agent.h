@@ -1,15 +1,11 @@
 #ifndef AGENT_H
 #define AGENT_H
 
-#include <QObject>
-#include <QPoint>
 #include <windows.h>
 #include "EventLoop.h"
 
 class Win32Console;
-class QLocalSocket;
 class Terminal;
-class QTimer;
 class ReadBuffer;
 class NamedPipe;
 
@@ -29,7 +25,7 @@ private:
     NamedPipe *makeSocket(LPCWSTR pipeName);
     void resetConsoleTracking(bool sendClear = true);
 
-private slots:
+private:
     void controlSocketReadyRead();
     void handlePacket(ReadBuffer &packet);
     int handleStartProcessPacket(ReadBuffer &packet);
@@ -57,7 +53,6 @@ private:
     NamedPipe *m_controlSocket;
     NamedPipe *m_dataSocket;
     Terminal *m_terminal;
-    QTimer *m_timer;
     HANDLE m_childProcess;
     int m_childExitCode;
 
