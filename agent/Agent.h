@@ -26,16 +26,15 @@ private:
     void resetConsoleTracking(bool sendClear = true);
 
 private:
-    void controlSocketReadyRead();
+    void pollControlSocket();
     void handlePacket(ReadBuffer &packet);
     int handleStartProcessPacket(ReadBuffer &packet);
     int handleSetSizePacket(ReadBuffer &packet);
-    void dataSocketReadyRead();
-    void socketDisconnected();
+    void pollDataSocket();
 
 protected:
     virtual void onPollTimeout();
-    virtual void onPipeIo();
+    virtual void onPipeIo(NamedPipe *namedPipe);
 
 private:
     void markEntireWindowDirty();
@@ -52,6 +51,7 @@ private:
     Win32Console *m_console;
     NamedPipe *m_controlSocket;
     NamedPipe *m_dataSocket;
+    bool m_closingDataSocket;
     Terminal *m_terminal;
     HANDLE m_childProcess;
     int m_childExitCode;

@@ -1,6 +1,6 @@
 #include "Win32Console.h"
+#include "AgentAssert.h"
 #include <windows.h>
-#include <assert.h>
 
 Win32Console::Win32Console()
 {
@@ -14,8 +14,8 @@ Win32Console::Win32Console()
                 GENERIC_READ | GENERIC_WRITE,
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
                 NULL, OPEN_EXISTING, 0, NULL);
-    assert(m_conin != NULL);
-    assert(m_conout != NULL);
+    ASSERT(m_conin != NULL);
+    ASSERT(m_conout != NULL);
 }
 
 Win32Console::~Win32Console()
@@ -84,9 +84,9 @@ void Win32Console::reposition(const Coord &newBufferSize,
     const SmallRect origWindowRect(windowRect());
     const SmallRect origBufferRect(Coord(), bufferSize());
 
-    assert(!newBufferSize.isEmpty());
+    ASSERT(!newBufferSize.isEmpty());
     SmallRect bufferRect(Coord(), newBufferSize);
-    assert(bufferRect.contains(newWindowRect));
+    ASSERT(bufferRect.contains(newWindowRect));
 
     SmallRect tempWindowRect = origWindowRect.intersected(bufferRect);
     if (tempWindowRect.width() <= 0) {

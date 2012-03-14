@@ -15,9 +15,9 @@ public:
 protected:
     NamedPipe *createNamedPipe();
     void setPollInterval(int ms);
-    void exit();
+    void shutdown();
     virtual void onPollTimeout();
-    virtual void onPipeIo();
+    virtual void onPipeIo(NamedPipe *namedPipe);
 
 private:
     bool m_exiting;

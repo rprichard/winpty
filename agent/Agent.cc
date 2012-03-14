@@ -2,6 +2,7 @@
 #include "Win32Console.h"
 #include "Terminal.h"
 #include "NamedPipe.h"
+#include "AgentAssert.h"
 #include "../Shared/DebugClient.h"
 #include "../Shared/AgentMsg.h"
 #include "../Shared/Buffer.h"
@@ -20,8 +21,8 @@ Agent::Agent(LPCWSTR controlPipeName,
              LPCWSTR dataPipeName,
              int initialCols,
              int initialRows) :
+    m_closingDataSocket(false),
     m_terminal(NULL),
-    //m_timer(NULL),
     m_childProcess(NULL),
     m_childExitCode(-1),
     m_syncCounter(0)
@@ -40,25 +41,17 @@ Agent::Agent(LPCWSTR controlPipeName,
 
     resetConsoleTracking(false);
 
-    //connect(m_controlSocket, SIGNAL(readyRead()), SLOT(controlSocketReadyRead()));
-    //connect(m_controlSocket, SIGNAL(disconnected()), SLOT(socketDisconnected()));
-    //connect(m_dataSocket, SIGNAL(readyRead()), SLOT(dataSocketReadyRead()));
-
-    //m_timer = new QTimer(this);
-    //m_timer->setSingleShot(false);
-    //connect(m_timer, SIGNAL(timeout()), SLOT(pollTimeout()));
-    //m_timer->start(25);
     setPollInterval(25);
 
-    Trace("agent starting...");
+    Trace("Agent starting...");
 }
 
 Agent::~Agent()
 {
-    // TODO: review how shut down and cleanup work.
-
+    Trace("Agent exiting...");
     m_console->postCloseMessage();
-
+    if (m_childProcess != NULL)
+        CloseHandle(m_childProcess);
     delete [] m_bufferData;
     delete m_console;
     delete m_terminal;
@@ -87,18 +80,22 @@ void Agent::resetConsoleTracking(bool sendClear)
     m_terminal->reset(sendClear, m_scrapedLineCount);
 }
 
-void Agent::onPipeIo()
+void Agent::onPipeIo(NamedPipe *namedPipe)
 {
-    controlSocketReadyRead();
-    dataSocketReadyRead();
-
-    // TODO: Is it possible that one or more pipe has closed when this
-    // function returns?  Will the agent shut down correctly?  I don't see any
-    // calls to EventLoop::exit.
+    if (namedPipe == m_controlSocket)
+        pollControlSocket();
+    else if (namedPipe == m_dataSocket)
+        pollDataSocket();
 }
 
-void Agent::controlSocketReadyRead()
+void Agent::pollControlSocket()
 {
+    if (m_controlSocket->isClosed()) {
+        Trace("Agent shutting down");
+        shutdown();
+        return;
+    }
+
     while (true) {
         int32_t packetSize;
         int size = m_controlSocket->peek((char*)&packetSize, sizeof(int32_t));
@@ -111,10 +108,9 @@ void Agent::controlSocketReadyRead()
             break;
         }
         std::string packetData = m_controlSocket->read(totalSize);
-        assert((int)packetData.size() == totalSize);
+        ASSERT((int)packetData.size() == totalSize);
         ReadBuffer buffer(packetData);
         buffer.getInt(); // Discard the size.
-        Trace("read packet of %d total bytes", totalSize);
         handlePacket(buffer);
     }
 }
@@ -133,6 +129,7 @@ void Agent::handlePacket(ReadBuffer &packet)
     case AgentMsg::GetExitCode:
         packet.assertEof();
         result = m_childExitCode;
+        break;
     default:
         Trace("Unrecognized message, id:%d", type);
     }
@@ -141,7 +138,7 @@ void Agent::handlePacket(ReadBuffer &packet)
 
 int Agent::handleStartProcessPacket(ReadBuffer &packet)
 {
-    assert(m_childProcess == NULL);
+    ASSERT(m_childProcess == NULL);
 
     std::wstring program = packet.getWString();
     std::wstring cmdline = packet.getWString();
@@ -171,7 +168,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
                              /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT,
                              (LPVOID)envArg, cwdArg, &sui, &pi);
 
-    Trace("cp: %s %d", (ret ? "success" : "fail"), (int)pi.dwProcessId);
+    Trace("CreateProcess: %s %d", (ret ? "success" : "fail"), (int)pi.dwProcessId);
 
     if (ret) {
         CloseHandle(pi.hThread);
@@ -184,7 +181,6 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
 
 int Agent::handleSetSizePacket(ReadBuffer &packet)
 {
-    Trace("SetSize msg");
     int cols = packet.getInt();
     int rows = packet.getInt();
     packet.assertEof();
@@ -192,10 +188,9 @@ int Agent::handleSetSizePacket(ReadBuffer &packet)
     return 0;
 }
 
-void Agent::dataSocketReadyRead()
+void Agent::pollDataSocket()
 {
     // TODO: This is an incomplete hack...
-    Trace("socketReadyRead -- %d bytes available", m_dataSocket->bytesAvailable());
     std::string data = m_dataSocket->readAll();
     for (size_t i = 0; i < data.size(); ++i) {
         char ch = data[i];
@@ -212,29 +207,43 @@ void Agent::dataSocketReadyRead()
             m_console->writeInput(&ir);
         }
     }
-}
 
-void Agent::socketDisconnected()
-{
-    //QCoreApplication::exit(0);
+    // If the child process had exited, then close the data socket if we've
+    // finished sending all of the collected output.
+    if (m_closingDataSocket &&
+            !m_dataSocket->isClosed() &&
+            m_dataSocket->bytesToSend() == 0) {
+        Trace("Closing data pipe after data is sent");
+        m_dataSocket->closePipe();
+    }
 }
 
 void Agent::onPollTimeout()
 {
-    if (/*TODO: stop scraping as we're shutting down*/true)
+    // Check if the child process has exited.
+    if (WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
+        DWORD exitCode;
+        if (GetExitCodeProcess(m_childProcess, &exitCode))
+            m_childExitCode = exitCode;
+        CloseHandle(m_childProcess);
+        m_childProcess = NULL;
+
+        // Close the data socket to signal to the client that the child
+        // process has exited.  If there's any data left to send, send it
+        // before closing the socket.
+        m_closingDataSocket = true;
+    }
+
+    // Scrape for output *after* the above exit-check to ensure that we collect
+    // the child process's final output.
+    if (!m_dataSocket->isClosed())
         scrapeOutput();
 
-    if (m_childProcess != NULL) {
-        if (WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
-            DWORD exitCode;
-            if (GetExitCodeProcess(m_childProcess, &exitCode))
-                m_childExitCode = exitCode;
-            CloseHandle(m_childProcess);
-            m_childProcess = NULL;
-            // TODO: review how exiting/disconnecting work...
-            //m_dataSocket->disconnectFromServer();
-            m_dataSocket->closePipe();
-        }
+    if (m_closingDataSocket &&
+            !m_dataSocket->isClosed() &&
+            m_dataSocket->bytesToSend() == 0) {
+        Trace("Closing data pipe after child exit");
+        m_dataSocket->closePipe();
     }
 }
 
@@ -325,7 +334,7 @@ void Agent::scrapeOutput()
             Trace("Sync marker has disappeared -- resetting the terminal");
             resetConsoleTracking();
         } else if (markerRow != m_syncRow) {
-            assert(markerRow < m_syncRow);
+            ASSERT(markerRow < m_syncRow);
             m_scrolledCount += (m_syncRow - markerRow);
             m_syncRow = markerRow;
             // If the buffer has scrolled, then the entire window is dirty.
@@ -424,7 +433,7 @@ void Agent::syncMarkerText(CHAR_INFO *output)
 
 int Agent::findSyncMarker()
 {
-    assert(m_syncRow >= 0);
+    ASSERT(m_syncRow >= 0);
     CHAR_INFO marker[SYNC_MARKER_LEN];
     CHAR_INFO column[BUFFER_LINE_COUNT];
     syncMarkerText(marker);

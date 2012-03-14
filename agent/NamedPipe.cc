@@ -1,14 +1,14 @@
 #include "NamedPipe.h"
 #include "EventLoop.h"
+#include "AgentAssert.h"
 #include "../Shared/DebugClient.h"
 #include <string.h>
-#include <assert.h>
 
 NamedPipe::NamedPipe() :
     m_readBufferSize(64 * 1024),
     m_handle(NULL),
-    m_inputWorker(this),
-    m_outputWorker(this)
+    m_inputWorker(NULL),
+    m_outputWorker(NULL)
 {
 }
 
@@ -17,70 +17,66 @@ NamedPipe::~NamedPipe()
     closePipe();
 }
 
-HANDLE NamedPipe::getWaitEvent1()
+// Returns true if anything happens (data received, data sent, pipe error).
+bool NamedPipe::serviceIo(std::vector<HANDLE> *waitHandles)
 {
-    return m_inputWorker.getWaitEvent();
-}
-
-HANDLE NamedPipe::getWaitEvent2()
-{
-    return m_outputWorker.getWaitEvent();
-}
-
-void NamedPipe::poll()
-{
-    m_inputWorker.service();
-    m_outputWorker.service();
+    if (m_handle == NULL)
+        return false;
+    int readBytes = m_inputWorker->service();
+    int writeBytes = m_outputWorker->service();
+    if (readBytes == -1 || writeBytes == -1) {
+        closePipe();
+        return true;
+    }
+    if (m_inputWorker->getWaitEvent() != NULL)
+        waitHandles->push_back(m_inputWorker->getWaitEvent());
+    if (m_outputWorker->getWaitEvent() != NULL)
+        waitHandles->push_back(m_outputWorker->getWaitEvent());
+    return readBytes > 0 || writeBytes > 0;
 }
 
 NamedPipe::IoWorker::IoWorker(NamedPipe *namedPipe) :
     m_namedPipe(namedPipe),
-    m_pending(false)
+    m_pending(false),
+    m_currentIoSize(-1)
 {
     m_event = CreateEvent(NULL, TRUE, FALSE, NULL);
-    assert(m_event != NULL);
+    ASSERT(m_event != NULL);
 }
 
 NamedPipe::IoWorker::~IoWorker()
 {
-    // TODO: Does it matter if an I/O is currently pending?
     CloseHandle(m_event);
 }
 
-void NamedPipe::IoWorker::service()
+int NamedPipe::IoWorker::service()
 {
-    if (m_namedPipe->isClosed()) {
-        m_pending = false;
-        ResetEvent(m_event);
-        return;
-    }
-
+    int progress = 0;
     if (m_pending) {
         DWORD actual;
         BOOL ret = GetOverlappedResult(m_namedPipe->m_handle, &m_over, &actual, FALSE);
         if (!ret) {
             if (GetLastError() == ERROR_IO_INCOMPLETE) {
                 // There is a pending I/O.
-                return;
+                return progress;
             } else {
-                // Pipe error.  Close the pipe.
-                ResetEvent(m_event);
-                m_pending = false;
-                m_namedPipe->closePipe();
-                return;
+                // Pipe error.
+                return -1;
             }
         }
         ResetEvent(m_event);
         m_pending = false;
         completeIo(actual);
+        m_currentIoSize = -1;
+        progress += actual;
     }
     int nextSize;
     bool isRead;
     while (shouldIssueIo(&nextSize, &isRead)) {
+        m_currentIoSize = nextSize;
         DWORD actual = 0;
         memset(&m_over, 0, sizeof(m_over));
         m_over.hEvent = m_event;
-        Trace("[startio] isread:%d size:%d", isRead, nextSize);
         BOOL ret = isRead
                 ? ReadFile(m_namedPipe->m_handle, m_buffer, nextSize, &actual, &m_over)
                 : WriteFile(m_namedPipe->m_handle, m_buffer, nextSize, &actual, &m_over);
@@ -88,15 +84,18 @@ void NamedPipe::IoWorker::service()
             if (GetLastError() == ERROR_IO_PENDING) {
                 // There is a pending I/O.
                 m_pending = true;
-                return;
+                return progress;
             } else {
-                // Pipe error.  Close the pipe.
-                m_namedPipe->closePipe();
-                return;
+                // Pipe error.
+                return -1;
             }
         }
+        ResetEvent(m_event);
         completeIo(actual);
+        m_currentIoSize = -1;
+        progress += actual;
     }
+    return progress;
 }
 
 HANDLE NamedPipe::IoWorker::getWaitEvent()
@@ -124,6 +123,7 @@ bool NamedPipe::InputWorker::shouldIssueIo(int *size, bool *isRead)
 
 void NamedPipe::OutputWorker::completeIo(int size)
 {
+    ASSERT(size == m_currentIoSize);
 }
 
 bool NamedPipe::OutputWorker::shouldIssueIo(int *size, bool *isRead)
@@ -140,32 +140,41 @@ bool NamedPipe::OutputWorker::shouldIssueIo(int *size, bool *isRead)
     }
 }
 
+int NamedPipe::OutputWorker::getPendingIoSize()
+{
+    return m_pending ? m_currentIoSize : 0;
+}
+
 bool NamedPipe::connectToServer(LPCWSTR pipeName)
 {
-    assert(m_handle == NULL);
-    m_handle = CreateFile(pipeName,
-                          GENERIC_READ | GENERIC_WRITE,
-                          0,
-                          NULL,
-                          OPEN_EXISTING,
-                          FILE_FLAG_OVERLAPPED,
-                          NULL);
-    Trace("connection to [%ls], handle == 0x%x", pipeName, m_handle);
-    if (m_handle == INVALID_HANDLE_VALUE)
+    ASSERT(isClosed());
+    HANDLE handle = CreateFile(pipeName,
+                               GENERIC_READ | GENERIC_WRITE,
+                               0,
+                               NULL,
+                               OPEN_EXISTING,
+                               FILE_FLAG_OVERLAPPED,
+                               NULL);
+    Trace("connection to [%ls], handle == 0x%x", pipeName, handle);
+    if (handle == INVALID_HANDLE_VALUE)
         return false;
-    m_inputWorker.service();
-
-    // TODO: I suppose the user could call write before calling
-    // connectToServer.  I think that would work, but I'm not sure.
-    m_outputWorker.service();
-
+    m_handle = handle;
+    m_inputWorker = new InputWorker(this);
+    m_outputWorker = new OutputWorker(this);
     return true;
+}
+
+int NamedPipe::bytesToSend()
+{
+    int ret = m_outQueue.size();
+    if (m_outputWorker != NULL)
+        ret += m_outputWorker->getPendingIoSize();
+    return ret;
 }
 
 void NamedPipe::write(const void *data, int size)
 {
     m_outQueue.append((const char*)data, size);
-    m_outputWorker.service();
 }
 
 void NamedPipe::write(const char *text)
@@ -181,7 +190,6 @@ int NamedPipe::readBufferSize()
 void NamedPipe::setReadBufferSize(int size)
 {
     m_readBufferSize = size;
-    m_inputWorker.service();
 }
 
 int NamedPipe::bytesAvailable()
@@ -201,7 +209,6 @@ std::string NamedPipe::read(int size)
     int retSize = std::min(size, (int)m_inQueue.size());
     std::string ret = m_inQueue.substr(0, retSize);
     m_inQueue.erase(0, retSize);
-    m_inputWorker.service();
     return ret;
 }
 
@@ -209,18 +216,20 @@ std::string NamedPipe::readAll()
 {
     std::string ret = m_inQueue;
     m_inQueue.clear();
-    m_inputWorker.service();
     return ret;
 }
 
 void NamedPipe::closePipe()
 {
-    // TODO: Use CancelIo, ResetEvent, etc, to ensure that the socket is in
-    // a completely shut down state when this function returns.
     if (m_handle == NULL)
         return;
+    CancelIo(m_handle);
+    delete m_inputWorker;
+    delete m_outputWorker;
     CloseHandle(m_handle);
     m_handle = NULL;
+    m_inputWorker = NULL;
+    m_outputWorker = NULL;
 }
 
 bool NamedPipe::isClosed()

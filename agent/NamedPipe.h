@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include <string>
+#include <vector>
 
 class EventLoop;
 
@@ -13,9 +14,7 @@ private:
     friend class EventLoop;
     NamedPipe();
     ~NamedPipe();
-    HANDLE getWaitEvent1();
-    HANDLE getWaitEvent2();
-    void poll();
+    bool serviceIo(std::vector<HANDLE> *waitHandles);
 
 private:
     class IoWorker
@@ -23,11 +22,12 @@ private:
     public:
         IoWorker(NamedPipe *namedPipe);
         virtual ~IoWorker();
-        void service();
+        int service();
         HANDLE getWaitEvent();
     protected:
         NamedPipe *m_namedPipe;
         bool m_pending;
+        int m_currentIoSize;
         HANDLE m_event;
         OVERLAPPED m_over;
         enum { kIoSize = 64 * 1024 };
@@ -49,6 +49,7 @@ private:
     {
     public:
         OutputWorker(NamedPipe *namedPipe) : IoWorker(namedPipe) {}
+        int getPendingIoSize();
     protected:
         virtual void completeIo(int size);
         virtual bool shouldIssueIo(int *size, bool *isRead);
@@ -56,6 +57,7 @@ private:
 
 public:
     bool connectToServer(LPCWSTR pipeName);
+    int bytesToSend();
     void write(const void *data, int size);
     void write(const char *text);
     int readBufferSize();
@@ -73,8 +75,8 @@ private:
     std::string m_inQueue;
     std::string m_outQueue;
     HANDLE m_handle;
-    InputWorker m_inputWorker;
-    OutputWorker m_outputWorker;
+    InputWorker *m_inputWorker;
+    OutputWorker *m_outputWorker;
 };
 
 #endif // NAMEDPIPE_H

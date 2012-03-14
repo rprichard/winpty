@@ -1,7 +1,7 @@
 #include "EventLoop.h"
 #include "NamedPipe.h"
+#include "AgentAssert.h"
 #include "../Shared/DebugClient.h"
-#include <assert.h>
 
 EventLoop::EventLoop() : m_exiting(false), m_pollInterval(0)
 {
@@ -13,48 +13,50 @@ EventLoop::~EventLoop()
         delete m_pipes[i];
 }
 
+// Enter the event loop.  Runs until the I/O or timeout handler calls exit().
 void EventLoop::run()
 {
     std::vector<HANDLE> waitHandles;
-    DWORD pollTime = GetTickCount();
+    DWORD lastTime = GetTickCount();
     while (!m_exiting) {
-        Trace("poll...");
-        waitHandles.reserve(m_pipes.size() * 2);
+        bool didSomething = false;
+
+        // Attempt to make progress with the pipes.
         waitHandles.clear();
         for (size_t i = 0; i < m_pipes.size(); ++i) {
-            HANDLE pipe1 = m_pipes[i]->getWaitEvent1();
-            HANDLE pipe2 = m_pipes[i]->getWaitEvent2();
-            if (pipe1 != NULL)
-                waitHandles.push_back(pipe1);
-            if (pipe2 != NULL)
-                waitHandles.push_back(pipe2);
+            if (m_pipes[i]->serviceIo(&waitHandles)) {
+                onPipeIo(m_pipes[i]);
+                didSomething = true;
+            }
         }
-        DWORD timeout = INFINITE;
+
+        // Call the timeout if enough time has elapsed.
         if (m_pollInterval > 0) {
-            int elapsed = GetTickCount() - pollTime;
-            if (elapsed < m_pollInterval)
-                timeout = m_pollInterval - elapsed;
-            else
-                timeout = 0;
-        }
-        Trace("poll... timeout is %d ms", (int)timeout);
-        DWORD result = WaitForMultipleObjects(waitHandles.size(),
-                                              waitHandles.data(),
-                                              FALSE,
-                                              timeout);
-        Trace("poll... result is 0x%x", result);
-        assert(result != WAIT_FAILED);
-        if (result != WAIT_TIMEOUT) {
-            for (size_t i = 0; i < m_pipes.size(); ++i)
-                m_pipes[i]->poll();
-            onPipeIo();
-        }
-        if (m_pollInterval > 0) {
-            int elapsed = GetTickCount() - pollTime;
+            int elapsed = GetTickCount() - lastTime;
             if (elapsed >= m_pollInterval) {
                 onPollTimeout();
-                pollTime = GetTickCount();
+                lastTime = GetTickCount();
+                didSomething = true;
             }
+        }
+
+        if (didSomething)
+            continue;
+
+        // If there's nothing to do, wait.
+        DWORD timeout = INFINITE;
+        if (m_pollInterval > 0)
+            timeout = std::max(0, (int)(lastTime + m_pollInterval - GetTickCount()));
+        if (waitHandles.size() == 0) {
+            ASSERT(timeout != INFINITE);
+            if (timeout > 0)
+                Sleep(timeout);
+        } else {
+            DWORD result = WaitForMultipleObjects(waitHandles.size(),
+                                                  waitHandles.data(),
+                                                  FALSE,
+                                                  timeout);
+            ASSERT(result != WAIT_FAILED);
         }
     }
 }
@@ -71,7 +73,7 @@ void EventLoop::setPollInterval(int ms)
     m_pollInterval = ms;
 }
 
-void EventLoop::exit()
+void EventLoop::shutdown()
 {
     m_exiting = true;
 }
@@ -80,6 +82,6 @@ void EventLoop::onPollTimeout()
 {
 }
 
-void EventLoop::onPipeIo()
+void EventLoop::onPipeIo(NamedPipe *namedPipe)
 {
 }

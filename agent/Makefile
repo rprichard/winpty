@@ -7,6 +7,7 @@ OBJECTS = \
 	EventLoop.o \
 	NamedPipe.o \
 	Agent.o \
+	AgentAssert.o \
 	Terminal.o \
 	Win32Console.o \
 	AgentDebugClient.o \
