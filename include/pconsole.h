@@ -43,6 +43,7 @@ PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
 
 PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc);
 
+/* TODO: Not implemented.  Should it be? */
 PCONSOLE_API int pconsole_flush_and_close(pconsole_t *pc);
 
 /*

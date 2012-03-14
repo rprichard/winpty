@@ -189,3 +189,10 @@ Experiment with the Terminator emulator, an emulator that doesn't wrap lines.
 How many columns does it report having?  What column does it report the cursor
 in as it's writing past the right end of the window?  Will Terminator be a
 problem if I implement line wrapping detection in the agent?
+
+BUG: After the unix-adapter/pconsole.exe program exits, the blinking cursor is
+replaced with a hidden cursor.
+
+Fix assert() in the agent.  If it fails, the failure message needs to be
+reported somewhere.  Pop up a dialog box?  Maybe switch the active desktop,
+then show a dialog box?
