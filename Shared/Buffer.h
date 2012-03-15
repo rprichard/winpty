@@ -3,7 +3,6 @@
 
 #include <sstream>
 #include <iostream>
-#include <assert.h>
 
 class WriteBuffer
 {
@@ -47,7 +46,7 @@ public:
     ReadBuffer(const std::string &packet);
     int getInt();
     std::wstring getWString();
-    void assertEof();
+    bool eof();
 };
 
 inline ReadBuffer::ReadBuffer(const std::string &packet) : ss(packet)
@@ -71,10 +70,10 @@ inline std::wstring ReadBuffer::getWString()
     return ret;
 }
 
-inline void ReadBuffer::assertEof()
+inline bool ReadBuffer::eof()
 {
     ss.peek();
-    assert(ss.eof());
+    return ss.eof();
 }
 
 #endif /* BUFFER_H */

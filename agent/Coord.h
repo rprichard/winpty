@@ -2,6 +2,7 @@
 #define COORD_H
 
 #include <windows.h>
+#include <string>
 
 struct Coord : COORD {
     Coord()
@@ -51,6 +52,8 @@ struct Coord : COORD {
     {
         return X <= 0 || Y <= 0;
     }
+
+    std::string toString() const;
 };
 
 #endif // COORD_H

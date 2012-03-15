@@ -4,6 +4,7 @@
 #include <windows.h>
 #include "Coord.h"
 #include <algorithm>
+#include <string>
 
 struct SmallRect : SMALL_RECT
 {
@@ -82,6 +83,8 @@ struct SmallRect : SMALL_RECT
     {
         return !(*this == other);
     }
+
+    std::string toString() const;
 };
 
 #endif // SMALLRECT_H

@@ -11,6 +11,8 @@ OBJECTS = \
 	Terminal.o \
 	Win32Console.o \
 	AgentDebugClient.o \
+	Coord.o \
+	SmallRect.o \
 	main.o
 
 CXXFLAGS += \

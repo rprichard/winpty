@@ -127,7 +127,7 @@ void Agent::handlePacket(ReadBuffer &packet)
         result = handleSetSizePacket(packet);
         break;
     case AgentMsg::GetExitCode:
-        packet.assertEof();
+        ASSERT(packet.eof());
         result = m_childExitCode;
         break;
     default:
@@ -144,7 +144,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     std::wstring cmdline = packet.getWString();
     std::wstring cwd = packet.getWString();
     std::wstring env = packet.getWString();
-    packet.assertEof();
+    ASSERT(packet.eof());
 
     LPCWSTR programArg = program.empty() ? NULL : program.c_str();
     std::vector<wchar_t> cmdlineCopy;
@@ -183,7 +183,7 @@ int Agent::handleSetSizePacket(ReadBuffer &packet)
 {
     int cols = packet.getInt();
     int rows = packet.getInt();
-    packet.assertEof();
+    ASSERT(packet.eof());
     resizeWindow(cols, rows);
     return 0;
 }
