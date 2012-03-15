@@ -7,10 +7,6 @@
 
 #define CSI "\x1b["
 
-#ifndef COMMON_LVB_REVERSE_VIDEO
-#define COMMON_LVB_REVERSE_VIDEO 0x4000
-#endif
-
 const int COLOR_ATTRIBUTE_MASK =
         FOREGROUND_BLUE |
         FOREGROUND_GREEN |
@@ -19,12 +15,13 @@ const int COLOR_ATTRIBUTE_MASK =
         BACKGROUND_BLUE |
         BACKGROUND_GREEN |
         BACKGROUND_RED |
-        BACKGROUND_INTENSITY |
-        COMMON_LVB_REVERSE_VIDEO;
+        BACKGROUND_INTENSITY;
 
+const int TERMINAL_BLACK = 0;
 const int TERMINAL_RED   = 1;
 const int TERMINAL_GREEN = 2;
 const int TERMINAL_BLUE  = 4;
+const int TERMINAL_WHITE = 7;
 
 const int TERMINAL_FOREGROUND = 30;
 const int TERMINAL_BACKGROUND = 40;
@@ -70,25 +67,67 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
             if (color & BACKGROUND_RED)   back |= TERMINAL_RED;
             if (color & BACKGROUND_GREEN) back |= TERMINAL_GREEN;
             if (color & BACKGROUND_BLUE)  back |= TERMINAL_BLUE;
+
             char buffer[128];
-            sprintf(buffer, CSI"0;%d;%d",
-                    TERMINAL_FOREGROUND + fore,
-                    TERMINAL_BACKGROUND + back);
-            if (color & FOREGROUND_INTENSITY)
-                strcat(buffer, ";1");
-            if (color & COMMON_LVB_REVERSE_VIDEO)
-                strcat(buffer, ";7");
+            if (back == TERMINAL_BLACK) {
+                if (fore == TERMINAL_WHITE) {
+                    // Use the terminal's default colors.
+                    sprintf(buffer, CSI"0");
+                } else if (fore == TERMINAL_BLACK) {
+                    // Attempt to hide the character, but some terminals won't
+                    // hide it.  Is this an important case?
+                    sprintf(buffer, CSI"0;8");
+                } else {
+                    sprintf(buffer, CSI"0;%d", TERMINAL_FOREGROUND + fore);
+                }
+                if (color & FOREGROUND_INTENSITY)
+                    strcat(buffer, ";1");
+            } else if (back == TERMINAL_WHITE) {
+                // Use the terminal's inverted colors.
+                if (fore == TERMINAL_BLACK) {
+                    sprintf(buffer, CSI"0;7");
+                } else if (fore == TERMINAL_WHITE) {
+                    // Attempt to hide the character, but some terminals won't
+                    // hide it.  Is this an important case?
+                    sprintf(buffer, CSI"0;7;8");
+                } else {
+                    sprintf(buffer, CSI"0;7;%d", TERMINAL_BACKGROUND + fore);
+                }
+                // Don't worry about FOREGROUND_INTENSITY because with at least
+                // one terminal (gnome-terminal 2.32.0), setting the Intensity
+                // flag affects both foreground and background when Reverse
+                // flag is also set.
+            } else {
+                sprintf(buffer, CSI"0;%d;%d",
+                        TERMINAL_FOREGROUND + fore,
+                        TERMINAL_BACKGROUND + back);
+                if (color & FOREGROUND_INTENSITY)
+                    strcat(buffer, ";1");
+            }
             strcat(buffer, "m");
             termLine.append(buffer);
             length = termLine.size();
             m_remoteColor = color;
         }
-        // TODO: Unicode
-        char ch = lineData[i].Char.AsciiChar;
-        if (ch == ' ') {
+        // TODO: Is it inefficient to call WideCharToMultiByte once per
+        // character?
+        char mbstr[16];
+        int mblen = WideCharToMultiByte(CP_UTF8,
+                                        0,
+                                        &lineData[i].Char.UnicodeChar,
+                                        1,
+                                        mbstr,
+                                        sizeof(mbstr),
+                                        NULL,
+                                        NULL);
+        if (mblen <= 0) {
+            mbstr[0] = '?';
+            mblen = 1;
+        }
+        if (mblen == 1 && mbstr[0] == ' ') {
             termLine.push_back(' ');
         } else {
-            termLine.push_back(isprint(ch) ? ch : '?');
+            termLine.append(mbstr, mblen);
             length = termLine.size();
         }
     }
