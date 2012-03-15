@@ -43,7 +43,7 @@ void Terminal::reset(bool sendClearFirst, int newLine)
         m_output->write(CSI"1;1H"CSI"2J");
     m_remoteLine = newLine;
     m_cursorHidden = false;
-    m_cursorPos = Coord(0, newLine);
+    m_cursorPos = std::pair<int, int>(0, newLine);
     m_remoteColor = -1;
 }
 
@@ -96,14 +96,14 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     m_output->write(termLine.data(), termLine.size());
 }
 
-void Terminal::finishOutput(const Coord &newCursorPos)
+void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)
 {
     if (newCursorPos != m_cursorPos)
         hideTerminalCursor();
     if (m_cursorHidden) {
-        moveTerminalToLine(newCursorPos.Y);
+        moveTerminalToLine(newCursorPos.second);
         char buffer[32];
-        sprintf(buffer, CSI"%dG"CSI"?25h", newCursorPos.X + 1);
+        sprintf(buffer, CSI"%dG"CSI"?25h", newCursorPos.first + 1);
         m_output->write(buffer);
         m_cursorHidden = false;
     }

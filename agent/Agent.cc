@@ -12,6 +12,7 @@
 #include <windows.h>
 #include <vector>
 #include <string>
+#include <utility>
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
@@ -405,7 +406,8 @@ void Agent::scrapeOutput()
         createSyncMarker(windowRect.top() - 200);
     }
 
-    m_terminal->finishOutput(cursor + Coord(0, m_scrolledCount));
+    m_terminal->finishOutput(std::pair<int, int>(cursor.X,
+                                                 cursor.Y + m_scrolledCount));
 
     unfreezeConsole();
 }
