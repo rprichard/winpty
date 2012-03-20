@@ -49,7 +49,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_controlSocket = makeSocket(controlPipeName);
     m_dataSocket = makeSocket(dataPipeName);
     m_terminal = new Terminal(m_dataSocket);
-    m_consoleInput = new ConsoleInput(m_console);
+    m_consoleInput = new ConsoleInput(m_console, this);
 
     resetConsoleTracking(false);
 
@@ -75,6 +75,15 @@ Agent::~Agent()
     delete m_console;
     delete m_terminal;
     delete m_consoleInput;
+}
+
+// Write a "Device Status Report" command to the terminal.  The terminal will
+// reply with a row+col escape sequence.  Presumably, the DSR reply will not
+// split a keypress escape sequence, so it should be safe to assume that the
+// bytes before it are complete keypresses.
+void Agent::sendDsr()
+{
+    m_dataSocket->write("\x1B[6n");
 }
 
 NamedPipe *Agent::makeSocket(LPCWSTR pipeName)

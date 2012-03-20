@@ -3,6 +3,7 @@
 
 #include <windows.h>
 #include "EventLoop.h"
+#include "DsrSender.h"
 
 class Win32Console;
 class ConsoleInput;
@@ -13,14 +14,15 @@ class NamedPipe;
 const int BUFFER_LINE_COUNT = 3000; // TODO: Use something like 9000.
 const int MAX_CONSOLE_WIDTH = 500;
 
-class Agent : public EventLoop
+class Agent : public EventLoop, public DsrSender
 {
 public:
     Agent(LPCWSTR controlPipeName,
           LPCWSTR dataPipeName,
           int initialCols,
           int initialRows);
-    ~Agent();
+    virtual ~Agent();
+    void sendDsr();
 
 private:
     NamedPipe *makeSocket(LPCWSTR pipeName);
