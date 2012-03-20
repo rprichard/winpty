@@ -12,148 +12,151 @@
 
 const int kIncompleteEscapeTimeoutMs = 1000;
 
+#define ESC "\x1B"
+#define CSI ESC"["
+
 ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
     // Ctrl-<letter/digit> seems to be handled OK by the default code path.
 
     // Alt-<letter/digit>
-    {   "\x1B""a",      'A',        LEFT_ALT_PRESSED    },
-    {   "\x1B""b",      'B',        LEFT_ALT_PRESSED    },
-    {   "\x1B""c",      'C',        LEFT_ALT_PRESSED    },
-    {   "\x1B""d",      'D',        LEFT_ALT_PRESSED    },
-    {   "\x1B""e",      'E',        LEFT_ALT_PRESSED    },
-    {   "\x1B""f",      'F',        LEFT_ALT_PRESSED    },
-    {   "\x1Bg",        'G',        LEFT_ALT_PRESSED    },
-    {   "\x1Bh",        'H',        LEFT_ALT_PRESSED    },
-    {   "\x1Bi",        'I',        LEFT_ALT_PRESSED    },
-    {   "\x1Bj",        'J',        LEFT_ALT_PRESSED    },
-    {   "\x1Bk",        'K',        LEFT_ALT_PRESSED    },
-    {   "\x1Bl",        'L',        LEFT_ALT_PRESSED    },
-    {   "\x1Bm",        'M',        LEFT_ALT_PRESSED    },
-    {   "\x1Bn",        'N',        LEFT_ALT_PRESSED    },
-    {   "\x1Bo",        'O',        LEFT_ALT_PRESSED    },
-    {   "\x1Bp",        'P',        LEFT_ALT_PRESSED    },
-    {   "\x1Bq",        'Q',        LEFT_ALT_PRESSED    },
-    {   "\x1Br",        'R',        LEFT_ALT_PRESSED    },
-    {   "\x1Bs",        'S',        LEFT_ALT_PRESSED    },
-    {   "\x1Bt",        'T',        LEFT_ALT_PRESSED    },
-    {   "\x1Bu",        'U',        LEFT_ALT_PRESSED    },
-    {   "\x1Bv",        'V',        LEFT_ALT_PRESSED    },
-    {   "\x1Bw",        'W',        LEFT_ALT_PRESSED    },
-    {   "\x1Bx",        'X',        LEFT_ALT_PRESSED    },
-    {   "\x1By",        'Y',        LEFT_ALT_PRESSED    },
-    {   "\x1Bz",        'Z',        LEFT_ALT_PRESSED    },
-    {   "\x1B""A",      'A',        LEFT_ALT_PRESSED    },
-    {   "\x1B""B",      'B',        LEFT_ALT_PRESSED    },
-    {   "\x1B""C",      'C',        LEFT_ALT_PRESSED    },
-    {   "\x1B""D",      'D',        LEFT_ALT_PRESSED    },
-    {   "\x1B""E",      'E',        LEFT_ALT_PRESSED    },
-    {   "\x1B""F",      'F',        LEFT_ALT_PRESSED    },
-    {   "\x1BG",        'G',        LEFT_ALT_PRESSED    },
-    {   "\x1BH",        'H',        LEFT_ALT_PRESSED    },
-    {   "\x1BI",        'I',        LEFT_ALT_PRESSED    },
-    {   "\x1BJ",        'J',        LEFT_ALT_PRESSED    },
-    {   "\x1BK",        'K',        LEFT_ALT_PRESSED    },
-    {   "\x1BL",        'L',        LEFT_ALT_PRESSED    },
-    {   "\x1BM",        'M',        LEFT_ALT_PRESSED    },
-    {   "\x1BN",        'N',        LEFT_ALT_PRESSED    },
-    {   "\x1BO",        'O',        LEFT_ALT_PRESSED    },
-    {   "\x1BP",        'P',        LEFT_ALT_PRESSED    },
-    {   "\x1BQ",        'Q',        LEFT_ALT_PRESSED    },
-    {   "\x1BR",        'R',        LEFT_ALT_PRESSED    },
-    {   "\x1BS",        'S',        LEFT_ALT_PRESSED    },
-    {   "\x1BT",        'T',        LEFT_ALT_PRESSED    },
-    {   "\x1BU",        'U',        LEFT_ALT_PRESSED    },
-    {   "\x1BV",        'V',        LEFT_ALT_PRESSED    },
-    {   "\x1BW",        'W',        LEFT_ALT_PRESSED    },
-    {   "\x1BX",        'X',        LEFT_ALT_PRESSED    },
-    {   "\x1BY",        'Y',        LEFT_ALT_PRESSED    },
-    {   "\x1BZ",        'Z',        LEFT_ALT_PRESSED    },
+    {   ESC"a",         'A',        LEFT_ALT_PRESSED    },
+    {   ESC"b",         'B',        LEFT_ALT_PRESSED    },
+    {   ESC"c",         'C',        LEFT_ALT_PRESSED    },
+    {   ESC"d",         'D',        LEFT_ALT_PRESSED    },
+    {   ESC"e",         'E',        LEFT_ALT_PRESSED    },
+    {   ESC"f",         'F',        LEFT_ALT_PRESSED    },
+    {   ESC"g",         'G',        LEFT_ALT_PRESSED    },
+    {   ESC"h",         'H',        LEFT_ALT_PRESSED    },
+    {   ESC"i",         'I',        LEFT_ALT_PRESSED    },
+    {   ESC"j",         'J',        LEFT_ALT_PRESSED    },
+    {   ESC"k",         'K',        LEFT_ALT_PRESSED    },
+    {   ESC"l",         'L',        LEFT_ALT_PRESSED    },
+    {   ESC"m",         'M',        LEFT_ALT_PRESSED    },
+    {   ESC"n",         'N',        LEFT_ALT_PRESSED    },
+    {   ESC"o",         'O',        LEFT_ALT_PRESSED    },
+    {   ESC"p",         'P',        LEFT_ALT_PRESSED    },
+    {   ESC"q",         'Q',        LEFT_ALT_PRESSED    },
+    {   ESC"r",         'R',        LEFT_ALT_PRESSED    },
+    {   ESC"s",         'S',        LEFT_ALT_PRESSED    },
+    {   ESC"t",         'T',        LEFT_ALT_PRESSED    },
+    {   ESC"u",         'U',        LEFT_ALT_PRESSED    },
+    {   ESC"v",         'V',        LEFT_ALT_PRESSED    },
+    {   ESC"w",         'W',        LEFT_ALT_PRESSED    },
+    {   ESC"x",         'X',        LEFT_ALT_PRESSED    },
+    {   ESC"y",         'Y',        LEFT_ALT_PRESSED    },
+    {   ESC"z",         'Z',        LEFT_ALT_PRESSED    },
+    {   ESC"A",         'A',        LEFT_ALT_PRESSED    },
+    {   ESC"B",         'B',        LEFT_ALT_PRESSED    },
+    {   ESC"C",         'C',        LEFT_ALT_PRESSED    },
+    {   ESC"D",         'D',        LEFT_ALT_PRESSED    },
+    {   ESC"E",         'E',        LEFT_ALT_PRESSED    },
+    {   ESC"F",         'F',        LEFT_ALT_PRESSED    },
+    {   ESC"G",         'G',        LEFT_ALT_PRESSED    },
+    {   ESC"H",         'H',        LEFT_ALT_PRESSED    },
+    {   ESC"I",         'I',        LEFT_ALT_PRESSED    },
+    {   ESC"J",         'J',        LEFT_ALT_PRESSED    },
+    {   ESC"K",         'K',        LEFT_ALT_PRESSED    },
+    {   ESC"L",         'L',        LEFT_ALT_PRESSED    },
+    {   ESC"M",         'M',        LEFT_ALT_PRESSED    },
+    {   ESC"N",         'N',        LEFT_ALT_PRESSED    },
+    {   ESC"O",         'O',        LEFT_ALT_PRESSED    },
+    {   ESC"P",         'P',        LEFT_ALT_PRESSED    },
+    {   ESC"Q",         'Q',        LEFT_ALT_PRESSED    },
+    {   ESC"R",         'R',        LEFT_ALT_PRESSED    },
+    {   ESC"S",         'S',        LEFT_ALT_PRESSED    },
+    {   ESC"T",         'T',        LEFT_ALT_PRESSED    },
+    {   ESC"U",         'U',        LEFT_ALT_PRESSED    },
+    {   ESC"V",         'V',        LEFT_ALT_PRESSED    },
+    {   ESC"W",         'W',        LEFT_ALT_PRESSED    },
+    {   ESC"X",         'X',        LEFT_ALT_PRESSED    },
+    {   ESC"Y",         'Y',        LEFT_ALT_PRESSED    },
+    {   ESC"Z",         'Z',        LEFT_ALT_PRESSED    },
 
-    {   "\x1B",         VK_ESCAPE,  0,                  },
-    {   "\x1B[",        '[',        LEFT_ALT_PRESSED    },
+    {   ESC,            VK_ESCAPE,  0,                  },
+    {   ESC"[",         '[',        LEFT_ALT_PRESSED    },
 
     // Function keys
-    {   "\x1BOP",       VK_F1,      0,                  }, // xt gt kon
-    {   "\x1BOQ",       VK_F2,      0,                  }, // xt gt kon
-    {   "\x1BOR",       VK_F3,      0,                  }, // xt gt kon
-    {   "\x1BOS",       VK_F4,      0,                  }, // xt gt kon
-    {   "\x1B[11~",     VK_F1,      0,                  }, // rxvt
-    {   "\x1B[12~",     VK_F2,      0,                  }, // rxvt
-    {   "\x1B[13~",     VK_F3,      0,                  }, // rxvt
-    {   "\x1B[14~",     VK_F4,      0,                  }, // rxvt
-    {   "\x1B[15~",     VK_F5,      0,                  }, // xt gt kon rxvt
-    {   "\x1B[17~",     VK_F6,      0,                  }, // xt gt kon rxvt
-    {   "\x1B[18~",     VK_F7,      0,                  }, // xt gt kon rxvt
-    {   "\x1B[19~",     VK_F8,      0,                  }, // xt gt kon rxvt
-    {   "\x1B[20~",     VK_F9,      0,                  }, // xt gt kon rxvt
-    {   "\x1B[21~",     VK_F10,     0,                  }, // xt gt kon rxvt
-    {   "\x1B[23~",     VK_F11,     0,                  }, // xt gt kon rxvt
-    {   "\x1B[24~",     VK_F12,     0,                  }, // xt gt kon rxvt
+    {   ESC"OP",        VK_F1,      0,                  }, // xt gt kon
+    {   ESC"OQ",        VK_F2,      0,                  }, // xt gt kon
+    {   ESC"OR",        VK_F3,      0,                  }, // xt gt kon
+    {   ESC"OS",        VK_F4,      0,                  }, // xt gt kon
+    {   CSI"11~",       VK_F1,      0,                  }, // rxvt
+    {   CSI"12~",       VK_F2,      0,                  }, // rxvt
+    {   CSI"13~",       VK_F3,      0,                  }, // rxvt
+    {   CSI"14~",       VK_F4,      0,                  }, // rxvt
+    {   CSI"15~",       VK_F5,      0,                  }, // xt gt kon rxvt
+    {   CSI"17~",       VK_F6,      0,                  }, // xt gt kon rxvt
+    {   CSI"18~",       VK_F7,      0,                  }, // xt gt kon rxvt
+    {   CSI"19~",       VK_F8,      0,                  }, // xt gt kon rxvt
+    {   CSI"20~",       VK_F9,      0,                  }, // xt gt kon rxvt
+    {   CSI"21~",       VK_F10,     0,                  }, // xt gt kon rxvt
+    {   CSI"23~",       VK_F11,     0,                  }, // xt gt kon rxvt
+    {   CSI"24~",       VK_F12,     0,                  }, // xt gt kon rxvt
 
     {   "\x7F",         VK_BACK,    0,                  },
-    {   "\x1B\x7F",     VK_BACK,    LEFT_ALT_PRESSED,   },
+    {   ESC"\x7F",      VK_BACK,    LEFT_ALT_PRESSED,   },
 
     // arrow keys
-    {   "\x1B[A",       VK_UP,      0,                  }, // xt gt kon rxvt
-    {   "\x1B[B",       VK_DOWN,    0,                  }, // xt gt kon rxvt
-    {   "\x1B[C",       VK_RIGHT,   0,                  }, // xt gt kon rxvt
-    {   "\x1B[D",       VK_LEFT,    0,                  }, // xt gt kon rxvt
+    {   CSI"A",         VK_UP,      0,                  }, // xt gt kon rxvt
+    {   CSI"B",         VK_DOWN,    0,                  }, // xt gt kon rxvt
+    {   CSI"C",         VK_RIGHT,   0,                  }, // xt gt kon rxvt
+    {   CSI"D",         VK_LEFT,    0,                  }, // xt gt kon rxvt
     // ctrl-<arrow>
-    {   "\x1B[1;5A",    VK_UP,      LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   "\x1B[1;5B",    VK_DOWN,    LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   "\x1B[1;5C",    VK_RIGHT,   LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   "\x1B[1;5D",    VK_LEFT,    LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   "\x1BOa",       VK_UP,      LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1BOb",       VK_DOWN,    LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1BOc",       VK_RIGHT,   LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1BOd",       VK_LEFT,    LEFT_CTRL_PRESSED   }, // rxvt
+    {   CSI"1;5A",      VK_UP,      LEFT_CTRL_PRESSED   }, // xt gt kon
+    {   CSI"1;5B",      VK_DOWN,    LEFT_CTRL_PRESSED   }, // xt gt kon
+    {   CSI"1;5C",      VK_RIGHT,   LEFT_CTRL_PRESSED   }, // xt gt kon
+    {   CSI"1;5D",      VK_LEFT,    LEFT_CTRL_PRESSED   }, // xt gt kon
+    {   ESC"Oa",        VK_UP,      LEFT_CTRL_PRESSED   }, // rxvt
+    {   ESC"Ob",        VK_DOWN,    LEFT_CTRL_PRESSED   }, // rxvt
+    {   ESC"Oc",        VK_RIGHT,   LEFT_CTRL_PRESSED   }, // rxvt
+    {   ESC"Od",        VK_LEFT,    LEFT_CTRL_PRESSED   }, // rxvt
     // alt-<arrow>
-    {   "\x1B[1;3A",    VK_UP,      LEFT_ALT_PRESSED    }, // xt gt kon
-    {   "\x1B[1;3B",    VK_DOWN,    LEFT_ALT_PRESSED    }, // xt gt kon
-    {   "\x1B[1;3C",    VK_RIGHT,   LEFT_ALT_PRESSED    }, // xt gt kon
-    {   "\x1B[1;3D",    VK_LEFT,    LEFT_ALT_PRESSED    }, // xt gt kon
-    {   "\x1B\x1B[A",   VK_UP,      LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[B",   VK_DOWN,    LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[C",   VK_RIGHT,   LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[D",   VK_LEFT,    LEFT_ALT_PRESSED    }, // rxvt
+    {   CSI"1;3A",      VK_UP,      LEFT_ALT_PRESSED    }, // xt gt kon
+    {   CSI"1;3B",      VK_DOWN,    LEFT_ALT_PRESSED    }, // xt gt kon
+    {   CSI"1;3C",      VK_RIGHT,   LEFT_ALT_PRESSED    }, // xt gt kon
+    {   CSI"1;3D",      VK_LEFT,    LEFT_ALT_PRESSED    }, // xt gt kon
+    {   ESC CSI"A",     VK_UP,      LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"B",     VK_DOWN,    LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"C",     VK_RIGHT,   LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"D",     VK_LEFT,    LEFT_ALT_PRESSED    }, // rxvt
 
     // insert,delete,home,end,pgup,pgdn
-    {   "\x1B[2~",      VK_INSERT,  0,                  }, // xt gt kon rxvt
-    {   "\x1B[3~",      VK_DELETE,  0,                  }, // xt gt kon rxvt
-    {   "\x1B[5~",      VK_PRIOR,   0,                  }, // xt gt kon rxvt
-    {   "\x1B[6~",      VK_NEXT,    0,                  }, // xt gt kon rxvt
-    {   "\x1B[H",       VK_HOME,    0,                  }, // xt kon
-    {   "\x1B[F",       VK_END,     0,                  }, // xt kon
-    {   "\x1BOH",       VK_HOME,    0,                  }, // gt
-    {   "\x1BOF",       VK_END,     0,                  }, // gt
-    {   "\x1B[7^",      VK_HOME,    0,                  }, // rxvt
-    {   "\x1B[8^",      VK_END,     0,                  }, // rxvt
+    {   CSI"2~",        VK_INSERT,  0,                  }, // xt gt kon rxvt
+    {   CSI"3~",        VK_DELETE,  0,                  }, // xt gt kon rxvt
+    {   CSI"5~",        VK_PRIOR,   0,                  }, // xt gt kon rxvt
+    {   CSI"6~",        VK_NEXT,    0,                  }, // xt gt kon rxvt
+    {   CSI"H",         VK_HOME,    0,                  }, // xt kon
+    {   CSI"F",         VK_END,     0,                  }, // xt kon
+    {   ESC"OH",        VK_HOME,    0,                  }, // gt
+    {   ESC"OF",        VK_END,     0,                  }, // gt
+    {   CSI"7^",        VK_HOME,    0,                  }, // rxvt
+    {   CSI"8^",        VK_END,     0,                  }, // rxvt
     // ctrl-<key>
-    {   "\x1B[2;5~",    VK_INSERT,  LEFT_CTRL_PRESSED   }, // xt
-    {   "\x1B[3;5~",    VK_DELETE,  LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   "\x1B[1;5H",    VK_HOME,    LEFT_CTRL_PRESSED   }, // xt kon
-    {   "\x1B[1;5F",    VK_END,     LEFT_CTRL_PRESSED   }, // xt kon
-    {   "\x1B[5;5~",    VK_PRIOR,   LEFT_CTRL_PRESSED   }, // xt gt
-    {   "\x1B[6;5~",    VK_NEXT,    LEFT_CTRL_PRESSED   }, // xt gt
-    {   "\x1B[2^",      VK_INSERT,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1B[3^",      VK_DELETE,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1B[7^",      VK_HOME,    LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1B[8^",      VK_END,     LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1B[5^",      VK_PRIOR,   LEFT_CTRL_PRESSED   }, // rxvt
-    {   "\x1B[6^",      VK_NEXT,    LEFT_CTRL_PRESSED   }, // rxvt
+    {   CSI"2;5~",      VK_INSERT,  LEFT_CTRL_PRESSED   }, // xt
+    {   CSI"3;5~",      VK_DELETE,  LEFT_CTRL_PRESSED   }, // xt gt kon
+    {   CSI"1;5H",      VK_HOME,    LEFT_CTRL_PRESSED   }, // xt kon
+    {   CSI"1;5F",      VK_END,     LEFT_CTRL_PRESSED   }, // xt kon
+    {   CSI"5;5~",      VK_PRIOR,   LEFT_CTRL_PRESSED   }, // xt gt
+    {   CSI"6;5~",      VK_NEXT,    LEFT_CTRL_PRESSED   }, // xt gt
+    {   CSI"2^",        VK_INSERT,  LEFT_CTRL_PRESSED   }, // rxvt
+    {   CSI"3^",        VK_DELETE,  LEFT_CTRL_PRESSED   }, // rxvt
+    {   CSI"7^",        VK_HOME,    LEFT_CTRL_PRESSED   }, // rxvt
+    {   CSI"8^",        VK_END,     LEFT_CTRL_PRESSED   }, // rxvt
+    {   CSI"5^",        VK_PRIOR,   LEFT_CTRL_PRESSED   }, // rxvt
+    {   CSI"6^",        VK_NEXT,    LEFT_CTRL_PRESSED   }, // rxvt
     // alt-<key>
-    {   "\x1B[2;3~",    VK_INSERT,  LEFT_ALT_PRESSED    }, // xt gt
-    {   "\x1B[3;3~",    VK_DELETE,  LEFT_ALT_PRESSED    }, // xt gt
-    {   "\x1B[1;3H",    VK_HOME,    LEFT_ALT_PRESSED    }, // xt
-    {   "\x1B[1;3F",    VK_END,     LEFT_ALT_PRESSED    }, // xt
-    {   "\x1B[5;3~",    VK_PRIOR,   LEFT_ALT_PRESSED    }, // xt gt
-    {   "\x1B[6;3~",    VK_NEXT,    LEFT_ALT_PRESSED    }, // xt gt
-    {   "\x1B\x1B[2~",  VK_INSERT,  LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[3~",  VK_DELETE,  LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[7~",  VK_HOME,    LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[8~",  VK_END,     LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[5~",  VK_PRIOR,   LEFT_ALT_PRESSED    }, // rxvt
-    {   "\x1B\x1B[6~",  VK_NEXT,    LEFT_ALT_PRESSED    }, // rxvt
+    {   CSI"2;3~",      VK_INSERT,  LEFT_ALT_PRESSED    }, // xt gt
+    {   CSI"3;3~",      VK_DELETE,  LEFT_ALT_PRESSED    }, // xt gt
+    {   CSI"1;3H",      VK_HOME,    LEFT_ALT_PRESSED    }, // xt
+    {   CSI"1;3F",      VK_END,     LEFT_ALT_PRESSED    }, // xt
+    {   CSI"5;3~",      VK_PRIOR,   LEFT_ALT_PRESSED    }, // xt gt
+    {   CSI"6;3~",      VK_NEXT,    LEFT_ALT_PRESSED    }, // xt gt
+    {   ESC CSI"2~",    VK_INSERT,  LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"3~",    VK_DELETE,  LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"7~",    VK_HOME,    LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"8~",    VK_END,     LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"5~",    VK_PRIOR,   LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC CSI"6~",    VK_NEXT,    LEFT_ALT_PRESSED    }, // rxvt
 };
 
 ConsoleInput::ConsoleInput(Win32Console *console) : m_console(console), lastWriteTick(0)
