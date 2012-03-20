@@ -4,6 +4,8 @@
 
 int main(int argc, char *argv[])
 {
+    static int escCount = 0;
+
     HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
     while (true) {
         DWORD count;
@@ -12,6 +14,13 @@ int main(int argc, char *argv[])
             printf("ReadConsoleInput failed\n");
             return 1;
         }
+
+        if (true) {
+            DWORD mode;
+            GetConsoleMode(hStdin, &mode);
+            SetConsoleMode(hStdin, mode & ~ENABLE_PROCESSED_INPUT);
+        }
+
         if (ir.EventType == KEY_EVENT) {
             const KEY_EVENT_RECORD &ker = ir.Event.KeyEvent;
             printf("%s", ker.bKeyDown ? "dn" : "up");
@@ -19,11 +28,13 @@ int main(int argc, char *argv[])
             if (isprint(ker.uChar.AsciiChar))
                 printf("'%c'", ker.uChar.AsciiChar);
             printf("%d", ker.uChar.AsciiChar);
-            printf(" ctrl=%d", (int)ker.dwControlKeyState);
-            printf(" vk=%d", ker.wVirtualKeyCode);
-            printf(" scan=%d", ker.wVirtualScanCode);
+            printf(" vk=%#x", ker.wVirtualKeyCode);
+            printf(" scan=%#x", ker.wVirtualScanCode);
+            printf(" state=%#x", (int)ker.dwControlKeyState);
             printf(" repeat=%d", ker.wRepeatCount);
             printf("\n");
+            if (ker.uChar.AsciiChar == 27 && ++escCount == 6)
+                break;
         }
     }
 }
