@@ -149,6 +149,16 @@ void Win32Console::writeInput(const INPUT_RECORD *ir, int count)
     }
 }
 
+bool Win32Console::processedInputMode()
+{
+    // TODO: error handling
+    DWORD mode = 0;
+    if (!GetConsoleMode(m_conin, &mode)) {
+        Trace("GetConsoleMode failed");
+    }
+    return (mode & ENABLE_PROCESSED_INPUT) == ENABLE_PROCESSED_INPUT;
+}
+
 void Win32Console::read(const SmallRect &rect, CHAR_INFO *data)
 {
     // TODO: error handling

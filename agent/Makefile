@@ -10,6 +10,7 @@ OBJECTS = \
 	AgentAssert.o \
 	Terminal.o \
 	Win32Console.o \
+	ConsoleInput.o \
 	AgentDebugClient.o \
 	Coord.o \
 	SmallRect.o \

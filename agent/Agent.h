@@ -5,6 +5,7 @@
 #include "EventLoop.h"
 
 class Win32Console;
+class ConsoleInput;
 class Terminal;
 class ReadBuffer;
 class NamedPipe;
@@ -53,6 +54,7 @@ private:
     NamedPipe *m_dataSocket;
     bool m_closingDataSocket;
     Terminal *m_terminal;
+    ConsoleInput *m_consoleInput;
     HANDLE m_childProcess;
     int m_childExitCode;
 

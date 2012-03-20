@@ -1,5 +1,6 @@
 #include "Agent.h"
 #include "Win32Console.h"
+#include "ConsoleInput.h"
 #include "Terminal.h"
 #include "NamedPipe.h"
 #include "AgentAssert.h"
@@ -17,6 +18,15 @@
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 const int SYNC_MARKER_LEN = 16;
+
+static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
+{
+    if (dwCtrlType == CTRL_C_EVENT) {
+        // Do nothing and claim to have handled the event.
+        return TRUE;
+    }
+    return FALSE;
+}
 
 Agent::Agent(LPCWSTR controlPipeName,
              LPCWSTR dataPipeName,
@@ -39,8 +49,16 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_controlSocket = makeSocket(controlPipeName);
     m_dataSocket = makeSocket(dataPipeName);
     m_terminal = new Terminal(m_dataSocket);
+    m_consoleInput = new ConsoleInput(m_console);
 
     resetConsoleTracking(false);
+
+    // Setup Ctrl-C handling.  First restore default handling of Ctrl-C.  This
+    // attribute is inherited by child processes.  Then register a custom
+    // Ctrl-C handler that does nothing.  The handler will be called when the
+    // agent calls GenerateConsoleCtrlEvent.
+    SetConsoleCtrlHandler(NULL, FALSE);
+    SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
 
     setPollInterval(25);
 
@@ -56,6 +74,7 @@ Agent::~Agent()
     delete [] m_bufferData;
     delete m_console;
     delete m_terminal;
+    delete m_consoleInput;
 }
 
 NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
@@ -196,23 +215,7 @@ int Agent::handleSetSizePacket(ReadBuffer &packet)
 
 void Agent::pollDataSocket()
 {
-    // TODO: This is an incomplete hack...
-    std::string data = m_dataSocket->readAll();
-    for (size_t i = 0; i < data.size(); ++i) {
-        char ch = data[i];
-        const short vk = VkKeyScan(ch);
-        if (vk != -1) {
-            INPUT_RECORD ir;
-            memset(&ir, 0, sizeof(ir));
-            ir.EventType = KEY_EVENT;
-            ir.Event.KeyEvent.bKeyDown = TRUE;
-            ir.Event.KeyEvent.wVirtualKeyCode = vk & 0xff;
-            ir.Event.KeyEvent.wVirtualScanCode = 0;
-            ir.Event.KeyEvent.uChar.AsciiChar = ch;
-            ir.Event.KeyEvent.wRepeatCount = 1;
-            m_console->writeInput(&ir);
-        }
-    }
+    m_consoleInput->writeInput(m_dataSocket->readAll());
 
     // If the child process had exited, then close the data socket if we've
     // finished sending all of the collected output.
@@ -226,6 +229,10 @@ void Agent::pollDataSocket()
 
 void Agent::onPollTimeout()
 {
+    // Give the ConsoleInput object a chance to flush input from an incomplete
+    // escape sequence (e.g. pressing ESC).
+    m_consoleInput->flushIncompleteEscapeCode();
+
     // Check if the child process has exited.
     if (WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
         DWORD exitCode;

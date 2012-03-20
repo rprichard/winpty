@@ -29,6 +29,7 @@ public:
 
     // Input stream.
     void writeInput(const INPUT_RECORD *ir, int count=1);
+    bool processedInputMode();
 
     // Screen content.
     void read(const SmallRect &rect, CHAR_INFO *data);
