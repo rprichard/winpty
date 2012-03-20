@@ -139,6 +139,7 @@ void Agent::handlePacket(ReadBuffer &packet)
 
 int Agent::handleStartProcessPacket(ReadBuffer &packet)
 {
+    BOOL success;
     ASSERT(m_childProcess == NULL);
 
     std::wstring program = packet.getWString();
@@ -164,20 +165,24 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     memset(&pi, 0, sizeof(pi));
     sui.cb = sizeof(STARTUPINFO);
 
-    BOOL ret = CreateProcess(programArg, cmdlineArg, NULL, NULL,
-                             /*bInheritHandles=*/FALSE,
-                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT,
-                             (LPVOID)envArg, cwdArg, &sui, &pi);
+    success = CreateProcess(programArg, cmdlineArg, NULL, NULL,
+                            /*bInheritHandles=*/FALSE,
+                            /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
+                            /*CREATE_NEW_PROCESS_GROUP*/0,
+                            (LPVOID)envArg, cwdArg, &sui, &pi);
+    int ret = success ? 0 : GetLastError();
 
-    Trace("CreateProcess: %s %d", (ret ? "success" : "fail"), (int)pi.dwProcessId);
+    Trace("CreateProcess: %s %d",
+          (success ? "success" : "fail"),
+          (int)pi.dwProcessId);
 
-    if (ret) {
+    if (success) {
         CloseHandle(pi.hThread);
         m_childProcess = pi.hProcess;
     }
 
     // TODO: report success/failure to client
-    return ret ? 0 : GetLastError();
+    return ret;
 }
 
 int Agent::handleSetSizePacket(ReadBuffer &packet)
