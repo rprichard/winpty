@@ -263,6 +263,7 @@ int ConsoleInput::appendChar(std::vector<INPUT_RECORD> &records,
                 MapVirtualKey(match->virtualKey, MAPVK_VK_TO_VSC);
         ir.Event.KeyEvent.uChar.UnicodeChar =
                 MapVirtualKey(match->virtualKey, MAPVK_VK_TO_CHAR);
+        ir.Event.KeyEvent.dwControlKeyState = match->keyState;
         records.push_back(ir);
         ir.Event.KeyEvent.bKeyDown = FALSE;
         records.push_back(ir);
