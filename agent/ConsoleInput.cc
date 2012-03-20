@@ -3,6 +3,7 @@
 #include "DsrSender.h"
 #include "../Shared/DebugClient.h"
 #include <string.h>
+#include <stdio.h>
 
 #ifndef MAPVK_VK_TO_VSC
 #define MAPVK_VK_TO_VSC 0
@@ -12,6 +13,7 @@ const int kIncompleteEscapeTimeoutMs = 1000;
 
 #define ESC "\x1B"
 #define CSI ESC"["
+#define DIM(x) (sizeof(x) / sizeof((x)[0]))
 
 ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
     // Ctrl-<letter/digit> seems to be handled OK by the default code path.
@@ -23,88 +25,17 @@ ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
     {   ESC"O",         'O',        0,  LEFT_ALT_PRESSED    },
     {   ESC"[",         '[',        0,  LEFT_ALT_PRESSED    },
 
-    // Function keys
+    // F1-F4 function keys.  F5-F12 seem to be handled consistently among the
+    // TERM=xterm terminals (gnome-terminal, konsole, xterm).
     {   ESC"OP",        VK_F1,      0,  0,                  }, // xt gt kon
     {   ESC"OQ",        VK_F2,      0,  0,                  }, // xt gt kon
     {   ESC"OR",        VK_F3,      0,  0,                  }, // xt gt kon
     {   ESC"OS",        VK_F4,      0,  0,                  }, // xt gt kon
-    {   CSI"11~",       VK_F1,      0,  0,                  }, // rxvt
-    {   CSI"12~",       VK_F2,      0,  0,                  }, // rxvt
-    {   CSI"13~",       VK_F3,      0,  0,                  }, // rxvt
-    {   CSI"14~",       VK_F4,      0,  0,                  }, // rxvt
-    {   CSI"15~",       VK_F5,      0,  0,                  }, // xt gt kon rxvt
-    {   CSI"17~",       VK_F6,      0,  0,                  }, // xt gt kon rxvt
-    {   CSI"18~",       VK_F7,      0,  0,                  }, // xt gt kon rxvt
-    {   CSI"19~",       VK_F8,      0,  0,                  }, // xt gt kon rxvt
-    {   CSI"20~",       VK_F9,      0,  0,                  }, // xt gt kon rxvt
-    {   CSI"21~",       VK_F10,     0,  0,                  }, // xt gt kon rxvt
-    {   CSI"23~",       VK_F11,     0,  0,                  }, // xt gt kon rxvt
-    {   CSI"24~",       VK_F12,     0,  0,                  }, // xt gt kon rxvt
 
-    {   "\x7F",         VK_BACK,    '\x08', 0,              },
+    {   "\x7F",         VK_BACK,    '\x08', 0,                  },
     {   ESC"\x7F",      VK_BACK,    '\x08', LEFT_ALT_PRESSED,   },
-
-    // arrow keys
-    {   CSI"A",         VK_UP,      0,  0,                  }, // xt gt kon rxvt
-    {   CSI"B",         VK_DOWN,    0,  0,                  }, // xt gt kon rxvt
-    {   CSI"C",         VK_RIGHT,   0,  0,                  }, // xt gt kon rxvt
-    {   CSI"D",         VK_LEFT,    0,  0,                  }, // xt gt kon rxvt
-    // ctrl-<arrow>
-    {   CSI"1;5A",      VK_UP,      0,  LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   CSI"1;5B",      VK_DOWN,    0,  LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   CSI"1;5C",      VK_RIGHT,   0,  LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   CSI"1;5D",      VK_LEFT,    0,  LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   ESC"Oa",        VK_UP,      0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   ESC"Ob",        VK_DOWN,    0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   ESC"Oc",        VK_RIGHT,   0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   ESC"Od",        VK_LEFT,    0,  LEFT_CTRL_PRESSED   }, // rxvt
-    // alt-<arrow>
-    {   CSI"1;3A",      VK_UP,      0,  LEFT_ALT_PRESSED    }, // xt gt kon
-    {   CSI"1;3B",      VK_DOWN,    0,  LEFT_ALT_PRESSED    }, // xt gt kon
-    {   CSI"1;3C",      VK_RIGHT,   0,  LEFT_ALT_PRESSED    }, // xt gt kon
-    {   CSI"1;3D",      VK_LEFT,    0,  LEFT_ALT_PRESSED    }, // xt gt kon
-    {   ESC CSI"A",     VK_UP,      0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"B",     VK_DOWN,    0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"C",     VK_RIGHT,   0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"D",     VK_LEFT,    0,  LEFT_ALT_PRESSED    }, // rxvt
-
-    // insert,delete,home,end,pgup,pgdn
-    {   CSI"2~",        VK_INSERT,  0,  0,                  }, // xt gt kon rxvt
-    {   CSI"3~",        VK_DELETE,  0,  0,                  }, // xt gt kon rxvt
-    {   CSI"5~",        VK_PRIOR,   0,  0,                  }, // xt gt kon rxvt
-    {   CSI"6~",        VK_NEXT,    0,  0,                  }, // xt gt kon rxvt
-    {   CSI"H",         VK_HOME,    0,  0,                  }, // xt kon
-    {   CSI"F",         VK_END,     0,  0,                  }, // xt kon
-    {   ESC"OH",        VK_HOME,    0,  0,                  }, // gt
-    {   ESC"OF",        VK_END,     0,  0,                  }, // gt
-    {   CSI"7^",        VK_HOME,    0,  0,                  }, // rxvt
-    {   CSI"8^",        VK_END,     0,  0,                  }, // rxvt
-    // ctrl-<key>
-    {   CSI"2;5~",      VK_INSERT,  0,  LEFT_CTRL_PRESSED   }, // xt
-    {   CSI"3;5~",      VK_DELETE,  0,  LEFT_CTRL_PRESSED   }, // xt gt kon
-    {   CSI"1;5H",      VK_HOME,    0,  LEFT_CTRL_PRESSED   }, // xt kon
-    {   CSI"1;5F",      VK_END,     0,  LEFT_CTRL_PRESSED   }, // xt kon
-    {   CSI"5;5~",      VK_PRIOR,   0,  LEFT_CTRL_PRESSED   }, // xt gt
-    {   CSI"6;5~",      VK_NEXT,    0,  LEFT_CTRL_PRESSED   }, // xt gt
-    {   CSI"2^",        VK_INSERT,  0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   CSI"3^",        VK_DELETE,  0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   CSI"7^",        VK_HOME,    0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   CSI"8^",        VK_END,     0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   CSI"5^",        VK_PRIOR,   0,  LEFT_CTRL_PRESSED   }, // rxvt
-    {   CSI"6^",        VK_NEXT,    0,  LEFT_CTRL_PRESSED   }, // rxvt
-    // alt-<key>
-    {   CSI"2;3~",      VK_INSERT,  0,  LEFT_ALT_PRESSED    }, // xt gt
-    {   CSI"3;3~",      VK_DELETE,  0,  LEFT_ALT_PRESSED    }, // xt gt
-    {   CSI"1;3H",      VK_HOME,    0,  LEFT_ALT_PRESSED    }, // xt
-    {   CSI"1;3F",      VK_END,     0,  LEFT_ALT_PRESSED    }, // xt
-    {   CSI"5;3~",      VK_PRIOR,   0,  LEFT_ALT_PRESSED    }, // xt gt
-    {   CSI"6;3~",      VK_NEXT,    0,  LEFT_ALT_PRESSED    }, // xt gt
-    {   ESC CSI"2~",    VK_INSERT,  0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"3~",    VK_DELETE,  0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"7~",    VK_HOME,    0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"8~",    VK_END,     0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"5~",    VK_PRIOR,   0,  LEFT_ALT_PRESSED    }, // rxvt
-    {   ESC CSI"6~",    VK_NEXT,    0,  LEFT_ALT_PRESSED    }, // rxvt
+    {   ESC"OH",        VK_HOME,    0,  0,                      }, // gnome-terminal
+    {   ESC"OF",        VK_END,     0,  0,                      }, // gnome-terminal
 };
 
 ConsoleInput::ConsoleInput(Win32Console *console, DsrSender *dsrSender) :
@@ -113,8 +44,100 @@ ConsoleInput::ConsoleInput(Win32Console *console, DsrSender *dsrSender) :
     m_dsrSent(false),
     lastWriteTick(0)
 {
+    // Generate CSI encodings and add them to the table.
+    struct CsiEncoding {
+        int id;
+        char letter;
+        int virtualKey;
+    };
+    static const CsiEncoding csiEncodings[] = {
+        {   0,  'A',    VK_UP       },
+        {   0,  'B',    VK_DOWN     },
+        {   0,  'C',    VK_RIGHT    },
+        {   0,  'D',    VK_LEFT     },
+        {   0,  'E',    VK_NUMPAD5  },
+        {   0,  'F',    VK_END      },
+        {   0,  'H',    VK_HOME     },
+        {   0,  'P',    VK_F1       },  // mod+F1 for xterm and mintty
+        {   0,  'Q',    VK_F2       },  // mod+F2 for xterm and mintty
+        {   0,  'R',    VK_F3       },  // mod+F3 for xterm and mintty
+        {   0,  'S',    VK_F4       },  // mod+F4 for xterm and mintty
+        {   1,  '~',    VK_HOME     },
+        {   2,  '~',    VK_INSERT   },
+        {   3,  '~',    VK_DELETE   },
+        {   4,  '~',    VK_END      },  // gnome-terminal keypad home/end
+        {   5,  '~',    VK_PRIOR    },
+        {   6,  '~',    VK_NEXT     },
+        {   7,  '~',    VK_HOME     },
+        {   8,  '~',    VK_END      },
+        {   15, '~',    VK_F5       },
+        {   17, '~',    VK_F6       },
+        {   18, '~',    VK_F7       },
+        {   19, '~',    VK_F8       },
+        {   20, '~',    VK_F9       },
+        {   21, '~',    VK_F10      },
+        {   23, '~',    VK_F11      },
+        {   24, '~',    VK_F12      },
+    };
+    const int kCsiShiftModifier = 1;
+    const int kCsiAltModifier   = 2;
+    const int kCsiCtrlModifier  = 4;
+    char encoding[32];
+    for (size_t i = 0; i < DIM(csiEncodings); ++i) {
+        const CsiEncoding *e = &csiEncodings[i];
+        if (e->id == 0)
+            sprintf(encoding, CSI"%c", e->letter);
+        else
+            sprintf(encoding, CSI"%d%c", e->id, e->letter);
+        KeyDescriptor *k = new KeyDescriptor;
+        k->encoding = NULL;
+        k->encodingLen = strlen(encoding);
+        k->keyState = 0;
+        k->unicodeChar = 0;
+        k->virtualKey = csiEncodings[i].virtualKey;
+        m_lookup.set(encoding, k);
+        int id = !e->id ? 1 : e->id;
+        for (int mod = 2; mod <= 8; ++mod) {
+            sprintf(encoding, CSI"%d;%d%c", id, mod, e->letter);
+            KeyDescriptor *k2 = new KeyDescriptor;
+            *k2 = *k;
+            k2->encodingLen = strlen(encoding);
+            if ((mod - 1) & kCsiShiftModifier)  k2->keyState |= SHIFT_PRESSED;
+            if ((mod - 1) & kCsiAltModifier)    k2->keyState |= LEFT_ALT_PRESSED;
+            if ((mod - 1) & kCsiCtrlModifier)   k2->keyState |= LEFT_CTRL_PRESSED;
+            m_lookup.set(encoding, k2);
+        }
+    }
+
+    // Modified F1-F4 on gnome-terminal and konsole.
+    for (int mod = 2; mod <= 8; ++mod) {
+        for (int fn = 0; fn < 4; ++fn) {
+            for (int fmt = 0; fmt < 1; ++fmt) {
+                if (fmt == 0) {
+                    // gnome-terminal
+                    sprintf(encoding, ESC"O1;%d%c", mod, 'P' + fn);
+                } else {
+                    // konsole
+                    sprintf(encoding, ESC"O%d%c", mod, 'P' + fn);
+                }
+                KeyDescriptor *k = new KeyDescriptor;
+                k->encoding = NULL;
+                k->encodingLen = strlen(encoding);
+                k->keyState = 0;
+                if ((mod - 1) & kCsiShiftModifier)  k->keyState |= SHIFT_PRESSED;
+                if ((mod - 1) & kCsiAltModifier)    k->keyState |= LEFT_ALT_PRESSED;
+                if ((mod - 1) & kCsiCtrlModifier)   k->keyState |= LEFT_CTRL_PRESSED;
+                k->unicodeChar = 0;
+                k->virtualKey = VK_F1 + fn;
+                m_lookup.set(encoding, k);
+            }
+        }
+    }
+
+    // Static key encodings.
     for (size_t i = 0; i < sizeof(keyDescriptorTable) / sizeof(keyDescriptorTable[0]); ++i) {
-        KeyDescriptor *k = &keyDescriptorTable[i];
+        KeyDescriptor *k = new KeyDescriptor;
+        *k = keyDescriptorTable[i];
         k->encodingLen = strlen(k->encoding);
         m_lookup.set(k->encoding, k);
     }
@@ -128,6 +151,7 @@ void ConsoleInput::writeInput(const std::string &input)
     m_byteQueue.append(input);
     doWrite(false);
     if (!m_byteQueue.empty() && !m_dsrSent) {
+        Trace("send DSR");
         m_dsrSender->sendDsr();
         m_dsrSent = true;
     }
@@ -149,6 +173,7 @@ ConsoleInput::KeyLookup::KeyLookup() : match(NULL), children(NULL)
 
 ConsoleInput::KeyLookup::~KeyLookup()
 {
+    delete match;
     if (children != NULL) {
         for (int i = 0; i < 256; ++i)
             delete (*children)[i];
@@ -194,6 +219,8 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
                                int inputSize,
                                bool isEof)
 {
+    Trace("scanKeyPress: %d bytes", inputSize);
+
     // Ctrl-C.
     if (input[0] == '\x03' && m_console->processedInputMode()) {
         Trace("Ctrl-C");
@@ -215,7 +242,9 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
     }
 
     // Recognize Alt-<character>.
-    if (input[0] == '\x1B' && input[1] != '\0' &&
+    if (input[0] == '\x1B' &&
+            input[1] != '\0' &&
+            input[1] != '\x1B' &&
             m_lookup.getChild('\x1B')->getChild(input[1]) == NULL) {
         int len = utf8CharLength(input[1]);
         if (1 + len > inputSize) {
