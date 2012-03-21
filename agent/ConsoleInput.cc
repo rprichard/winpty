@@ -25,8 +25,11 @@ ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
     {   ESC"O",         'O',        0,  LEFT_ALT_PRESSED    },
     {   ESC"[",         '[',        0,  LEFT_ALT_PRESSED    },
 
-    // F1-F4 function keys.  F5-F12 seem to be handled consistently among the
-    // TERM=xterm terminals (gnome-terminal, konsole, xterm).
+    // F1-F4 function keys.  F5-F12 seem to be handled more consistently among
+    // various TERM=xterm terminals (gnome-terminal, konsole, xterm, mintty),
+    // using a CSI-prefix with an optional extra modifier digit.  (putty is
+    // also TERM=xterm, though, and has completely different modified F5-F12
+    // encodings.)
     {   ESC"OP",        VK_F1,      0,  0,                  }, // xt gt kon
     {   ESC"OQ",        VK_F2,      0,  0,                  }, // xt gt kon
     {   ESC"OR",        VK_F3,      0,  0,                  }, // xt gt kon
