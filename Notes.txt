@@ -196,3 +196,21 @@ replaced with a hidden cursor.
 Fix assert() in the agent.  If it fails, the failure message needs to be
 reported somewhere.  Pop up a dialog box?  Maybe switch the active desktop,
 then show a dialog box?
+
+TODO: There's already a pconsole project on GitHub.  Maybe rename this project
+to something else?  winpty?
+
+TODO: Can the DebugServer system be replaced with OutputDebugString?  How
+do we decide whose processes' output to collect?
+
+TODO: Three executables:
+  build/winpty-agent.exe
+  build/winpty.dll
+  build/console.exe
+
+BUG: Run the pconsole.exe inside another console.  As I type dir, I see this:
+      D:\rprichard\pconsole>
+      D:\rprichard\pconsole>d
+      D:\rprichard\pconsole>di
+      D:\rprichard\pconsole>dir
+In the output of "dir", every other line is blank.
