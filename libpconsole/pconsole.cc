@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <assert.h>
 #include <string.h>
+#include <stdint.h>
 #include <string>
 #include <vector>
 #include <sstream>
