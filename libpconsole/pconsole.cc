@@ -193,7 +193,15 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     std::wstring controlPipeName = pipeName.str() + L"-control";
     std::wstring dataPipeName = pipeName.str() + L"-data";
     pc->controlPipe = createNamedPipe(controlPipeName, false);
+    if (pc->controlPipe == INVALID_HANDLE_VALUE) {
+        delete pc;
+        return NULL;
+    }
     pc->dataPipe = createNamedPipe(dataPipeName, true);
+    if (pc->dataPipe == INVALID_HANDLE_VALUE) {
+        delete pc;
+        return NULL;
+    }
 
     // Setup a background desktop for the agent.
     BackgroundDesktop desktop = setupBackgroundDesktop();
@@ -210,9 +218,15 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     // Connect the pipes.
     bool success;
     success = connectNamedPipe(pc->controlPipe, false);
-    assert(success);
+    if (!success) {
+        delete pc;
+        return NULL;
+    }
     success = connectNamedPipe(pc->dataPipe, true);
-    assert(success);
+    if (!success) {
+        delete pc;
+        return NULL;
+    }
 
     // Close handles to the background desktop and restore the original window
     // station.  This must wait until we know the agent is running -- if we
