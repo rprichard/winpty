@@ -239,7 +239,7 @@ static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
     BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int32_t), &actual, NULL);
     assert(success && actual == sizeof(int32_t));
     success = WriteFile(pc->controlPipe, payload.c_str(), payloadSize, &actual, NULL);
-    assert(success && actual == payloadSize);
+    assert(success && (int32_t)actual == payloadSize);
 }
 
 static int32_t readInt32(pconsole_t *pc)

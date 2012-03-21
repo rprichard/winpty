@@ -132,7 +132,7 @@ void *OutputHandler::threadProc(void *pvthis)
         do {
             written = write(STDOUT_FILENO, buffer, amount);
         } while (written == -1 && errno == EINTR);
-        if (written != amount)
+        if (written != (int)amount)
             break;
     }
     delete [] buffer;
@@ -185,7 +185,7 @@ void *InputHandler::threadProc(void *pvthis)
         if (!ret && GetLastError() == ERROR_IO_PENDING)
             ret = GetOverlappedResult(pthis->pconsole, &over, &written, TRUE);
         // TODO: partial writes?
-        if (!ret || written != amount)
+        if (!ret || (int)written != amount)
             break;
     }
     delete [] buffer;
@@ -255,7 +255,7 @@ int main()
         {
             char tmpBuf[256];
             int amount = read(signalReadFd, tmpBuf, sizeof(tmpBuf));
-            if (amount == 0 || amount < 0 && errno != EAGAIN) {
+            if (amount == 0 || (amount < 0 && errno != EAGAIN)) {
                 perror("error reading internal signal fd");
                 exit(1);
             }
