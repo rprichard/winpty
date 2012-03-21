@@ -1,7 +1,7 @@
 include ../config.mk
 include ../config-mingw.mk
 
-LIBRARY = pconsole.dll
+LIBRARY = ../build/pconsole.dll
 OBJECTS = pconsole.o PConsoleDebugClient.o
 LDFLAGS += -shared -static-libgcc -static-libstdc++
 

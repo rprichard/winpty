@@ -56,15 +56,6 @@ static std::wstring dirname(const std::wstring &path)
         return path.substr(0, pos);
 }
 
-static std::wstring basename(const std::wstring &path)
-{
-    std::wstring::size_type pos = path.find_last_of(L"\\/");
-    if (pos == std::wstring::npos)
-        return path;
-    else
-        return path.substr(pos + 1);
-}
-
 static bool pathExists(const std::wstring &path)
 {
     return GetFileAttributes(path.c_str()) != 0xFFFFFFFF;
@@ -73,21 +64,9 @@ static bool pathExists(const std::wstring &path)
 static std::wstring findAgentProgram()
 {
     std::wstring progDir = dirname(getModuleFileName(getCurrentModule()));
-    if (pathExists(progDir + L"\\"AGENT_EXE)) {
-        return progDir + L"\\"AGENT_EXE;
-    } else {
-        // The development directory structure looks like this:
-        //     root/
-        //         agent/
-        //             pconsole-agent.exe
-        //         libpconsole/
-        //             pconsole.dll
-        std::wstring agentProgram = dirname(progDir) + L"\\agent\\"AGENT_EXE;
-        if (!pathExists(agentProgram)) {
-            assert(false);
-        }
-        return agentProgram;
-    }
+    std::wstring ret = progDir + L"\\"AGENT_EXE;
+    assert(pathExists(ret));
+    return ret;
 }
 
 // Call ConnectNamedPipe and block, even for an overlapped pipe.  If the

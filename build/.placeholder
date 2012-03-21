@@ -1,0 +1,2 @@
+This version-controlled file exists so that git creates the otherwise-empty
+build directory on checkout.

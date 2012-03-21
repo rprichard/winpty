@@ -1,10 +1,10 @@
 include ../config.mk
 include ../config-unix.mk
 
-PROGRAM = pconsole
+PROGRAM = ../build/pconsole.exe
 OBJECTS = main.o Shared.o
 CXXFLAGS += -I../include
-LDFLAGS += ../libpconsole/pconsole.dll
+LDFLAGS += ../build/pconsole.dll
 
 all : $(PROGRAM)
 

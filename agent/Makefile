@@ -1,7 +1,7 @@
 include ../config.mk
 include ../config-mingw.mk
 
-PROGRAM = pconsole-agent
+PROGRAM = ../build/pconsole-agent.exe
 
 OBJECTS = \
 	EventLoop.o \
