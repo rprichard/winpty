@@ -4,6 +4,7 @@
 struct AgentMsg
 {
     enum Type {
+        Ping,
         StartProcess,
         SetSize,
         GetExitCode

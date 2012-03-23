@@ -93,6 +93,26 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
     return success;
 }
 
+static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
+{
+    std::string payload = packet.str();
+    int32_t payloadSize = payload.size();
+    DWORD actual;
+    BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int32_t), &actual, NULL);
+    assert(success && actual == sizeof(int32_t));
+    success = WriteFile(pc->controlPipe, payload.c_str(), payloadSize, &actual, NULL);
+    assert(success && (int32_t)actual == payloadSize);
+}
+
+static int32_t readInt32(pconsole_t *pc)
+{
+    int32_t result;
+    DWORD actual;
+    BOOL success = ReadFile(pc->controlPipe, &result, sizeof(int32_t), &actual, NULL);
+    assert(success && actual == sizeof(int32_t));
+    return result;
+}
+
 static HANDLE createNamedPipe(const std::wstring &name, bool overlapped)
 {
     return CreateNamedPipe(name.c_str(),
@@ -211,10 +231,9 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
 
     // TODO: Frequently, I see the CreateProcess call return successfully,
-    // but the agent immediately dies (e.g. because it can't locate one of
-    // the Qt DLLs).  The following pipe connect calls then hang.  These
-    // calls should probably timeout.  Maybe this code could also poll the
-    // agent process handle?
+    // but the agent immediately dies.  The following pipe connect calls then
+    // hang.  These calls should probably timeout.  Maybe this code could also
+    // poll the agent process handle?
 
     // Connect the pipes.
     bool success;
@@ -235,35 +254,53 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     // destroyed before the agent can connect with them.
     restoreOriginalDesktop(desktop);
 
-    // TODO: Review security w.r.t. the named pipe.  Ensure that we're really
-    // connected to the agent we just started.  (e.g. Block network
-    // connections, set an ACL, call GetNamedPipeClientProcessId, etc.
-    // Alternatively, connect the client end of the named pipe and pass an
-    // inheritable handle to the agent instead.)  It might be a good idea to
-    // run the agent (and therefore the Win7 conhost) under the logged in user
-    // for an SSH connection.
+    // The default security descriptor for a named pipe allows anyone to connect
+    // to the pipe to read, but not to write.  Only the "creator owner" and
+    // various system accounts can write to the pipe.  By sending and receiving
+    // a dummy message on the control pipe, we should confirm that something
+    // trusted (i.e. the agent we just started) successfully connected and wrote
+    // to one of our pipes.
+    WriteBuffer packet;
+    packet.putInt(AgentMsg::Ping);
+    writePacket(pc, packet);
+    if (readInt32(pc) != 0) {
+        delete pc;
+        return NULL;
+    }
+
+    // TODO: On Windows Vista and forward, we could call
+    // GetNamedPipeClientProcessId and verify that the PID is correct.  We could
+    // also pass the PIPE_REJECT_REMOTE_CLIENTS flag on newer OS's.
+    // TODO: I suppose this code is still subject to a denial-of-service attack
+    // from untrusted accounts making read-only connections to the pipe.  It
+    // should probably provide a SECURITY_DESCRIPTOR for the pipe, but the last
+    // time I tried that (using SDDL), I couldn't get it to work (access denied
+    // errors).
+
+    // Aside: An obvious way to setup these handles is to open both ends of the
+    // pipe in the parent process and let the child inherit its handles.
+    // Unfortunately, the Windows API makes inheriting handles problematic.
+    // MSDN says that handles have to be marked inheritable, and once they are,
+    // they are inherited by any call to CreateProcess with
+    // bInheritHandles==TRUE.  To avoid accidental inheritance, the library's
+    // clients would be obligated not to create new processes while a thread
+    // was calling pconsole_open.  Moreover, to inherit handles, MSDN seems
+    // to say that bInheritHandles must be TRUE[*], but I don't want to use a
+    // TRUE bInheritHandles, because I want to avoid leaking handles into the
+    // agent process, especially if the library someday allows creating the
+    // agent process under a different user account.
+    //
+    // [*] The way that bInheritHandles and STARTF_USESTDHANDLES work together
+    // is unclear in the documentation.  On one hand, for STARTF_USESTDHANDLES,
+    // it says that bInheritHandles must be TRUE.  On Vista and up, isn't
+    // PROC_THREAD_ATTRIBUTE_HANDLE_LIST an acceptable alternative to
+    // bInheritHandles?  On the other hand, KB315939 contradicts the
+    // STARTF_USESTDHANDLES documentation by saying, "Your pipe handles will
+    // still be duplicated because Windows will always duplicate the STD
+    // handles, even when bInheritHandles is set to FALSE."  IIRC, my testing
+    // showed that the KB article was correct.
 
     return pc;
-}
-
-static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
-{
-    std::string payload = packet.str();
-    int32_t payloadSize = payload.size();
-    DWORD actual;
-    BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int32_t), &actual, NULL);
-    assert(success && actual == sizeof(int32_t));
-    success = WriteFile(pc->controlPipe, payload.c_str(), payloadSize, &actual, NULL);
-    assert(success && (int32_t)actual == payloadSize);
-}
-
-static int32_t readInt32(pconsole_t *pc)
-{
-    int32_t result;
-    DWORD actual;
-    BOOL success = ReadFile(pc->controlPipe, &result, sizeof(int32_t), &actual, NULL);
-    assert(success && actual == sizeof(int32_t));
-    return result;
 }
 
 // TODO: We also need to control what desktop the child process is started with.

@@ -150,6 +150,9 @@ void Agent::handlePacket(ReadBuffer &packet)
     int type = packet.getInt();
     int32_t result = -1;
     switch (type) {
+    case AgentMsg::Ping:
+        result = 0;
+        break;
     case AgentMsg::StartProcess:
         result = handleStartProcessPacket(packet);
         break;
