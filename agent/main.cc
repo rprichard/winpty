@@ -19,23 +19,22 @@
 // IN THE SOFTWARE.
 
 #include "Agent.h"
-#include <assert.h>
+#include "AgentAssert.h"
 #include <stdlib.h>
 
-wchar_t *heapMbsToWcs(const char *text)
+static wchar_t *heapMbsToWcs(const char *text)
 {
     size_t len = mbstowcs(NULL, text, 0);
-    if (len == (size_t)-1)
-        return NULL;
+    ASSERT(len != (size_t)-1);
     wchar_t *ret = new wchar_t[len + 1];
     size_t len2 = mbstowcs(ret, text, len + 1);
-    assert(len == len2);
+    ASSERT(len == len2);
     return ret;
 }
 
 int main(int argc, char *argv[])
 {
-    assert(argc == 5);
+    ASSERT(argc == 5);
     Agent agent(heapMbsToWcs(argv[1]),
                 heapMbsToWcs(argv[2]),
                 atoi(argv[3]),
