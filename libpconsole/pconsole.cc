@@ -345,6 +345,10 @@ PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
         }
         p++;
         envStr.assign(env, p);
+
+        // Can a Win32 environment be empty?  If so, does it end with one NUL or
+        // two?  Add an extra NUL just in case it matters.
+        envStr.push_back(L'\0');
     }
     packet.putWString(envStr);
     writePacket(pc, packet);

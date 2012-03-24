@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
@@ -31,6 +32,7 @@
 #include <pthread.h>
 #include <pconsole.h>
 #include "../Shared/DebugClient.h"
+#include <string>
 
 
 static int signalWriteFd;
@@ -48,19 +50,6 @@ static termios setRawTerminalMode()
         fprintf(stderr, "output is not a tty\n");
 	exit(1);
     }
-
-/*
-    // This code makes the terminal output non-blocking.
-    int flags = fcntl(STDOUT_FILENO, F_GETFL, 0);
-    if (flags == -1) {
-	perror("fcntl F_GETFL on stdout failed");
-	exit(1);
-    }
-    if (fcntl(STDOUT_FILENO, F_SETFL, flags | O_NONBLOCK) == -1) {
-        perror("fcntl F_SETFL on stdout failed");
-	exit(1);
-    }
-*/
 
     termios buf;
     if (tcgetattr(STDIN_FILENO, &buf) < 0) {
@@ -221,8 +210,84 @@ static void setFdNonBlock(int fd)
     fcntl(fd, F_SETFL, status | O_NONBLOCK);
 }
 
-int main()
+// Convert argc/argv into a Win32 command-line following the escaping convention
+// documented on MSDN.  (e.g. see CommandLineToArgvW documentation)
+static std::string argvToCommandLine(int argc, char *argv[])
 {
+    std::string result;
+    for (int argIndex = 0; argIndex < argc; ++argIndex) {
+        if (argIndex > 0)
+            result.push_back(' ');
+        const char *arg = argv[argIndex];
+        bool quote = strchr(arg, ' ') != NULL || strchr(arg, '\"') != NULL;
+        if (quote)
+            result.push_back('\"');
+        int bsCount = 0;
+        for (const char *p = arg; *p != '\0'; ++p) {
+            if (*p == '\\') {
+                bsCount++;
+            } else if (*p == '\"') {
+                result.append(bsCount * 2 + 1, '\\');
+                result.push_back('\"');
+                bsCount = 0;
+            } else {
+                result.append(bsCount, '\\');
+                bsCount = 0;
+                result.push_back(*p);
+            }
+        }
+        if (quote) {
+            result.append(bsCount * 2, '\\');
+            result.push_back('\"');
+        } else {
+            result.append(bsCount, '\\');
+        }
+    }
+    return result;
+}
+
+// Convert the std::string to a std::wstring.  The input string must not contain
+// embedded NUL characters.
+static std::wstring wstringFString(const std::string &text)
+{
+    size_t len = mbstowcs(NULL, text.c_str(), 0);
+    assert(len != (size_t)-1);
+    wchar_t *tmp = new wchar_t[len + 1];
+    size_t len2 = mbstowcs(tmp, text.c_str(), len + 1);
+    assert(len == len2);
+    std::wstring ret(tmp);
+    delete [] tmp;
+    return ret;
+}
+
+// Convert the Cygwin/MSYS environment to a Win32 UNICODE environment block.
+static std::wstring makeEnvironBlock()
+{
+    std::wstring ret;
+    for (char **envp = environ; *envp != NULL; ++envp) {
+        char *env = *envp;
+        ret += wstringFString(env);
+        ret.push_back(L'\0');
+    }
+    ret.push_back(L'\0');
+
+    // Can a Win32 environment be empty?  If so, does it end with one NUL or
+    // two?  Add an extra NUL just in case it matters.
+    ret.push_back(L'\0');
+    return ret;
+}
+
+int main(int argc, char *argv[])
+{
+    {
+        // Copy the PCONSOLEDBG environment variable from the Cygwin environment
+        // to the Win32 environment so the agent will inherit it.
+        const char *dbgvar = getenv("PCONSOLEDBG");
+        if (dbgvar != NULL) {
+            SetEnvironmentVariableW(L"PCONSOLEDBG", L"1");
+        }
+    }
+
     winsize sz;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
 
@@ -232,8 +297,12 @@ int main()
 	exit(1);
     }
 
-    // TODO: start the appropriate child process...
-    pconsole_start_process(pconsole, L"c:\\cygwin\\bin\\bash.exe", NULL, NULL, NULL);
+    {
+        // Start the child process under the console.
+        std::wstring cmdLine = wstringFString(argvToCommandLine(argc - 1, &argv[1]));
+        std::wstring envp = makeEnvironBlock();
+        pconsole_start_process(pconsole, NULL, cmdLine.c_str(), NULL, envp.data());
+    }
 
     {
 	struct sigaction resizeSigAct;
