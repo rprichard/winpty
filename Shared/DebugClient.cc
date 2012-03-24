@@ -23,7 +23,9 @@
 #include <stdio.h>
 #include <string.h>
 
-static void SendToDebugServer(const char *message)
+const char *volatile tracingConfig;
+
+static void sendToDebugServer(const char *message)
 {
     char response[16];
     DWORD responseSize;
@@ -34,24 +36,11 @@ static void SendToDebugServer(const char *message)
         NMPWAIT_WAIT_FOREVER);
 }
 
-void TraceRaw(const char *format, ...)
-{
-    char message[1024];
-
-    va_list ap;
-    va_start(ap, format);
-    vsnprintf(message, sizeof(message), format, ap);
-    message[sizeof(message) - 1] = '\0';
-    va_end(ap);
-
-    SendToDebugServer(message);
-}
-
 // Get the current UTC time as milliseconds from the epoch (ignoring leap
 // seconds).  Use the Unix epoch for consistency with DebugClient.py.  There
 // are 134774 days between 1601-01-01 (the Win32 epoch) and 1970-01-01 (the
 // Unix epoch).
-static long long UnixTimeMillis()
+static long long unixTimeMillis()
 {
     FILETIME fileTime;
     GetSystemTimeAsFileTime(&fileTime);
@@ -60,8 +49,27 @@ static long long UnixTimeMillis()
     return msTime - 134774LL * 24 * 3600 * 1000;
 }
 
-void Trace(const char *format, ...)
+static const char *getTracingConfig()
 {
+    if (tracingConfig == NULL) {
+        const char *newTracingConfig = getenv("PCONSOLEDBG");
+        if (newTracingConfig == NULL)
+            newTracingConfig = "";
+        tracingConfig = newTracingConfig;
+    }
+    return tracingConfig;
+}
+
+bool isTracingEnabled()
+{
+    return getTracingConfig()[0] != '\0';
+}
+
+void trace(const char *format, ...)
+{
+    if (!isTracingEnabled())
+        return;
+
     char message[1024];
 
     va_list ap;
@@ -70,7 +78,7 @@ void Trace(const char *format, ...)
     message[sizeof(message) - 1] = '\0';
     va_end(ap);
 
-    const int currentTime = (int)(UnixTimeMillis() % (100000 * 1000));
+    const int currentTime = (int)(unixTimeMillis() % (100000 * 1000));
 
     char moduleName[1024];
     moduleName[0] = '\0';
@@ -84,6 +92,7 @@ void Trace(const char *format, ...)
              currentTime / 1000, currentTime % 1000,
              baseName, (int)GetCurrentProcessId(), (int)GetCurrentThreadId(),
              message);
+    fullMessage[sizeof(fullMessage) - 1] = '\0';
 
-    SendToDebugServer(fullMessage);
+    sendToDebugServer(fullMessage);
 }

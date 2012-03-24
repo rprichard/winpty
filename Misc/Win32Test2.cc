@@ -42,13 +42,13 @@ CALLBACK DWORD writerThread(void*)
 int main()
 {
   CreateThread(NULL, 0, writerThread, NULL, 0, NULL);
-  Trace("marking console");
+  trace("marking console");
   HWND hwnd = GetConsoleWindow();
   PostMessage(hwnd, WM_SYSCOMMAND, SC_CONSOLE_MARK, 0);
 
   Sleep(2000);
 
-  Trace("reading output");
+  trace("reading output");
   CHAR_INFO buf[1];
   COORD bufSize = { 1, 1 };
   COORD zeroCoord = { 0, 0 };
@@ -58,7 +58,7 @@ int main()
 		    bufSize,
 		    zeroCoord,
 		    &readRect);
-  Trace("done reading output");
+  trace("done reading output");
 
   Sleep(2000);
 

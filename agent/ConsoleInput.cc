@@ -168,13 +168,13 @@ ConsoleInput::ConsoleInput(Win32Console *console, DsrSender *dsrSender) :
 
 void ConsoleInput::writeInput(const std::string &input)
 {
-    Trace("writeInput: %d bytes", input.size());
+    trace("writeInput: %d bytes", input.size());
     if (input.size() == 0)
         return;
     m_byteQueue.append(input);
     doWrite(false);
     if (!m_byteQueue.empty() && !m_dsrSent) {
-        Trace("send DSR");
+        trace("send DSR");
         m_dsrSender->sendDsr();
         m_dsrSent = true;
     }
@@ -242,25 +242,25 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
                                int inputSize,
                                bool isEof)
 {
-    Trace("scanKeyPress: %d bytes", inputSize);
+    trace("scanKeyPress: %d bytes", inputSize);
 
     // Ctrl-C.
     if (input[0] == '\x03' && m_console->processedInputMode()) {
-        Trace("Ctrl-C");
+        trace("Ctrl-C");
         BOOL ret = GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
-        Trace("GenerateConsoleCtrlEvent: %d", ret);
+        trace("GenerateConsoleCtrlEvent: %d", ret);
         return 1;
     }
 
     // Attempt to match the Device Status Report (DSR) reply.
     int dsrLen = matchDsr(input);
     if (dsrLen > 0) {
-        Trace("Received a DSR reply");
+        trace("Received a DSR reply");
         m_dsrSent = false;
         return dsrLen;
     } else if (!isEof && dsrLen == -1) {
         // Incomplete DSR match.
-        Trace("Incomplete DSR match");
+        trace("Incomplete DSR match");
         return -1;
     }
 
@@ -272,7 +272,7 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
         int len = utf8CharLength(input[1]);
         if (1 + len > inputSize) {
             // Incomplete character.
-            Trace("Incomplete Alt-char match");
+            trace("Incomplete Alt-char match");
             return -1;
         }
         appendUtf8Char(records, &input[1], len, LEFT_ALT_PRESSED);
@@ -285,7 +285,7 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
     if (incomplete) {
         // Incomplete match -- need more characters (or wait for a
         // timeout to signify flushed input).
-        Trace("Incomplete ESC-keypress match");
+        trace("Incomplete ESC-keypress match");
         return -1;
     } else if (match != NULL) {
         appendKeyPress(records,
@@ -299,7 +299,7 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
     int len = utf8CharLength(input[0]);
     if (len > inputSize) {
         // Incomplete character.
-        Trace("Incomplete UTF-8 character");
+        trace("Incomplete UTF-8 character");
         return -1;
     }
     appendUtf8Char(records, &input[0], len, 0);
@@ -429,9 +429,9 @@ int ConsoleInput::utf8CharLength(char firstByte)
 const ConsoleInput::KeyDescriptor *
 ConsoleInput::lookupKey(const char *encoding, bool isEof, bool *incomplete)
 {
-    Trace("lookupKey");
+    trace("lookupKey");
     for (int i = 0; encoding[i] != '\0'; ++i)
-        Trace("%d", encoding[i]);
+        trace("%d", encoding[i]);
 
     *incomplete = false;
     KeyLookup *node = &m_lookup;
@@ -439,7 +439,7 @@ ConsoleInput::lookupKey(const char *encoding, bool isEof, bool *incomplete)
     for (int i = 0; encoding[i] != '\0'; ++i) {
         unsigned char ch = encoding[i];
         node = node->getChild(ch);
-        Trace("ch: %d --> node:%p", ch, node);
+        trace("ch: %d --> node:%p", ch, node);
         if (node == NULL) {
             return longestMatch;
         } else if (node->getMatch() != NULL) {

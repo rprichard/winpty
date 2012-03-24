@@ -29,7 +29,7 @@
 
 void assertFail(const char *file, int line, const char *cond)
 {
-    Trace("Assertion failed: %s, file %s, line %d",
+    trace("Assertion failed: %s, file %s, line %d",
           cond, file, line);
     abort();
 }

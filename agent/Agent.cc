@@ -83,12 +83,12 @@ Agent::Agent(LPCWSTR controlPipeName,
 
     setPollInterval(25);
 
-    Trace("Agent starting...");
+    trace("Agent starting...");
 }
 
 Agent::~Agent()
 {
-    Trace("Agent exiting...");
+    trace("Agent exiting...");
     m_console->postCloseMessage();
     if (m_childProcess != NULL)
         CloseHandle(m_childProcess);
@@ -111,7 +111,7 @@ NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
 {
     NamedPipe *pipe = createNamedPipe();
     if (!pipe->connectToServer(pipeName)) {
-        Trace("error: could not connect to %ls", pipeName);
+        trace("error: could not connect to %ls", pipeName);
         ::exit(1);
     }
     pipe->setReadBufferSize(64 * 1024);
@@ -141,7 +141,7 @@ void Agent::onPipeIo(NamedPipe *namedPipe)
 void Agent::pollControlSocket()
 {
     if (m_controlSocket->isClosed()) {
-        Trace("Agent shutting down");
+        trace("Agent shutting down");
         shutdown();
         return;
     }
@@ -184,7 +184,7 @@ void Agent::handlePacket(ReadBuffer &packet)
         result = m_childExitCode;
         break;
     default:
-        Trace("Unrecognized message, id:%d", type);
+        trace("Unrecognized message, id:%d", type);
     }
     m_controlSocket->write((char*)&result, sizeof(result));
 }
@@ -224,7 +224,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
                             (LPVOID)envArg, cwdArg, &sui, &pi);
     int ret = success ? 0 : GetLastError();
 
-    Trace("CreateProcess: %s %d",
+    trace("CreateProcess: %s %d",
           (success ? "success" : "fail"),
           (int)pi.dwProcessId);
 
@@ -255,7 +255,7 @@ void Agent::pollDataSocket()
     if (m_closingDataSocket &&
             !m_dataSocket->isClosed() &&
             m_dataSocket->bytesToSend() == 0) {
-        Trace("Closing data pipe after data is sent");
+        trace("Closing data pipe after data is sent");
         m_dataSocket->closePipe();
     }
 }
@@ -288,7 +288,7 @@ void Agent::onPollTimeout()
     if (m_closingDataSocket &&
             !m_dataSocket->isClosed() &&
             m_dataSocket->bytesToSend() == 0) {
-        Trace("Closing data pipe after child exit");
+        trace("Closing data pipe after child exit");
         m_dataSocket->closePipe();
     }
 }
@@ -377,7 +377,7 @@ void Agent::scrapeOutput()
         int markerRow = findSyncMarker();
         if (markerRow == -1) {
             // Something has happened.  Reset the terminal.
-            Trace("Sync marker has disappeared -- resetting the terminal");
+            trace("Sync marker has disappeared -- resetting the terminal");
             resetConsoleTracking();
         } else if (markerRow != m_syncRow) {
             ASSERT(markerRow < m_syncRow);
@@ -401,7 +401,7 @@ void Agent::scrapeOutput()
             // The window has moved upward.  This is generally not expected to
             // happen, but the CMD/PowerShell CMD command will move the window
             // to the top as part of clearing everything else in the console.
-            Trace("Window moved upward -- resetting the terminal");
+            trace("Window moved upward -- resetting the terminal");
             resetConsoleTracking();
         }
     }
@@ -432,7 +432,7 @@ void Agent::scrapeOutput()
         if (sawModifiedLine ||
                 line > m_maxBufferedLine ||
                 memcmp(curLine, bufLine, sizeof(CHAR_INFO) * w) != 0) {
-            //Trace("sent line %d", line);
+            //trace("sent line %d", line);
             m_terminal->sendLine(line, curLine, windowRect.width());
             memset(bufLine, 0, sizeof(bufLine));
             memcpy(bufLine, curLine, sizeof(CHAR_INFO) * w);

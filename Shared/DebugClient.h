@@ -21,7 +21,7 @@
 #ifndef DEBUGCLIENT_H
 #define DEBUGCLIENT_H
 
-void TraceRaw(const char *format, ...);
-void Trace(const char *format, ...);
+bool isTracingEnabled();
+void trace(const char *format, ...);
 
 #endif // DEBUGCLIENT_H

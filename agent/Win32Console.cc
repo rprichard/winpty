@@ -73,7 +73,7 @@ Coord Win32Console::bufferSize()
     CONSOLE_SCREEN_BUFFER_INFO info;
     memset(&info, 0, sizeof(info));
     if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        Trace("GetConsoleScreenBufferInfo failed");
+        trace("GetConsoleScreenBufferInfo failed");
     }
     return info.dwSize;
 }
@@ -84,7 +84,7 @@ SmallRect Win32Console::windowRect()
     CONSOLE_SCREEN_BUFFER_INFO info;
     memset(&info, 0, sizeof(info));
     if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        Trace("GetConsoleScreenBufferInfo failed");
+        trace("GetConsoleScreenBufferInfo failed");
     }
     return info.srWindow;
 }
@@ -93,7 +93,7 @@ void Win32Console::resizeBuffer(const Coord &size)
 {
     // TODO: error handling
     if (!SetConsoleScreenBufferSize(m_conout, size)) {
-        Trace("SetConsoleScreenBufferSize failed");
+        trace("SetConsoleScreenBufferSize failed");
     }
 }
 
@@ -101,7 +101,7 @@ void Win32Console::moveWindow(const SmallRect &rect)
 {
     // TODO: error handling
     if (!SetConsoleWindowInfo(m_conout, TRUE, &rect)) {
-        Trace("SetConsoleWindowInfo failed");
+        trace("SetConsoleWindowInfo failed");
     }
 }
 
@@ -147,7 +147,7 @@ Coord Win32Console::cursorPosition()
     CONSOLE_SCREEN_BUFFER_INFO info;
     memset(&info, 0, sizeof(info));
     if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        Trace("GetConsoleScreenBufferInfo failed");
+        trace("GetConsoleScreenBufferInfo failed");
     }
     return info.dwCursorPosition;
 }
@@ -156,7 +156,7 @@ void Win32Console::setCursorPosition(const Coord &coord)
 {
     // TODO: error handling
     if (!SetConsoleCursorPosition(m_conout, coord)) {
-        Trace("SetConsoleCursorPosition failed");
+        trace("SetConsoleCursorPosition failed");
     }
 }
 
@@ -165,7 +165,7 @@ void Win32Console::writeInput(const INPUT_RECORD *ir, int count)
     // TODO: error handling
     DWORD dummy = 0;
     if (!WriteConsoleInput(m_conin, ir, count, &dummy)) {
-        Trace("WriteConsoleInput failed");
+        trace("WriteConsoleInput failed");
     }
 }
 
@@ -174,7 +174,7 @@ bool Win32Console::processedInputMode()
     // TODO: error handling
     DWORD mode = 0;
     if (!GetConsoleMode(m_conin, &mode)) {
-        Trace("GetConsoleMode failed");
+        trace("GetConsoleMode failed");
     }
     return (mode & ENABLE_PROCESSED_INPUT) == ENABLE_PROCESSED_INPUT;
 }
@@ -184,7 +184,7 @@ void Win32Console::read(const SmallRect &rect, CHAR_INFO *data)
     // TODO: error handling
     SmallRect tmp(rect);
     if (!ReadConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp)) {
-        Trace("ReadConsoleOutput failed [x:%d,y:%d,w:%d,h:%d]",
+        trace("ReadConsoleOutput failed [x:%d,y:%d,w:%d,h:%d]",
               rect.Left, rect.Top, rect.width(), rect.height());
     }
 }
@@ -194,6 +194,6 @@ void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
     // TODO: error handling
     SmallRect tmp(rect);
     if (!WriteConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp)) {
-        Trace("WriteConsoleOutput failed");
+        trace("WriteConsoleOutput failed");
     }
 }
