@@ -279,6 +279,12 @@ static std::wstring makeEnvironBlock()
 
 int main(int argc, char *argv[])
 {
+    if (argc == 1) {
+        printf("Usage: %s program [args]\n",
+               argv[0]);
+        return 0;
+    }
+
     {
         // Copy the PCONSOLEDBG environment variable from the Cygwin environment
         // to the Win32 environment so the agent will inherit it.
