@@ -260,23 +260,6 @@ static std::wstring wstringFString(const std::string &text)
     return ret;
 }
 
-// Convert the Cygwin/MSYS environment to a Win32 UNICODE environment block.
-static std::wstring makeEnvironBlock()
-{
-    std::wstring ret;
-    for (char **envp = environ; *envp != NULL; ++envp) {
-        char *env = *envp;
-        ret += wstringFString(env);
-        ret.push_back(L'\0');
-    }
-    ret.push_back(L'\0');
-
-    // Can a Win32 environment be empty?  If so, does it end with one NUL or
-    // two?  Add an extra NUL just in case it matters.
-    ret.push_back(L'\0');
-    return ret;
-}
-
 int main(int argc, char *argv[])
 {
     if (argc == 1) {
@@ -306,12 +289,11 @@ int main(int argc, char *argv[])
     {
         // Start the child process under the console.
         std::wstring cmdLine = wstringFString(argvToCommandLine(argc - 1, &argv[1]));
-        std::wstring envp = makeEnvironBlock();
         int ret = pconsole_start_process(pconsole,
                                          NULL,
                                          cmdLine.c_str(),
                                          NULL,
-                                         envp.data());
+                                         NULL);
         if (ret != 0) {
             fprintf(stderr,
                     "Error %#x starting %ls\n",
