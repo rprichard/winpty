@@ -301,7 +301,18 @@ int main(int argc, char *argv[])
         // Start the child process under the console.
         std::wstring cmdLine = wstringFString(argvToCommandLine(argc - 1, &argv[1]));
         std::wstring envp = makeEnvironBlock();
-        pconsole_start_process(pconsole, NULL, cmdLine.c_str(), NULL, envp.data());
+        int ret = pconsole_start_process(pconsole,
+                                         NULL,
+                                         cmdLine.c_str(),
+                                         NULL,
+                                         envp.data());
+        if (ret != 0) {
+            fprintf(stderr,
+                    "Error %#x starting %ls\n",
+                    (unsigned int)ret,
+                    cmdLine.c_str());
+            exit(1);
+        }
     }
 
     {

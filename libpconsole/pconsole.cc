@@ -22,6 +22,7 @@
 #include <windows.h>
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -216,7 +217,11 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
                             NULL, NULL,
                             &sui, &pi);
     if (!success) {
-        assert(false);
+        fprintf(stderr,
+                "Error %#x starting %ls\n",
+                (unsigned int)GetLastError(),
+                agentCmdLine.c_str());
+        exit(1);
     }
 
     CloseHandle(pi.hProcess);

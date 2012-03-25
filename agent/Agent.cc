@@ -233,7 +233,6 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
         m_childProcess = pi.hProcess;
     }
 
-    // TODO: report success/failure to client
     return ret;
 }
 
