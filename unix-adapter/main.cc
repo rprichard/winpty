@@ -246,17 +246,15 @@ static std::string argvToCommandLine(int argc, char *argv[])
     return result;
 }
 
-// Convert the std::string to a std::wstring.  The input string must not contain
-// embedded NUL characters.
-static std::wstring wstringFString(const std::string &text)
+static wchar_t *heapMbsToWcs(const char *text)
 {
-    size_t len = mbstowcs(NULL, text.c_str(), 0);
-    assert(len != (size_t)-1);
-    wchar_t *tmp = new wchar_t[len + 1];
-    size_t len2 = mbstowcs(tmp, text.c_str(), len + 1);
-    assert(len == len2);
-    std::wstring ret(tmp);
-    delete [] tmp;
+    // Calling mbstowcs with a NULL first argument seems to be broken on MSYS.
+    // Instead of returning the size of the converted string, it returns 0
+    // instead.  Using strlen(text) * 2 is probably big enough.
+    size_t maxLen = strlen(text) * 2 + 1;
+    wchar_t *ret = new wchar_t[maxLen];
+    size_t len = mbstowcs(ret, text, maxLen);
+    assert(len != (size_t)-1 && len < maxLen);
     return ret;
 }
 
@@ -288,19 +286,21 @@ int main(int argc, char *argv[])
 
     {
         // Start the child process under the console.
-        std::wstring cmdLine = wstringFString(argvToCommandLine(argc - 1, &argv[1]));
+        std::string cmdLine = argvToCommandLine(argc - 1, &argv[1]);
+        wchar_t *cmdLineW = heapMbsToWcs(cmdLine.c_str());
         int ret = pconsole_start_process(pconsole,
                                          NULL,
-                                         cmdLine.c_str(),
+                                         cmdLineW,
                                          NULL,
                                          NULL);
         if (ret != 0) {
             fprintf(stderr,
-                    "Error %#x starting %ls\n",
+                    "Error %#x starting %s\n",
                     (unsigned int)ret,
                     cmdLine.c_str());
             exit(1);
         }
+        delete [] cmdLineW;
     }
 
     {
