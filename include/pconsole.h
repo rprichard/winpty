@@ -44,6 +44,8 @@ typedef struct pconsole_s pconsole_t;
 
 /*
  * Starts a new pconsole instance with the given size.
+ *
+ * This function creates a new agent process and connects to it.
  */
 PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows);
 
@@ -55,7 +57,10 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows);
  * This function never modifies the cmdline, unlike CreateProcess.
  *
  * Only one child process may be started.  After the child process exits, the
- * agent will flush and close the data pipe.
+ * agent will scrape the console output one last time, then close the data pipe
+ * once all remaining data has been sent.
+ *
+ * Returns 0 on success or a Win32 error code on failure.
  */
 PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
 					const wchar_t *appname,
@@ -63,10 +68,11 @@ PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
 					const wchar_t *cwd,
 					const wchar_t *env);
 
+/*
+ * Returns the exit code of the process started with pconsole_start_process,
+ * or -1 none is available.
+ */
 PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc);
-
-/* TODO: Not implemented.  Should it be? */
-PCONSOLE_API int pconsole_flush_and_close(pconsole_t *pc);
 
 /*
  * Returns an overlapped-mode pipe handle that can be read and written
