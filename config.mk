@@ -30,3 +30,10 @@ CXXFLAGS += -MMD -Wall
 %.o : %.cc
 	@echo Compiling $<
 	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+# Attempt to detect whether configure has been run yet.  The CWD will
+# be one of the subdirectories, so refer to ../config-mingw.mk instead
+# of ./config-mingw.mk.
+ifeq "$(wildcard ../config-mingw.mk)" ""
+    $(error config-mingw.mk does not exist.  Please run ./configure)
+endif
