@@ -52,7 +52,7 @@ static long long unixTimeMillis()
 static const char *getTracingConfig()
 {
     if (tracingConfig == NULL) {
-        const char *newTracingConfig = getenv("PCONSOLEDBG");
+        const char *newTracingConfig = getenv("WINPTYDBG");
         if (newTracingConfig == NULL)
             newTracingConfig = "";
         tracingConfig = newTracingConfig;

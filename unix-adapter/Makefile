@@ -21,10 +21,10 @@
 include ../config.mk
 include ../config-unix.mk
 
-PROGRAM = ../build/pconsole.exe
+PROGRAM = ../build/console.exe
 OBJECTS = main.o Shared.o
 CXXFLAGS += -I../include
-LDFLAGS += ../build/pconsole.dll
+LDFLAGS += ../build/winpty.dll
 
 all : $(PROGRAM)
 

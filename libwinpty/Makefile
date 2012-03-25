@@ -21,8 +21,8 @@
 include ../config.mk
 include ../config-mingw.mk
 
-LIBRARY = ../build/pconsole.dll
-OBJECTS = pconsole.o PConsoleDebugClient.o
+LIBRARY = ../build/winpty.dll
+OBJECTS = winpty.o WinPtyDebugClient.o
 LDFLAGS += -shared -static-libgcc -static-libstdc++
 
 CXXFLAGS += \
@@ -30,7 +30,7 @@ CXXFLAGS += \
 	-DUNICODE \
 	-D_UNICODE \
 	-D_WIN32_WINNT=0x0501 \
-	-DPCONSOLE \
+	-DWINPTY \
 	-fno-exceptions \
 	-fno-rtti
 

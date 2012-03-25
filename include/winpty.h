@@ -20,34 +20,34 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef PCONSOLE_H
-#define PCONSOLE_H
+#ifndef WINPTY_H
+#define WINPTY_H
 
 #include <stdlib.h>
 #include <windows.h>
 
-#ifdef PCONSOLE
-#define PCONSOLE_API __declspec(dllexport)
+#ifdef WINPTY
+#define WINPTY_API __declspec(dllexport)
 #else
-#define PCONSOLE_API __declspec(dllimport)
+#define WINPTY_API __declspec(dllimport)
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct pconsole_s pconsole_t;
+typedef struct winpty_s winpty_t;
 
 /*
- * pconsole API.
+ * winpty API.
  */
 
 /*
- * Starts a new pconsole instance with the given size.
+ * Starts a new winpty instance with the given size.
  *
  * This function creates a new agent process and connects to it.
  */
-PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows);
+WINPTY_API winpty_t *winpty_open(int cols, int rows);
 
 /*
  * Start a child process.  Either (but not both) of appname and cmdline may
@@ -62,36 +62,36 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows);
  *
  * Returns 0 on success or a Win32 error code on failure.
  */
-PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
+WINPTY_API int winpty_start_process(winpty_t *pc,
 					const wchar_t *appname,
 					const wchar_t *cmdline,
 					const wchar_t *cwd,
 					const wchar_t *env);
 
 /*
- * Returns the exit code of the process started with pconsole_start_process,
+ * Returns the exit code of the process started with winpty_start_process,
  * or -1 none is available.
  */
-PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc);
+WINPTY_API int winpty_get_exit_code(winpty_t *pc);
 
 /*
  * Returns an overlapped-mode pipe handle that can be read and written
  * like a Unix terminal.
  */
-PCONSOLE_API HANDLE pconsole_get_data_pipe(pconsole_t *pc);
+WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc);
 
 /*
  * Change the size of the Windows console.
  */
-PCONSOLE_API int pconsole_set_size(pconsole_t *pc, int cols, int rows);
+WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows);
 
 /*
- * Closes the pconsole.
+ * Closes the winpty.
  */
-PCONSOLE_API void pconsole_close(pconsole_t *pc);
+WINPTY_API void winpty_close(winpty_t *pc);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* PCONSOLE_H */
+#endif /* WINPTY_H */

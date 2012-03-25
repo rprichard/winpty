@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#include <pconsole.h>
+#include <winpty.h>
 #include <windows.h>
 #include <assert.h>
 #include <string.h>
@@ -33,17 +33,17 @@
 
 // TODO: Error handling, handle out-of-memory.
 
-#define AGENT_EXE L"pconsole-agent.exe"
+#define AGENT_EXE L"winpty-agent.exe"
 
 static volatile LONG consoleCounter;
 
-struct pconsole_s {
-    pconsole_s();
+struct winpty_s {
+    winpty_s();
     HANDLE controlPipe;
     HANDLE dataPipe;
 };
 
-pconsole_s::pconsole_s() : controlPipe(NULL), dataPipe(NULL)
+winpty_s::winpty_s() : controlPipe(NULL), dataPipe(NULL)
 {
 }
 
@@ -114,7 +114,7 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
     return success;
 }
 
-static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
+static void writePacket(winpty_t *pc, const WriteBuffer &packet)
 {
     std::string payload = packet.str();
     int32_t payloadSize = payload.size();
@@ -125,7 +125,7 @@ static void writePacket(pconsole_t *pc, const WriteBuffer &packet)
     assert(success && (int32_t)actual == payloadSize);
 }
 
-static int32_t readInt32(pconsole_t *pc)
+static int32_t readInt32(winpty_t *pc)
 {
     int32_t result;
     DWORD actual;
@@ -228,13 +228,13 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     CloseHandle(pi.hThread);
 }
 
-PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
+WINPTY_API winpty_t *winpty_open(int cols, int rows)
 {
-    pconsole_t *pc = new pconsole_t;
+    winpty_t *pc = new winpty_t;
 
     // Start pipes.
     std::wstringstream pipeName;
-    pipeName << L"\\\\.\\pipe\\pconsole-" << GetCurrentProcessId()
+    pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
              << L"-" << InterlockedIncrement(&consoleCounter);
     std::wstring controlPipeName = pipeName.str() + L"-control";
     std::wstring dataPipeName = pipeName.str() + L"-data";
@@ -309,7 +309,7 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
     // they are inherited by any call to CreateProcess with
     // bInheritHandles==TRUE.  To avoid accidental inheritance, the library's
     // clients would be obligated not to create new processes while a thread
-    // was calling pconsole_open.  Moreover, to inherit handles, MSDN seems
+    // was calling winpty_open.  Moreover, to inherit handles, MSDN seems
     // to say that bInheritHandles must be TRUE[*], but I don't want to use a
     // TRUE bInheritHandles, because I want to avoid leaking handles into the
     // agent process, especially if the library someday allows creating the
@@ -329,9 +329,9 @@ PCONSOLE_API pconsole_t *pconsole_open(int cols, int rows)
 }
 
 // TODO: We also need to control what desktop the child process is started with.
-// I think the right default is for this pconsole.dll function to query the
+// I think the right default is for this winpty.dll function to query the
 // current desktop and send that to the agent.
-PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
+WINPTY_API int winpty_start_process(winpty_t *pc,
 					const wchar_t *appname,
 					const wchar_t *cmdline,
 					const wchar_t *cwd,
@@ -360,7 +360,7 @@ PCONSOLE_API int pconsole_start_process(pconsole_t *pc,
     return readInt32(pc);
 }
 
-PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc)
+WINPTY_API int winpty_get_exit_code(winpty_t *pc)
 {
     WriteBuffer packet;
     packet.putInt(AgentMsg::GetExitCode);
@@ -368,12 +368,12 @@ PCONSOLE_API int pconsole_get_exit_code(pconsole_t *pc)
     return readInt32(pc);
 }
 
-PCONSOLE_API HANDLE pconsole_get_data_pipe(pconsole_t *pc)
+WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc)
 {
     return pc->dataPipe;
 }
 
-PCONSOLE_API int pconsole_set_size(pconsole_t *pc, int cols, int rows)
+WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows)
 {
     WriteBuffer packet;
     packet.putInt(AgentMsg::SetSize);
@@ -383,7 +383,7 @@ PCONSOLE_API int pconsole_set_size(pconsole_t *pc, int cols, int rows)
     return readInt32(pc);
 }
 
-PCONSOLE_API void pconsole_close(pconsole_t *pc)
+WINPTY_API void winpty_close(winpty_t *pc)
 {
     CloseHandle(pc->controlPipe);
     CloseHandle(pc->dataPipe);

@@ -21,7 +21,7 @@
 include ../config.mk
 include ../config-mingw.mk
 
-PROGRAM = ../build/pconsole-agent.exe
+PROGRAM = ../build/winpty-agent.exe
 
 OBJECTS = \
 	EventLoop.o \

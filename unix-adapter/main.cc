@@ -30,7 +30,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <pthread.h>
-#include <pconsole.h>
+#include <winpty.h>
 #include "../Shared/DebugClient.h"
 #include <string>
 
@@ -97,18 +97,18 @@ static HANDLE createEvent()
 }
 
 
-// Connect pconsole overlapped I/O to Cygwin blocking STDOUT_FILENO.
+// Connect winpty overlapped I/O to Cygwin blocking STDOUT_FILENO.
 class OutputHandler {
 public:
-    OutputHandler(HANDLE pconsole);
+    OutputHandler(HANDLE winpty);
     pthread_t getThread() { return thread; }
 private:
     static void *threadProc(void *pvthis);
-    HANDLE pconsole;
+    HANDLE winpty;
     pthread_t thread;
 };
 
-OutputHandler::OutputHandler(HANDLE pconsole) : pconsole(pconsole)
+OutputHandler::OutputHandler(HANDLE winpty) : winpty(winpty)
 {
     pthread_create(&thread, NULL, OutputHandler::threadProc, this);
 }
@@ -126,12 +126,12 @@ void *OutputHandler::threadProc(void *pvthis)
         DWORD amount;
         memset(&over, 0, sizeof(over));
         over.hEvent = event;
-        BOOL ret = ReadFile(pthis->pconsole,
+        BOOL ret = ReadFile(pthis->winpty,
                             buffer, bufferSize,
                             &amount,
                             &over);
         if (!ret && GetLastError() == ERROR_IO_PENDING)
-            ret = GetOverlappedResult(pthis->pconsole, &over, &amount, TRUE);
+            ret = GetOverlappedResult(pthis->winpty, &over, &amount, TRUE);
         if (!ret || amount == 0)
             break;
         // TODO: partial writes?
@@ -152,18 +152,18 @@ void *OutputHandler::threadProc(void *pvthis)
 }
 
 
-// Connect Cygwin non-blocking STDIN_FILENO to pconsole overlapped I/O.
+// Connect Cygwin non-blocking STDIN_FILENO to winpty overlapped I/O.
 class InputHandler {
 public:
-    InputHandler(HANDLE pconsole);
+    InputHandler(HANDLE winpty);
     pthread_t getThread() { return thread; }
 private:
     static void *threadProc(void *pvthis);
-    HANDLE pconsole;
+    HANDLE winpty;
     pthread_t thread;
 };
 
-InputHandler::InputHandler(HANDLE pconsole) : pconsole(pconsole)
+InputHandler::InputHandler(HANDLE winpty) : winpty(winpty)
 {
     pthread_create(&thread, NULL, InputHandler::threadProc, this);
 }
@@ -187,12 +187,12 @@ void *InputHandler::threadProc(void *pvthis)
         OVERLAPPED over;
         memset(&over, 0, sizeof(over));
         over.hEvent = event;
-        BOOL ret = WriteFile(pthis->pconsole,
+        BOOL ret = WriteFile(pthis->winpty,
                              buffer, amount,
                              &written,
                              &over);
         if (!ret && GetLastError() == ERROR_IO_PENDING)
-            ret = GetOverlappedResult(pthis->pconsole, &over, &written, TRUE);
+            ret = GetOverlappedResult(pthis->winpty, &over, &written, TRUE);
         // TODO: partial writes?
         if (!ret || (int)written != amount)
             break;
@@ -267,20 +267,20 @@ int main(int argc, char *argv[])
     }
 
     {
-        // Copy the PCONSOLEDBG environment variable from the Cygwin environment
+        // Copy the WINPTYDBG environment variable from the Cygwin environment
         // to the Win32 environment so the agent will inherit it.
-        const char *dbgvar = getenv("PCONSOLEDBG");
+        const char *dbgvar = getenv("WINPTYDBG");
         if (dbgvar != NULL) {
-            SetEnvironmentVariableW(L"PCONSOLEDBG", L"1");
+            SetEnvironmentVariableW(L"WINPTYDBG", L"1");
         }
     }
 
     winsize sz;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
 
-    pconsole_t *pconsole = pconsole_open(sz.ws_col, sz.ws_row);
-    if (pconsole == NULL) {
-	fprintf(stderr, "Error creating pconsole.\n");
+    winpty_t *winpty = winpty_open(sz.ws_col, sz.ws_row);
+    if (winpty == NULL) {
+	fprintf(stderr, "Error creating winpty.\n");
 	exit(1);
     }
 
@@ -288,7 +288,7 @@ int main(int argc, char *argv[])
         // Start the child process under the console.
         std::string cmdLine = argvToCommandLine(argc - 1, &argv[1]);
         wchar_t *cmdLineW = heapMbsToWcs(cmdLine.c_str());
-        int ret = pconsole_start_process(pconsole,
+        int ret = winpty_start_process(winpty,
                                          NULL,
                                          cmdLineW,
                                          NULL,
@@ -326,8 +326,8 @@ int main(int argc, char *argv[])
         signalWriteFd = pipeFd[1];
     }
 
-    OutputHandler outputHandler(pconsole_get_data_pipe(pconsole));
-    InputHandler inputHandler(pconsole_get_data_pipe(pconsole));
+    OutputHandler outputHandler(winpty_get_data_pipe(winpty));
+    InputHandler inputHandler(winpty_get_data_pipe(winpty));
 
     while (true) {
         fd_set readfds;
@@ -355,7 +355,7 @@ int main(int argc, char *argv[])
 	    ioctl(STDIN_FILENO, TIOCGWINSZ, &sz2);
 	    if (memcmp(&sz, &sz2, sizeof(sz)) != 0) {
 		sz = sz2;
-		pconsole_set_size(pconsole, sz.ws_col, sz.ws_row);
+		winpty_set_size(winpty, sz.ws_col, sz.ws_row);
 	    }
 	}
 
@@ -365,9 +365,9 @@ int main(int argc, char *argv[])
             break;
     }
 
-    int exitCode = pconsole_get_exit_code(pconsole);
+    int exitCode = winpty_get_exit_code(winpty);
 
     restoreTerminalMode(mode);
-    // TODO: Call pconsole_close?  Shut down one or both I/O threads?
+    // TODO: Call winpty_close?  Shut down one or both I/O threads?
     return exitCode;
 }
