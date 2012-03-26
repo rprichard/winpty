@@ -62,7 +62,8 @@ case $(uname -s) in
         MINGW_GPP=mingw32-g++
         ;;
     *)
-        echo 'uname -s did not match either CYGWIN* or MINGW*.'
+        echo 'Error: uname -s did not match either CYGWIN* or MINGW*.'
+        exit 1
         ;;
 esac
 
