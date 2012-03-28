@@ -25,18 +25,8 @@
 
 Win32Console::Win32Console()
 {
-    m_conin = CreateFile(
-                L"CONIN$",
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                NULL, OPEN_EXISTING, 0, NULL);
-    m_conout = CreateFile(
-                L"CONOUT$",
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                NULL, OPEN_EXISTING, 0, NULL);
-    ASSERT(m_conin != NULL);
-    ASSERT(m_conout != NULL);
+    m_conin = GetStdHandle(STD_INPUT_HANDLE);
+    m_conout = GetStdHandle(STD_OUTPUT_HANDLE);
 }
 
 Win32Console::~Win32Console()
