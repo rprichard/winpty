@@ -82,20 +82,10 @@ void Win32Console::setSmallFont()
     typedef BOOL WINAPI SetConsoleFontType(
                 HANDLE hOutput,
                 DWORD dwFontIndex);
-    typedef BOOL WINAPI GetConsoleFontInfoType(
-                HANDLE hOutput,
-                BOOL bMaximize,
-                DWORD dwNumFonts,
-                AGENT_CONSOLE_FONT_INFO *info);
-    typedef DWORD WINAPI GetNumberOfConsoleFontsType();
     typedef BOOL WINAPI GetCurrentConsoleFontType(
                 HANDLE hOutput,
                 BOOL bMaximize,
                 AGENT_CONSOLE_FONT_INFO *pFontInfo);
-    typedef BOOL WINAPI GetCurrentConsoleFontExType(
-                HANDLE hOutput,
-                BOOL bMaximize,
-                AGENT_CONSOLE_FONT_INFOEX *pFontInfoEx);
     typedef BOOL WINAPI SetCurrentConsoleFontExType(
                 HANDLE hConsoleOutput,
                 BOOL bMaximumWindow,
@@ -109,14 +99,8 @@ void Win32Console::setSmallFont()
 
     SetConsoleFontType *pSetConsoleFont =
             (SetConsoleFontType*)GetProcAddress(dll, "SetConsoleFont");
-    GetConsoleFontInfoType *pGetConsoleFontInfo =
-            (GetConsoleFontInfoType*)GetProcAddress(dll, "GetConsoleFontInfo");
-    GetNumberOfConsoleFontsType *pGetNumberOfConsoleFonts =
-            (GetNumberOfConsoleFontsType*)GetProcAddress(dll, "GetNumberOfConsoleFonts");
     GetCurrentConsoleFontType *pGetCurrentConsoleFont =
             (GetCurrentConsoleFontType*)GetProcAddress(dll, "GetCurrentConsoleFont");
-    GetCurrentConsoleFontExType *pGetCurrentConsoleFontEx =
-            (GetCurrentConsoleFontExType*)GetProcAddress(dll, "GetCurrentConsoleFontEx");
     SetCurrentConsoleFontExType *pSetCurrentConsoleFontEx =
             (SetCurrentConsoleFontExType*)GetProcAddress(dll, "SetCurrentConsoleFontEx");
     GetConsoleFontSizeType *pGetConsoleFontSize =
