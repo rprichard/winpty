@@ -185,10 +185,9 @@ void Terminal::moveTerminalToLine(int line)
     // cursor is on the last line already.
 
     if (line < m_remoteLine) {
-        // Cursor Horizontal Absolute (CHA) -- move to column 1.
         // CUrsor Up (CUU)
         char buffer[32];
-        sprintf(buffer, CSI"1G"CSI"%dA", m_remoteLine - line);
+        sprintf(buffer, "\r"CSI"%dA", m_remoteLine - line);
         m_output->write(buffer);
         m_remoteLine = line;
     } else if (line > m_remoteLine) {
@@ -197,7 +196,6 @@ void Terminal::moveTerminalToLine(int line)
             m_remoteLine++;
         }
     } else {
-        // Cursor Horizontal Absolute -- move to column 1.
-        m_output->write(CSI"1G");
+        m_output->write("\r");
     }
 }
