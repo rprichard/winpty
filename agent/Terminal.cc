@@ -152,7 +152,7 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
         }
     }
 
-    m_output->write(termLine.data(), termLine.size());
+    m_output->write(termLine.data(), length);
 }
 
 void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)

@@ -213,4 +213,7 @@ BUG: Run the pconsole.exe inside another console.  As I type dir, I see this:
       D:\rprichard\pconsole>d
       D:\rprichard\pconsole>di
       D:\rprichard\pconsole>dir
-In the output of "dir", every other line is blank.
+    In the output of "dir", every other line is blank.
+    There was a bug in Terminal::sendLine that was causing this to happen
+    frequently.  Now that I fixed it, this bug should only manifest on lines
+    whose last column is not a space (i.e. a full line).
