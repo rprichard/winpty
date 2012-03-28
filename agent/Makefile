@@ -53,6 +53,6 @@ $(PROGRAM) : $(OBJECTS)
 
 .PHONY : clean
 clean:
-	rm -f $(PROGRAM) *.o *.d moc_*.cc
+	rm -f $(PROGRAM) *.o *.d
 
 -include $(OBJECTS:.o=.d)
