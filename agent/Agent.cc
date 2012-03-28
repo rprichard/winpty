@@ -59,9 +59,12 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_childExitCode(-1),
     m_syncCounter(0)
 {
+    trace("Agent starting...");
+
     m_bufferData = new CHAR_INFO[BUFFER_LINE_COUNT][MAX_CONSOLE_WIDTH];
 
     m_console = new Win32Console;
+    m_console->setSmallFont();
     m_console->reposition(
                 Coord(initialCols, BUFFER_LINE_COUNT),
                 SmallRect(0, 0, initialCols, initialRows));
@@ -82,8 +85,6 @@ Agent::Agent(LPCWSTR controlPipeName,
     SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
 
     setPollInterval(25);
-
-    trace("Agent starting...");
 }
 
 Agent::~Agent()

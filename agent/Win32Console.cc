@@ -57,6 +57,132 @@ void Win32Console::postCloseMessage()
         PostMessage(h, WM_CLOSE, 0, 0);
 }
 
+// A Windows console window can never be larger than the desktop window.  To
+// maximize the possible size of the console in rows*cols, try to configure
+// the console with a small font.
+void Win32Console::setSmallFont()
+{
+    // Some of these types and functions are missing from the MinGW headers.
+    // Others are undocumented.
+
+    struct AGENT_CONSOLE_FONT_INFO {
+        DWORD nFont;
+        COORD dwFontSize;
+    };
+
+    struct AGENT_CONSOLE_FONT_INFOEX {
+        ULONG cbSize;
+        DWORD nFont;
+        COORD dwFontSize;
+        UINT FontFamily;
+        UINT FontWeight;
+        WCHAR FaceName[LF_FACESIZE];
+    };
+
+    typedef BOOL WINAPI SetConsoleFontType(
+                HANDLE hOutput,
+                DWORD dwFontIndex);
+    typedef BOOL WINAPI GetConsoleFontInfoType(
+                HANDLE hOutput,
+                BOOL bMaximize,
+                DWORD dwNumFonts,
+                AGENT_CONSOLE_FONT_INFO *info);
+    typedef DWORD WINAPI GetNumberOfConsoleFontsType();
+    typedef BOOL WINAPI GetCurrentConsoleFontType(
+                HANDLE hOutput,
+                BOOL bMaximize,
+                AGENT_CONSOLE_FONT_INFO *pFontInfo);
+    typedef BOOL WINAPI GetCurrentConsoleFontExType(
+                HANDLE hOutput,
+                BOOL bMaximize,
+                AGENT_CONSOLE_FONT_INFOEX *pFontInfoEx);
+    typedef BOOL WINAPI SetCurrentConsoleFontExType(
+                HANDLE hConsoleOutput,
+                BOOL bMaximumWindow,
+                AGENT_CONSOLE_FONT_INFOEX *lpConsoleCurrentFontEx);
+    typedef COORD WINAPI GetConsoleFontSizeType(
+                HANDLE hConsoleOutput,
+                DWORD nFont);
+
+    HINSTANCE dll = LoadLibrary(L"kernel32.dll");
+    ASSERT(dll != NULL);
+
+    SetConsoleFontType *pSetConsoleFont =
+            (SetConsoleFontType*)GetProcAddress(dll, "SetConsoleFont");
+    GetConsoleFontInfoType *pGetConsoleFontInfo =
+            (GetConsoleFontInfoType*)GetProcAddress(dll, "GetConsoleFontInfo");
+    GetNumberOfConsoleFontsType *pGetNumberOfConsoleFonts =
+            (GetNumberOfConsoleFontsType*)GetProcAddress(dll, "GetNumberOfConsoleFonts");
+    GetCurrentConsoleFontType *pGetCurrentConsoleFont =
+            (GetCurrentConsoleFontType*)GetProcAddress(dll, "GetCurrentConsoleFont");
+    GetCurrentConsoleFontExType *pGetCurrentConsoleFontEx =
+            (GetCurrentConsoleFontExType*)GetProcAddress(dll, "GetCurrentConsoleFontEx");
+    SetCurrentConsoleFontExType *pSetCurrentConsoleFontEx =
+            (SetCurrentConsoleFontExType*)GetProcAddress(dll, "SetCurrentConsoleFontEx");
+    GetConsoleFontSizeType *pGetConsoleFontSize =
+            (GetConsoleFontSizeType*)GetProcAddress(dll, "GetConsoleFontSize");
+
+    BOOL success;
+
+    // The undocumented GetNumberOfConsoleFonts API reports that my Windows 7
+    // system has 12 fonts on it.  Each font is really just a differently-sized
+    // raster/Terminal font.  Font index 0 is the smallest font, so we want to
+    // choose it.
+    if (pGetConsoleFontSize == NULL) {
+        // This API should exist even on Windows XP.
+        trace("error: GetConsoleFontSize API is missing");
+        return;
+    }
+    if (pGetCurrentConsoleFont == NULL) {
+        // This API should exist even on Windows XP.
+        trace("error: GetCurrentConsoleFont API is missing");
+        return;
+    }
+
+    AGENT_CONSOLE_FONT_INFO fi;
+    success = pGetCurrentConsoleFont(m_conout, FALSE, &fi);
+    if (!success) {
+        trace("error: GetCurrentConsoleFont failed");
+        return;
+    }
+    COORD smallest = pGetConsoleFontSize(m_conout, 0);
+    if (smallest.X == 0 || smallest.Y == 0) {
+        trace("error: GetConsoleFontSize failed");
+        return;
+    }
+    trace("font #0: X=%d Y=%d", smallest.X, smallest.Y);
+    trace("current font: idx=%d X=%d Y=%d",
+          (int)fi.nFont, fi.dwFontSize.X, fi.dwFontSize.Y);
+    if (fi.dwFontSize.X <= smallest.X && fi.dwFontSize.Y <= smallest.Y)
+        return;
+
+    // First try to call the documented Vista API.
+    if (pSetCurrentConsoleFontEx != NULL) {
+        AGENT_CONSOLE_FONT_INFOEX fix = {0};
+        fix.cbSize = sizeof(fix);
+        fix.nFont = 0;
+        fix.dwFontSize = smallest;
+        success = pSetCurrentConsoleFontEx(m_conout, FALSE, &fix);
+        trace("SetCurrentConsoleFontEx call %s",
+              success ? "succeeded" : "failed");
+        return;
+    }
+
+    // Then try to call the undocumented Windows XP API.
+    //
+    // Somewhat described here:
+    // http://blogs.microsoft.co.il/blogs/pavely/archive/2009/07/23/changing-console-fonts.aspx
+    //
+    if (pSetConsoleFont != NULL) {
+        success = pSetConsoleFont(m_conout, 0);
+        trace("SetConsoleFont call %s", success ? "succeeded" : "failed");
+        return;
+    }
+
+    trace("Not setting console font size -- "
+          "neither SetConsoleFont nor SetCurrentConsoleFontEx API exists");
+}
+
 Coord Win32Console::bufferSize()
 {
     // TODO: error handling

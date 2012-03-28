@@ -35,6 +35,7 @@ public:
     HANDLE conout();
     HWND hwnd();
     void postCloseMessage();
+    void setSmallFont();
 
     // Buffer and window sizes.
     Coord bufferSize();
