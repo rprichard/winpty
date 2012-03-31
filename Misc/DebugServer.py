@@ -1,4 +1,5 @@
-#!python -u
+#!python
+#
 # Run with native CPython.  Needs pywin32 extensions.
 
 # Copyright (c) 2011-2012 Ryan Prichard
@@ -26,6 +27,7 @@ import win32api
 import win32file
 import time
 import threading
+import sys
 
 # A message may not be larger than this size.
 MSG_SIZE=4096
@@ -43,6 +45,7 @@ while True:
     win32pipe.ConnectNamedPipe(serverPipe, None)
     (ret, data) = win32file.ReadFile(serverPipe, MSG_SIZE)
     print(data.decode())
+    sys.stdout.flush()
 
     # The client uses CallNamedPipe to send its message.  CallNamedPipe waits
     # for a reply message.  If I send a reply, however, using WriteFile, then
