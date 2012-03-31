@@ -199,6 +199,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     std::wstring cmdline = packet.getWString();
     std::wstring cwd = packet.getWString();
     std::wstring env = packet.getWString();
+    std::wstring desktop = packet.getWString();
     ASSERT(packet.eof());
 
     LPCWSTR programArg = program.empty() ? NULL : program.c_str();
@@ -212,11 +213,13 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     }
     LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
     LPCWSTR envArg = env.empty() ? NULL : env.data();
+
     STARTUPINFO sui;
     PROCESS_INFORMATION pi;
     memset(&sui, 0, sizeof(sui));
     memset(&pi, 0, sizeof(pi));
     sui.cb = sizeof(STARTUPINFO);
+    sui.lpDesktop = desktop.empty() ? NULL : (LPWSTR)desktop.c_str();
 
     success = CreateProcess(programArg, cmdlineArg, NULL, NULL,
                             /*bInheritHandles=*/FALSE,

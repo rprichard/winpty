@@ -156,6 +156,24 @@ struct BackgroundDesktop {
     std::wstring desktopName;
 };
 
+static std::wstring getObjectName(HANDLE object)
+{
+    BOOL success;
+    DWORD lengthNeeded = 0;
+    GetUserObjectInformation(object, UOI_NAME,
+                             NULL, 0,
+                             &lengthNeeded);
+    assert(lengthNeeded % sizeof(wchar_t) == 0);
+    wchar_t *tmp = new wchar_t[lengthNeeded / 2];
+    success = GetUserObjectInformation(object, UOI_NAME,
+                                       tmp, lengthNeeded,
+                                       NULL);
+    assert(success);
+    std::wstring ret = tmp;
+    delete [] tmp;
+    return ret;
+}
+
 // Get a non-interactive window station for the agent.
 // TODO: review security w.r.t. windowstation and desktop.
 static BackgroundDesktop setupBackgroundDesktop()
@@ -169,12 +187,8 @@ static BackgroundDesktop setupBackgroundDesktop()
     assert(ret.originalStation != NULL);
     assert(ret.station != NULL);
     assert(ret.desktop != NULL);
-    wchar_t stationNameWStr[256];
-    success = GetUserObjectInformation(ret.station, UOI_NAME,
-                                       stationNameWStr, sizeof(stationNameWStr),
-                                       NULL);
-    assert(success);
-    ret.desktopName = std::wstring(stationNameWStr) + L"\\Default";
+    ret.desktopName =
+        getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
     return ret;
 }
 
@@ -183,6 +197,17 @@ static void restoreOriginalDesktop(const BackgroundDesktop &desktop)
     SetProcessWindowStation(desktop.originalStation);
     CloseDesktop(desktop.desktop);
     CloseWindowStation(desktop.station);
+}
+
+static std::wstring getDesktopFullName()
+{
+    // MSDN says that the handle returned by GetThreadDesktop does not need
+    // to be passed to CloseDesktop.
+    HWINSTA station = GetProcessWindowStation();
+    HDESK desktop = GetThreadDesktop(GetCurrentThreadId());
+    assert(station != NULL);
+    assert(desktop != NULL);
+    return getObjectName(station) + L"\\" + getObjectName(desktop);
 }
 
 static void startAgentProcess(const BackgroundDesktop &desktop,
@@ -356,6 +381,7 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
         envStr.push_back(L'\0');
     }
     packet.putWString(envStr);
+    packet.putWString(getDesktopFullName());
     writePacket(pc, packet);
     return readInt32(pc);
 }
