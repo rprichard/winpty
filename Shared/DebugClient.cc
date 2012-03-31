@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 
-const char *volatile tracingConfig;
+char *tracingConfig;
 
 static void sendToDebugServer(const char *message)
 {
@@ -52,10 +52,13 @@ static long long unixTimeMillis()
 static const char *getTracingConfig()
 {
     if (tracingConfig == NULL) {
-        const char *newTracingConfig = getenv("WINPTYDBG");
-        if (newTracingConfig == NULL)
-            newTracingConfig = "";
-        tracingConfig = newTracingConfig;
+        const int bufSize = 256;
+        char buf[bufSize];
+        DWORD actualSize = GetEnvironmentVariableA("WINPTYDBG", buf, bufSize);
+        if (actualSize == 0 || actualSize >= (DWORD)bufSize)
+            buf[0] = '\0';
+        tracingConfig = new char[strlen(buf) + 1];
+        strcpy(tracingConfig, buf);
     }
     return tracingConfig;
 }
