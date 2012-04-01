@@ -27,11 +27,13 @@ You need the following to build winpty:
 * GNU make
 * A MinGW 32-bit g++ toolchain, v4 or later, to build ``winpty.dll`` and
   ``winpty-agent.exe``
-* A g++ toolchain targeting Cygwin or MSYS, v3 or later, to build console.exe
+* A g++ toolchain targeting Cygwin or MSYS, v3 or later, to build
+  ``console.exe``
 
-MinGW appears to be split into two distributions -- MinGW (32-bit only) and
-MinGW-w64 (which compiles both 32-bit and 64-bit binaries).  Either one is
-acceptable, but the compiler must be v4 or later.
+MinGW appears to be split into two distributions -- MinGW (creates 32-bit
+binaries) and MinGW-w64 (creates both 32-bit and 64-bit binaries).  Either
+one is acceptable, but the compiler must be v4 or later and produce 32-bit
+binaries.
 
 Cygwin packages
 ---------------
