@@ -21,7 +21,7 @@
 #include "NamedPipe.h"
 #include "EventLoop.h"
 #include "AgentAssert.h"
-#include "../Shared/DebugClient.h"
+#include "../shared/DebugClient.h"
 #include <string.h>
 
 NamedPipe::NamedPipe() :

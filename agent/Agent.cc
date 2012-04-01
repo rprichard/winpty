@@ -24,9 +24,9 @@
 #include "Terminal.h"
 #include "NamedPipe.h"
 #include "AgentAssert.h"
-#include "../Shared/DebugClient.h"
-#include "../Shared/AgentMsg.h"
-#include "../Shared/Buffer.h"
+#include "../shared/DebugClient.h"
+#include "../shared/AgentMsg.h"
+#include "../shared/Buffer.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -21,7 +21,7 @@
 #include "ConsoleInput.h"
 #include "Win32Console.h"
 #include "DsrSender.h"
-#include "../Shared/DebugClient.h"
+#include "../shared/DebugClient.h"
 #include <string.h>
 #include <stdio.h>
 

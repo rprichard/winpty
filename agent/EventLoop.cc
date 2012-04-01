@@ -21,7 +21,7 @@
 #include "EventLoop.h"
 #include "NamedPipe.h"
 #include "AgentAssert.h"
-#include "../Shared/DebugClient.h"
+#include "../shared/DebugClient.h"
 
 EventLoop::EventLoop() : m_exiting(false), m_pollInterval(0)
 {

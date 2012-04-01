@@ -19,7 +19,7 @@
 // IN THE SOFTWARE.
 
 #include "AgentAssert.h"
-#include "../Shared/DebugClient.h"
+#include "../shared/DebugClient.h"
 #include <stdlib.h>
 
 // Calling the standard assert() function does not work in the agent because

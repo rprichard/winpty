@@ -27,9 +27,9 @@
 #include <string>
 #include <vector>
 #include <sstream>
-#include "../Shared/DebugClient.h"
-#include "../Shared/AgentMsg.h"
-#include "../Shared/Buffer.h"
+#include "../shared/DebugClient.h"
+#include "../shared/AgentMsg.h"
+#include "../shared/Buffer.h"
 
 // TODO: Error handling, handle out-of-memory.
 

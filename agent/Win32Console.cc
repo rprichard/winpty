@@ -20,7 +20,7 @@
 
 #include "Win32Console.h"
 #include "AgentAssert.h"
-#include "../Shared/DebugClient.h"
+#include "../shared/DebugClient.h"
 #include <windows.h>
 
 Win32Console::Win32Console()

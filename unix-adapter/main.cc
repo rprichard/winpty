@@ -31,7 +31,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <winpty.h>
-#include "../Shared/DebugClient.h"
+#include "../shared/DebugClient.h"
 #include <string>
 
 
