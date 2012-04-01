@@ -353,9 +353,6 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     return pc;
 }
 
-// TODO: We also need to control what desktop the child process is started with.
-// I think the right default is for this winpty.dll function to query the
-// current desktop and send that to the agent.
 WINPTY_API int winpty_start_process(winpty_t *pc,
                                     const wchar_t *appname,
                                     const wchar_t *cmdline,
