@@ -43,18 +43,18 @@ static volatile bool ioHandlerDied;
 static termios setRawTerminalMode()
 {
     if (!isatty(STDIN_FILENO)) {
-	fprintf(stderr, "input is not a tty\n");
-	exit(1);
+        fprintf(stderr, "input is not a tty\n");
+        exit(1);
     }
     if (!isatty(STDOUT_FILENO)) {
         fprintf(stderr, "output is not a tty\n");
-	exit(1);
+        exit(1);
     }
 
     termios buf;
     if (tcgetattr(STDIN_FILENO, &buf) < 0) {
-	perror("tcgetattr failed");
-	exit(1);
+        perror("tcgetattr failed");
+        exit(1);
     }
     termios saved = buf;
     buf.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
@@ -65,8 +65,8 @@ static termios setRawTerminalMode()
     buf.c_cc[VMIN] = 1;  // blocking read
     buf.c_cc[VTIME] = 0;
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &buf) < 0) {
-	fprintf(stderr, "tcsetattr failed\n");
-	exit(1);
+        fprintf(stderr, "tcsetattr failed\n");
+        exit(1);
     }
     return saved;
 }
@@ -74,8 +74,8 @@ static termios setRawTerminalMode()
 static void restoreTerminalMode(termios original)
 {
     if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &original) < 0) {
-	perror("error restoring terminal mode");
-	exit(1);
+        perror("error restoring terminal mode");
+        exit(1);
     }
 }
 
@@ -280,8 +280,8 @@ int main(int argc, char *argv[])
 
     winpty_t *winpty = winpty_open(sz.ws_col, sz.ws_row);
     if (winpty == NULL) {
-	fprintf(stderr, "Error creating winpty.\n");
-	exit(1);
+        fprintf(stderr, "Error creating winpty.\n");
+        exit(1);
     }
 
     {
@@ -304,22 +304,22 @@ int main(int argc, char *argv[])
     }
 
     {
-	struct sigaction resizeSigAct;
-	memset(&resizeSigAct, 0, sizeof(resizeSigAct));
-	resizeSigAct.sa_handler = terminalResized;
-	resizeSigAct.sa_flags = SA_RESTART;
-	sigaction(SIGWINCH, &resizeSigAct, NULL);
+        struct sigaction resizeSigAct;
+        memset(&resizeSigAct, 0, sizeof(resizeSigAct));
+        resizeSigAct.sa_handler = terminalResized;
+        resizeSigAct.sa_flags = SA_RESTART;
+        sigaction(SIGWINCH, &resizeSigAct, NULL);
     }
 
     termios mode = setRawTerminalMode();
     int signalReadFd;
 
     {
-	int pipeFd[2];
-	if (pipe(pipeFd) != 0) {
-	    perror("Could not create pipe");
-	    exit(1);
-	}
+        int pipeFd[2];
+        if (pipe(pipeFd) != 0) {
+            perror("Could not create pipe");
+            exit(1);
+        }
         setFdNonBlock(pipeFd[0]);
         setFdNonBlock(pipeFd[1]);
         signalReadFd = pipeFd[0];
@@ -333,13 +333,13 @@ int main(int argc, char *argv[])
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(signalReadFd, &readfds);
-	if (select(signalReadFd + 1, &readfds, NULL, NULL, NULL) < 0 &&
+        if (select(signalReadFd + 1, &readfds, NULL, NULL, NULL) < 0 &&
                 errno != EINTR) {
-	    perror("select failed");
-	    exit(1);
-	}
+            perror("select failed");
+            exit(1);
+        }
 
-	// Discard any data in the signal pipe.
+        // Discard any data in the signal pipe.
         {
             char tmpBuf[256];
             int amount = read(signalReadFd, tmpBuf, sizeof(tmpBuf));
@@ -349,15 +349,15 @@ int main(int argc, char *argv[])
             }
         }
 
-	// Check for terminal resize.
-	{
-	    winsize sz2;
-	    ioctl(STDIN_FILENO, TIOCGWINSZ, &sz2);
-	    if (memcmp(&sz, &sz2, sizeof(sz)) != 0) {
-		sz = sz2;
-		winpty_set_size(winpty, sz.ws_col, sz.ws_row);
-	    }
-	}
+        // Check for terminal resize.
+        {
+            winsize sz2;
+            ioctl(STDIN_FILENO, TIOCGWINSZ, &sz2);
+            if (memcmp(&sz, &sz2, sizeof(sz)) != 0) {
+                sz = sz2;
+                winpty_set_size(winpty, sz.ws_col, sz.ws_row);
+            }
+        }
 
         // Check for an I/O handler shutting down (possibly indicating that the
         // child process has exited).
