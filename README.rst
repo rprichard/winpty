@@ -2,10 +2,21 @@
 winpty
 ======
 
-winpty is a Windows software package that emulates a Unix pty-master interface
-to Windows console programs.  It consists of a library and a tool for Cygwin
-and MSYS for running a Windows console program under a Cygwin/MSYS pty, such as
-that used by ``mintty`` or ``sshd``.
+winpty is a Windows software package providing an interface similar to a Unix
+pty-master for communicating with Windows console programs.  The package
+consists of a library (libwinpty) and a tool for Cygwin and MSYS for running
+Windows console programs in a Cygwin/MSYS pty.
+
+The software works by starting the ``winpty-agent.exe`` process with a new,
+hidden console window, which bridges between the console API and terminal
+input/output escape codes.  It polls the hidden console's screen buffer for
+changes and generates a corresponding stream of output.
+
+The Unix adapter allows running Windows console programs (e.g. CMD, PowerShell,
+IronPython, etc.) under ``mintty`` or Cygwin's ``sshd`` with
+properly-functioning input (e.g. arrow and function keys) and output (e.g. line
+buffering).  The library could be also useful for writing a non-Cygwin SSH
+server.
 
 Prerequisites
 =============
@@ -57,11 +68,3 @@ To run a Windows console program in ``mintty`` or Cygwin ``sshd``, prepend
     30
     >>> exit()
     $
-
-How it works
-============
-
-The emulation starts a ``winpty-agent.exe`` process with a console window on a
-hidden desktop.  It polls the console output for changes and converts them
-to a stream of VT100 escape codes.  It converts input escape codes into console
-input records.
