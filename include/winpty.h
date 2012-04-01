@@ -63,10 +63,10 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows);
  * Returns 0 on success or a Win32 error code on failure.
  */
 WINPTY_API int winpty_start_process(winpty_t *pc,
-					const wchar_t *appname,
-					const wchar_t *cmdline,
-					const wchar_t *cwd,
-					const wchar_t *env);
+                                    const wchar_t *appname,
+                                    const wchar_t *cmdline,
+                                    const wchar_t *cwd,
+                                    const wchar_t *env);
 
 /*
  * Returns the exit code of the process started with winpty_start_process,
