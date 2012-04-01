@@ -402,7 +402,7 @@ void Agent::scrapeOutput()
             markEntireWindowDirty();
         } else if (windowRect.top() < m_dirtyWindowTop) {
             // The window has moved upward.  This is generally not expected to
-            // happen, but the CMD/PowerShell CMD command will move the window
+            // happen, but the CMD/PowerShell CLS command will move the window
             // to the top as part of clearing everything else in the console.
             trace("Window moved upward -- resetting the terminal");
             resetConsoleTracking();
