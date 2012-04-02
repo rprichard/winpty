@@ -25,6 +25,8 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/cygwin.h>
+#include <cygwin/version.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -33,6 +35,7 @@
 #include <winpty.h>
 #include "../shared/DebugClient.h"
 #include <string>
+#include <vector>
 
 
 static int signalWriteFd;
@@ -210,15 +213,47 @@ static void setFdNonBlock(int fd)
     fcntl(fd, F_SETFL, status | O_NONBLOCK);
 }
 
+// Convert the path to a Win32 path if it is a POSIX path, and convert slashes
+// to backslashes.
+static std::string convertPosixPathToWin(const std::string &path)
+{
+    char *tmp;
+#if CYGWIN_VERSION_API_MINOR >= 181
+    ssize_t newSize = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
+                                       path.c_str(), NULL, 0);
+    assert(newSize >= 0);
+    tmp = new char[newSize + 1];
+    ssize_t success = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
+                                       path.c_str(), tmp, newSize + 1);
+    assert(success == 0);
+#else
+    // In the current Cygwin header file, this API is documented as deprecated
+    // because it's restricted to paths of MAX_PATH length.  In the CVS version
+    // of MSYS, the newer API doesn't exist, and this older API is implemented
+    // using msys_p2w, which seems like it would handle paths larger than
+    // MAX_PATH, but there's no way to query how large the new path is.
+    // Hopefully, this is large enough.
+    tmp = new char[MAX_PATH + path.size()];
+    cygwin_conv_to_win32_path(path.c_str(), tmp);
+#endif
+    for (int i = 0; tmp[i] != '\0'; ++i) {
+        if (tmp[i] == '/')
+            tmp[i] = '\\';
+    }
+    std::string ret(tmp);
+    delete [] tmp;
+    return ret;
+}
+
 // Convert argc/argv into a Win32 command-line following the escaping convention
 // documented on MSDN.  (e.g. see CommandLineToArgvW documentation)
-static std::string argvToCommandLine(int argc, char *argv[])
+static std::string argvToCommandLine(const std::vector<std::string> &argv)
 {
     std::string result;
-    for (int argIndex = 0; argIndex < argc; ++argIndex) {
+    for (size_t argIndex = 0; argIndex < argv.size(); ++argIndex) {
         if (argIndex > 0)
             result.push_back(' ');
-        const char *arg = argv[argIndex];
+        const char *arg = argv[argIndex].c_str();
         bool quote = strchr(arg, ' ') != NULL || strchr(arg, '\"') != NULL;
         if (quote)
             result.push_back('\"');
@@ -286,7 +321,11 @@ int main(int argc, char *argv[])
 
     {
         // Start the child process under the console.
-        std::string cmdLine = argvToCommandLine(argc - 1, &argv[1]);
+        std::vector<std::string> argVector;
+        argVector.push_back(convertPosixPathToWin(argv[1]));
+        for (int i = 2; i < argc; ++i)
+            argVector.push_back(argv[i]);
+        std::string cmdLine = argvToCommandLine(argVector);
         wchar_t *cmdLineW = heapMbsToWcs(cmdLine.c_str());
         int ret = winpty_start_process(winpty,
                                          NULL,
