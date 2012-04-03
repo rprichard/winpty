@@ -254,7 +254,10 @@ static std::string argvToCommandLine(const std::vector<std::string> &argv)
         if (argIndex > 0)
             result.push_back(' ');
         const char *arg = argv[argIndex].c_str();
-        bool quote = strchr(arg, ' ') != NULL || strchr(arg, '\"') != NULL;
+        const bool quote =
+            strchr(arg, ' ') != NULL ||
+            strchr(arg, '\t') != NULL ||
+            *arg == '\0';
         if (quote)
             result.push_back('\"');
         int bsCount = 0;
