@@ -27,3 +27,7 @@ clean :
 	cd agent && $(MAKE) clean
 	cd libwinpty && $(MAKE) clean
 	cd unix-adapter && $(MAKE) clean
+
+distclean : clean
+	rm -f config-unix.mk
+	rm -f config-mingw.mk
