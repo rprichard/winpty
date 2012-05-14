@@ -56,12 +56,12 @@ MinGW packages
 --------------
 
 The default g++ compiler for MinGW targets native Windows, but the MinGW 
-project also packages compilers to target the MSYS enviroment itself. The
+project also packages compilers to target the MSYS environment itself. The
 required packages are:
 
-* mingw32-make 
-* g++ 
-* msys-dvlpr
+* ``mingw32-make`` 
+* ``g++`` 
+* ``msys-dvlpr``
 
 
 Build
