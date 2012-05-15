@@ -30,6 +30,12 @@ You need the following to build winpty:
 * A g++ toolchain targeting Cygwin or MSYS, v3 or later, to build
   ``console.exe``
 
+Winpty requires two g++ toolchains as it is split into two parts. The
+binaries winpty.dll and winpty-agent.exe interface with the native Windows
+command prompt window so they are compiled with the native MinGW toolchain.
+The console.exe binary interfaces with the MSYS/Cygwin terminal so it is
+compiled with the MSYS/Cygwin toolchain.
+
 MinGW appears to be split into two distributions -- MinGW (creates 32-bit
 binaries) and MinGW-w64 (creates both 32-bit and 64-bit binaries).  Either
 one is acceptable, but the compiler must be v4 or later and produce 32-bit
@@ -45,6 +51,18 @@ this writing, the necessary packages are:
 * Either ``mingw-gcc-g++`` or ``mingw64-i686-gcc-g++`` (but not
   ``mingw64-x86_64-gcc-g++``)
 * ``gcc4-g++``
+
+MinGW packages
+--------------
+
+The default g++ compiler for MinGW targets native Windows, but the MinGW 
+project also packages compilers to target the MSYS environment itself. The
+required packages are:
+
+* ``mingw32-make`` 
+* ``g++`` 
+* ``msys-dvlpr``
+
 
 Build
 =====
