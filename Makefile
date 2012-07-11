@@ -18,10 +18,16 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
+PREFIX ?= /usr/local
+
 all :
 	cd agent && $(MAKE)
 	cd libwinpty && $(MAKE)
 	cd unix-adapter && $(MAKE)
+
+install : all
+	mkdir -p $(PREFIX)/bin
+	cp build/* $(PREFIX)/bin
 
 clean :
 	cd agent && $(MAKE) clean
