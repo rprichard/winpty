@@ -18,6 +18,10 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
+// MSYS's sys/cygwin.h header only declares cygwin_internal if WINVER is
+// defined, which is defined in windows.h.  Therefore, include windows.h early.
+#include <windows.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -218,7 +222,7 @@ static void setFdNonBlock(int fd)
 static std::string convertPosixPathToWin(const std::string &path)
 {
     char *tmp;
-#if CYGWIN_VERSION_API_MINOR >= 181
+#if !defined(__MSYS__) && CYGWIN_VERSION_API_MINOR >= 181
     ssize_t newSize = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
                                        path.c_str(), NULL, 0);
     assert(newSize >= 0);
@@ -296,6 +300,41 @@ static wchar_t *heapMbsToWcs(const char *text)
     return ret;
 }
 
+void setupWin32Environment()
+{
+    std::string dbgValue;
+    const char *dbgValueCStr = getenv("WINPTYDBG");
+    if (dbgValueCStr != NULL)
+        dbgValue = dbgValueCStr;
+
+#if defined(__MSYS__) && CYGWIN_VERSION_API_MINOR >= 48 || \
+        !defined(__MSYS__) && CYGWIN_VERSION_API_MINOR >= 153
+    // Use CW_SYNC_WINENV to copy the Unix environment to the Win32
+    // environment.  The command performs special translation on some variables
+    // (such as PATH and TMP).  It also copies the WINPTYDBG variable.
+    //
+    // Note that the API minor versions have diverged in Cygwin and MSYS.
+    // CW_SYNC_WINENV was added to Cygwin in version 153.  (Cygwin's
+    // include/cygwin/version.h says that CW_SETUP_WINENV was added in 153.
+    // The flag was renamed 8 days after it was added, but the API docs weren't
+    // updated.)  The flag was added to MSYS in version 48.
+    //
+    // Also, in my limited testing, this call seems to be necessary with Cygwin
+    // but unnecessary with MSYS.  Perhaps MSYS is automatically syncing the
+    // Unix environment with the Win32 environment before starting console.exe?
+    // It shouldn't hurt to call it for MSYS.
+    cygwin_internal(CW_SYNC_WINENV);
+#endif
+
+    // Copy the WINPTYDBG environment variable from the Cygwin environment
+    // to the Win32 environment so the agent will inherit it.
+    if (!dbgValue.empty()) {
+        wchar_t *dbgvarW = heapMbsToWcs(dbgValue.c_str());
+        SetEnvironmentVariableW(L"WINPTYDBG", dbgvarW);
+        delete [] dbgvarW;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     if (argc == 1) {
@@ -304,14 +343,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    {
-        // Copy the WINPTYDBG environment variable from the Cygwin environment
-        // to the Win32 environment so the agent will inherit it.
-        const char *dbgvar = getenv("WINPTYDBG");
-        if (dbgvar != NULL) {
-            SetEnvironmentVariableW(L"WINPTYDBG", L"1");
-        }
-    }
+    setupWin32Environment();
 
     winsize sz;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
