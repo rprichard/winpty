@@ -223,11 +223,11 @@ static std::string convertPosixPathToWin(const std::string &path)
 {
     char *tmp;
 #if !defined(__MSYS__) && CYGWIN_VERSION_API_MINOR >= 181
-    ssize_t newSize = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
+    ssize_t newSize = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE,
                                        path.c_str(), NULL, 0);
     assert(newSize >= 0);
     tmp = new char[newSize + 1];
-    ssize_t success = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
+    ssize_t success = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE,
                                        path.c_str(), tmp, newSize + 1);
     assert(success == 0);
 #else
