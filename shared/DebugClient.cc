@@ -23,6 +23,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if _MSC_VER
+	#define snprintf _snprintf
+#endif
+
 char *tracingConfig;
 
 static void sendToDebugServer(const char *message)
@@ -90,6 +94,7 @@ void trace(const char *format, ...)
     baseName = (baseName != NULL) ? baseName + 1 : moduleName;
 
     char fullMessage[1024];
+	
     snprintf(fullMessage, sizeof(fullMessage),
              "[%05d.%03d %s,p%04d,t%04d]: %s",
              currentTime / 1000, currentTime % 1000,
