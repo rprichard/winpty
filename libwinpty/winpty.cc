@@ -253,8 +253,7 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     CloseHandle(pi.hThread);
 }
 
-WINPTY_API winpty_t *winpty_open(int cols, int rows, std::wstring &controlPipeName,
-                              std::wstring &dataPipeName)
+WINPTY_API winpty_t *winpty_open(int cols, int rows)
 {
     winpty_t *pc = new winpty_t;
 
@@ -262,12 +261,10 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows, std::wstring &controlPipeNa
     std::wstringstream pipeName;
 
 	// Allow custom pipe names.
-	if(controlPipeName.empty() && dataPipeName.empty()) {
-		pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
-				 << L"-" << InterlockedIncrement(&consoleCounter);
-		std::wstring controlPipeName = pipeName.str() + L"-control";
-		std::wstring dataPipeName = pipeName.str() + L"-data";
-	}
+	pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
+				<< L"-" << InterlockedIncrement(&consoleCounter);
+	std::wstring controlPipeName = pipeName.str() + L"-control";
+	std::wstring dataPipeName = pipeName.str() + L"-data";
 
     pc->controlPipe = createNamedPipe(controlPipeName, false);
     if (pc->controlPipe == INVALID_HANDLE_VALUE) {
