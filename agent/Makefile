@@ -31,7 +31,7 @@ OBJECTS = \
 	Terminal.o \
 	Win32Console.o \
 	ConsoleInput.o \
-	AgentDebugClient.o \
+	DebugClient.o \
 	Coord.o \
 	SmallRect.o \
 	main.o

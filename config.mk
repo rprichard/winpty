@@ -31,6 +31,10 @@ CXXFLAGS += -MMD -Wall
 	@echo Compiling $<
 	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
+%.o : ../shared/%.cc
+	@echo Compiling $<
+	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+
 # Attempt to detect whether configure has been run yet.  The CWD will
 # be one of the subdirectories, so refer to ../config-mingw.mk instead
 # of ./config-mingw.mk.
