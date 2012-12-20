@@ -2,5 +2,12 @@
 *.d
 *.exe
 *.dll
+*.sln
+*.suo
+*.vcxproj
+*.vcxproj.filters
+Default
+winpty.sdf
+winpty.opensdf
 config-mingw.mk
 config-unix.mk
