@@ -20,6 +20,7 @@
 
 #include "Agent.h"
 #include "AgentAssert.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 static wchar_t *heapMbsToWcs(const char *text)
@@ -34,7 +35,14 @@ static wchar_t *heapMbsToWcs(const char *text)
 
 int main(int argc, char *argv[])
 {
-    ASSERT(argc == 5);
+    if (argc != 5) {
+        fprintf(stderr,
+            "Usage: %s controlPipeName dataPipeName cols rows\n"
+            "(Note: This program is intended to be run by libwinpty.dll.)\n",
+            argv[0]);
+        return 1;
+    }
+
     Agent agent(heapMbsToWcs(argv[1]),
                 heapMbsToWcs(argv[2]),
                 atoi(argv[3]),
