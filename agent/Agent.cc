@@ -229,8 +229,11 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     int ret = success ? 0 : GetLastError();
 
     trace("CreateProcess: %s %d",
-          (success ? "success" : "fail"),
+		(success == ERROR_SUCCESS ? "success" : "fail"),
           (int)pi.dwProcessId);
+	if(ret != ERROR_SUCCESS) {
+		trace("Create process error code: %d", GetLastError());
+	}
 
     if (success) {
         CloseHandle(pi.hThread);

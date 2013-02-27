@@ -27,9 +27,59 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <fstream>
+
+std::string to_utf8(const wchar_t* buffer, int len)
+{
+        int nChars = ::WideCharToMultiByte(
+                CP_UTF8,
+                0,
+                buffer,
+                len,
+                NULL,
+                0,
+                NULL,
+                NULL);
+        if (nChars == 0) return "";
+
+        std::string newbuffer;
+        newbuffer.resize(nChars) ;
+        ::WideCharToMultiByte(
+                CP_UTF8,
+                0,
+                buffer,
+                len,
+                const_cast< char* >(newbuffer.c_str()),
+                nChars,
+                NULL,
+                NULL); 
+
+        return newbuffer;
+}
+
+std::string to_utf8(const std::wstring& str)
+{
+        return to_utf8(str.c_str(), (int)str.size());
+}
+
+std::wstring to_wstring(const std::string& s)
+{
+ int len;
+ int slength = (int)s.length() + 1;
+ len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0); 
+ wchar_t* buf = new wchar_t[len];
+ MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
+ std::wstring r(buf);
+ delete[] buf;
+ return r;
+}
+
+
+
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
+#include "../shared/c99_snprintf.h"
 
 // TODO: Error handling, handle out-of-memory.
 
@@ -117,10 +167,13 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
 static void writePacket(winpty_t *pc, const WriteBuffer &packet)
 {
     std::string payload = packet.str();
+
     int32_t payloadSize = payload.size();
     DWORD actual;
     BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int32_t), &actual, NULL);
+
     assert(success && actual == sizeof(int32_t));
+
     success = WriteFile(pc->controlPipe, payload.c_str(), payloadSize, &actual, NULL);
     assert(success && (int32_t)actual == payloadSize);
 }
@@ -259,10 +312,13 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
 
     // Start pipes.
     std::wstringstream pipeName;
-    pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
-             << L"-" << InterlockedIncrement(&consoleCounter);
-    std::wstring controlPipeName = pipeName.str() + L"-control";
-    std::wstring dataPipeName = pipeName.str() + L"-data";
+
+	// Allow custom pipe names.
+	pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
+				<< L"-" << InterlockedIncrement(&consoleCounter);
+	std::wstring controlPipeName = pipeName.str() + L"-control";
+	std::wstring dataPipeName = pipeName.str() + L"-data";
+
     pc->controlPipe = createNamedPipe(controlPipeName, false);
     if (pc->controlPipe == INVALID_HANDLE_VALUE) {
         delete pc;
@@ -353,12 +409,61 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     return pc;
 }
 
+WINPTY_API winpty_t *winpty_open_use_own_datapipe(const wchar_t *dataPipe, int cols, int rows)
+{
+
+	winpty_t *pc = new winpty_t;
+
+	// Setup pipes.
+	std::wstringstream pipeName;
+    pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
+             << L"-" << InterlockedIncrement(&consoleCounter);
+    std::wstring controlPipeName = pipeName.str() + L"-control";
+
+	// The callee provides his own pipe implementation for handling sending/recieving
+	// data between the started child process.
+	std::wstring dataPipeName(to_wstring(to_utf8(dataPipe)));
+
+	// Create control pipe
+	pc->controlPipe = createNamedPipe(controlPipeName, false);
+	if (pc->controlPipe == INVALID_HANDLE_VALUE) {
+		delete pc;
+		return NULL;
+	}
+
+	// Setup a background desktop for the agent.
+	BackgroundDesktop desktop = setupBackgroundDesktop();
+
+	// Start the agent.
+	startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
+
+	// Test control pipe connection.
+	if (!connectNamedPipe(pc->controlPipe, false)) {
+		delete pc;
+		return NULL;
+	}
+
+	// Restore desktop.
+	restoreOriginalDesktop(desktop);
+
+	WriteBuffer packet;
+	packet.putInt(AgentMsg::Ping);
+	writePacket(pc, packet);
+	if (readInt32(pc) != 0) {
+		delete pc;
+		return NULL;
+	}
+
+	return pc;
+} 
+
 WINPTY_API int winpty_start_process(winpty_t *pc,
                                     const wchar_t *appname,
                                     const wchar_t *cmdline,
                                     const wchar_t *cwd,
                                     const wchar_t *env)
 {
+
     WriteBuffer packet;
     packet.putInt(AgentMsg::StartProcess);
     packet.putWString(appname ? appname : L"");
@@ -406,9 +511,10 @@ WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows)
     return readInt32(pc);
 }
 
-WINPTY_API void winpty_close(winpty_t *pc)
+WINPTY_API void winpty_exit(winpty_t *pc)
 {
-    CloseHandle(pc->controlPipe);
-    CloseHandle(pc->dataPipe);
-    delete pc;
+	CloseHandle(pc->controlPipe);
+	if(pc->dataPipe > 0) {
+		CloseHandle(pc->dataPipe);
+	}
 }
