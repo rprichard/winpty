@@ -24,10 +24,6 @@
 #include <string.h>
 #include "c99_snprintf.h"
 
-#if _MSC_VER
-	#define snprintf _snprintf
-#endif
-
 char *tracingConfig;
 
 static void sendToDebugServer(const char *message)
@@ -95,12 +91,7 @@ void trace(const char *format, ...)
     baseName = (baseName != NULL) ? baseName + 1 : moduleName;
 
     char fullMessage[1024];
-<<<<<<< HEAD
     c99_snprintf(fullMessage, sizeof(fullMessage),
-=======
-	
-    snprintf(fullMessage, sizeof(fullMessage),
->>>>>>> 964f5a63f88d9503f4fc33c54d1e608b9d6e2eab
              "[%05d.%03d %s,p%04d,t%04d]: %s",
              currentTime / 1000, currentTime % 1000,
              baseName, (int)GetCurrentProcessId(), (int)GetCurrentThreadId(),

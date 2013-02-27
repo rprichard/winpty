@@ -75,27 +75,11 @@ std::wstring to_wstring(const std::string& s)
 }
 
 
+
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 #include "../shared/c99_snprintf.h"
-
-void traceFile(const char *format ...) {
-	std::wofstream logFile;
-	
-	char message[1024];
-
-	va_list ap;
-    va_start(ap, format);
-    c99_vsnprintf(message, sizeof(message), format, ap);
-    message[sizeof(message) - 1] = '\0';
-    va_end(ap);
-
-	logFile.open("C:\\Users\\peters\\Documents\\Visual Studio 2012\\Projects\\AwesomeTerm\\thirdparty\\winpty\\Default\\demo.log", std::ios::out | std::ios::binary || std::ios::app); 
-	logFile << message;
-	logFile.close();
-
-}
 
 // TODO: Error handling, handle out-of-memory.
 
@@ -258,7 +242,6 @@ static BackgroundDesktop setupBackgroundDesktop()
     assert(ret.desktop != NULL);
     ret.desktopName =
         getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
-	std::wcout << ret.desktopName;
     return ret;
 }
 
@@ -480,8 +463,6 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
                                     const wchar_t *cwd,
                                     const wchar_t *env)
 {
-
-	traceFile("Recieved handle: %d", pc->controlPipe);
 
     WriteBuffer packet;
     packet.putInt(AgentMsg::StartProcess);
