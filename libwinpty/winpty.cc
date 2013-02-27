@@ -329,10 +329,13 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
 
     // Start pipes.
     std::wstringstream pipeName;
-    pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
-             << L"-" << InterlockedIncrement(&consoleCounter);
-    std::wstring controlPipeName = pipeName.str() + L"-control";
-    std::wstring dataPipeName = pipeName.str() + L"-data";
+
+	// Allow custom pipe names.
+	pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
+				<< L"-" << InterlockedIncrement(&consoleCounter);
+	std::wstring controlPipeName = pipeName.str() + L"-control";
+	std::wstring dataPipeName = pipeName.str() + L"-data";
+
     pc->controlPipe = createNamedPipe(controlPipeName, false);
     if (pc->controlPipe == INVALID_HANDLE_VALUE) {
         delete pc;
