@@ -55,6 +55,11 @@ ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
     {   ESC"OR",        VK_F3,      0,  0,                  }, // xt gt kon
     {   ESC"OS",        VK_F4,      0,  0,                  }, // xt gt kon
 
+	{   ESC"OA",        VK_UP,      0,  0,                  },
+	{   ESC"OB",        VK_DOWN,    0,  0,                  },
+	{   ESC"OC",        VK_RIGHT,   0,  0,                  },
+	{   ESC"OD",        VK_LEFT,    0,  0,                  },
+
     {   "\x7F",         VK_BACK,    '\x08', 0,                  },
     {   ESC"\x7F",      VK_BACK,    '\x08', LEFT_ALT_PRESSED,   },
     {   ESC"OH",        VK_HOME,    0,  0,                      }, // gnome-terminal
