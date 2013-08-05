@@ -1,7 +1,5 @@
 *.o
 *.d
-*.exe
-*.dll
 *.suo
 Default
 winpty.sdf
