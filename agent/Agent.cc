@@ -36,6 +36,9 @@
 #include <string>
 #include <utility>
 
+#undef min
+#undef max
+
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 const int SYNC_MARKER_LEN = 16;
@@ -165,6 +168,7 @@ void Agent::pollControlSocket()
         handlePacket(buffer);
     }
 }
+
 
 void Agent::handlePacket(ReadBuffer &packet)
 {

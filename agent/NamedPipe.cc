@@ -24,6 +24,9 @@
 #include "../shared/DebugClient.h"
 #include <string.h>
 
+#undef max
+#undef min
+
 NamedPipe::NamedPipe() :
     m_readBufferSize(64 * 1024),
     m_handle(NULL),

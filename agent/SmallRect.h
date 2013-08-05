@@ -26,6 +26,9 @@
 #include <algorithm>
 #include <string>
 
+#undef max
+#undef min
+
 struct SmallRect : SMALL_RECT
 {
     SmallRect()
