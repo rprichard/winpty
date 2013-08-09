@@ -67,6 +67,7 @@ case $(uname -s) in
                 echo 'Error: uname -m did not match either i686 or x86_64.'
                 exit 1
                 ;;
+        esac
         UNIX_LDFLAGS_STATIC_LIBSTDCXX="-static-libgcc -static-libstdc++"
         ;;
     MINGW*)
