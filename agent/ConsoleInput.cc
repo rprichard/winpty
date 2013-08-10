@@ -428,7 +428,14 @@ void ConsoleInput::appendMouseInputRecord(std::vector<INPUT_RECORD> &records,
 	coord.Y = y-1;
     ir.Event.MouseEvent.dwMousePosition = coord;
     ir.Event.MouseEvent.dwButtonState = button == 3? /*released*/ 0: button == 0? /*left*/ FROM_LEFT_1ST_BUTTON_PRESSED : RIGHTMOST_BUTTON_PRESSED;
-	ir.Event.MouseEvent.dwControlKeyState = 0; //TODO
+	int keyState = 0;
+	if (button & 4) {
+	   keyState |= 10;
+	}
+	if (button & 16) {
+	   keyState |= 8;
+	}
+	ir.Event.MouseEvent.dwControlKeyState = keyState;
 
     records.push_back(ir);
 }
