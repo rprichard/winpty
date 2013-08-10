@@ -62,6 +62,9 @@ void Terminal::reset(bool sendClearFirst, int newLine)
     m_cursorHidden = false;
     m_cursorPos = std::pair<int, int>(0, newLine);
     m_remoteColor = -1;
+
+	//use mouse
+	m_output->write(CSI"?1000h");
 }
 
 void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)

@@ -75,6 +75,10 @@ private:
                            int virtualKey,
                            int unicodeChar,
                            int keyState);
+	void appendMouseInputRecord(std::vector<INPUT_RECORD> &records,
+                                     int button,
+                                     int x,
+                                     int y);
     static int utf8CharLength(char firstByte);
     const KeyDescriptor *lookupKey(const char *encoding, bool isEof, bool *incomplete);
     static int matchDsr(const char *encoding);

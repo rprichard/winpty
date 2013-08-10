@@ -269,6 +269,14 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
         return -1;
     }
 
+	if (inputSize ==6 && input[0] == 27 && input[1] == '[' && input[2] == 'M') { //mouse event
+	   int button = input[3]-32;
+	   int x = input[4] - 32;
+	   int y = input[5] - 32;
+	   appendMouseInputRecord(records, button, x, y);
+	   return 6;
+	}
+
     // Recognize Alt-<character>.
     if (input[0] == '\x1B' &&
             input[1] != '\0' &&
@@ -404,6 +412,24 @@ void ConsoleInput::appendInputRecord(std::vector<INPUT_RECORD> &records,
             MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
     ir.Event.KeyEvent.uChar.UnicodeChar = unicodeChar;
     ir.Event.KeyEvent.dwControlKeyState = keyState;
+    records.push_back(ir);
+}
+
+void ConsoleInput::appendMouseInputRecord(std::vector<INPUT_RECORD> &records,
+                                     int button,
+                                     int x,
+                                     int y)
+{
+    INPUT_RECORD ir;
+    memset(&ir, 0, sizeof(ir));
+    ir.EventType = MOUSE_EVENT;
+	COORD coord;
+	coord.X = x-1;
+	coord.Y = y-1;
+    ir.Event.MouseEvent.dwMousePosition = coord;
+    ir.Event.MouseEvent.dwButtonState = button == 3? /*released*/ 0: button == 0? /*left*/ FROM_LEFT_1ST_BUTTON_PRESSED : RIGHTMOST_BUTTON_PRESSED;
+	ir.Event.MouseEvent.dwControlKeyState = 0; //TODO
+
     records.push_back(ir);
 }
 
