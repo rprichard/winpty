@@ -12,6 +12,7 @@
                 '_WIN32_WINNT=0x0501',
                 'NOMINMAX',
             ],
+            'msvs_disabled_warnings': [ 4267, 4244, 4530, 4267, 4800 ],
             'sources' : [
                 'agent/Agent.cc',
                 'agent/AgentAssert.cc',
@@ -39,6 +40,7 @@
                 'NOMINMAX',
                 'WINPTY',
             ],
+            'msvs_disabled_warnings': [ 4267, 4800 ],
             'sources' : [
                 'libwinpty/winpty.cc',
                 'shared/DebugClient.cc',
