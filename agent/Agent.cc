@@ -203,17 +203,27 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     ASSERT(packet.eof());
 
     LPCWSTR programArg = program.empty() ? NULL : program.c_str();
-    std::vector<wchar_t> cmdlineCopy;
     LPWSTR cmdlineArg = NULL;
+    LPWSTR envArg = NULL;
+
+    std::vector<wchar_t> cmdlineCopy;
+    std::vector<wchar_t> envCopy;
+
     if (!cmdline.empty()) {
         cmdlineCopy.resize(cmdline.size() + 1);
         cmdline.copy(&cmdlineCopy[0], cmdline.size());
         cmdlineCopy[cmdline.size()] = L'\0';
         cmdlineArg = &cmdlineCopy[0];
     }
-    LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
-    LPCWSTR envArg = env.empty() ? NULL : env.data();
 
+    if (!env.empty()) {
+        envCopy.resize(env.size() + 1);
+        env.copy(&envCopy[0], env.size());
+        envCopy[env.size()] = L'\0';
+        envArg = &envCopy[0];
+    }
+
+    
     STARTUPINFO sui;
     PROCESS_INFORMATION pi;
     memset(&sui, 0, sizeof(sui));
