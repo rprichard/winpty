@@ -235,15 +235,12 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
                             /*bInheritHandles=*/FALSE,
                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
                             /*CREATE_NEW_PROCESS_GROUP*/0,
-                            (LPVOID)envArg, cwdArg, &sui, &pi);
-    int ret = success ? 0 : GetLastError();
+                            envArg, cmdlineArg, &sui, &pi);
+    DWORD ret = success ? 0 : GetLastError();
 
-    trace("CreateProcess: %s %d",
-		(success == ERROR_SUCCESS ? "success" : "fail"),
-          (int)pi.dwProcessId);
-	if(ret != ERROR_SUCCESS) {
-		trace("Create process error code: %d", GetLastError());
-	}
+    trace("CreateProcess: %s code: %d pid: %d", 
+      success == ERROR_SUCCESS ? "success" : "fail", 
+      ret, pi.dwProcessId);
 
     if (success) {
         CloseHandle(pi.hThread);
