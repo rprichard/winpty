@@ -469,20 +469,7 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
     packet.putWString(appname ? appname : L"");
     packet.putWString(cmdline ? cmdline : L"");
     packet.putWString(cwd ? cwd : L"");
-    std::wstring envStr;
-    if (env != NULL) {
-        const wchar_t *p = env;
-        while (*p != L'\0') {
-            p += wcslen(p) + 1;
-        }
-        p++;
-        envStr.assign(env, p);
-
-        // Can a Win32 environment be empty?  If so, does it end with one NUL or
-        // two?  Add an extra NUL just in case it matters.
-        envStr.push_back(L'\0');
-    }
-    packet.putWString(envStr);
+    packet.putWString(env ? env : L"");
     packet.putWString(getDesktopFullName());
     writePacket(pc, packet);
     return readInt32(pc);
