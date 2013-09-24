@@ -184,6 +184,13 @@ void Agent::handlePacket(ReadBuffer &packet)
         ASSERT(packet.eof());
         result = m_childExitCode;
         break;
+    case AgentMsg::GetProcessId:
+        ASSERT(packet.eof());
+        if (m_childProcess == NULL)
+            result = -1;
+        else
+            result = GetProcessId(m_childProcess);
+        break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
