@@ -28,7 +28,7 @@ struct AgentMsg
         StartProcess,
         SetSize,
         GetExitCode,
-		GetProcessId
+        GetProcessId
     };
 };
 
