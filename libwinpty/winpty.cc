@@ -391,6 +391,14 @@ WINPTY_API int winpty_get_exit_code(winpty_t *pc)
     return readInt32(pc);
 }
 
+WINPTY_API int winpty_get_process_id(winpty_t *pc)
+{
+    WriteBuffer packet;
+    packet.putInt(AgentMsg::GetProcessId);
+    writePacket(pc, packet);
+    return readInt32(pc);
+}
+
 WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc)
 {
     return pc->dataPipe;

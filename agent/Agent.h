@@ -79,6 +79,7 @@ private:
     ConsoleInput *m_consoleInput;
     HANDLE m_childProcess;
     int m_childExitCode;
+	int m_childProcessId;
 
     int m_syncRow;
     int m_syncCounter;

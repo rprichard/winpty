@@ -75,6 +75,12 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
 WINPTY_API int winpty_get_exit_code(winpty_t *pc);
 
 /*
+ * Returns the process id of the process started with winpty_start_process,
+ * or -1 none is available.
+ */
+WINPTY_API int winpty_get_process_id(winpty_t *pc);
+
+/*
  * Returns an overlapped-mode pipe handle that can be read and written
  * like a Unix terminal.
  */

@@ -57,6 +57,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_terminal(NULL),
     m_childProcess(NULL),
     m_childExitCode(-1),
+	m_childProcessId(-1),
     m_syncCounter(0)
 {
     trace("Agent starting...");
@@ -184,6 +185,10 @@ void Agent::handlePacket(ReadBuffer &packet)
         ASSERT(packet.eof());
         result = m_childExitCode;
         break;
+    case AgentMsg::GetProcessId:
+        ASSERT(packet.eof());
+		result = m_childProcessId;
+        break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
@@ -194,6 +199,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
 {
     BOOL success;
     ASSERT(m_childProcess == NULL);
+	ASSERT(m_childProcessId == -1);
 
     std::wstring program = packet.getWString();
     std::wstring cmdline = packet.getWString();
@@ -235,6 +241,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     if (success) {
         CloseHandle(pi.hThread);
         m_childProcess = pi.hProcess;
+		m_childProcessId = (int)pi.dwProcessId;
     }
 
     return ret;
@@ -276,6 +283,7 @@ void Agent::onPollTimeout()
             m_childExitCode = exitCode;
         CloseHandle(m_childProcess);
         m_childProcess = NULL;
+		m_childProcessId = -1;
 
         // Close the data socket to signal to the client that the child
         // process has exited.  If there's any data left to send, send it
