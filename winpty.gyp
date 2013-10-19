@@ -6,6 +6,9 @@
             'include_dirs' : [
                 'include',
             ],
+			'library' : {
+				'user32.lib'
+			},
             'defines' : [
                 'UNICODE',
                 '_UNICODE',
@@ -33,6 +36,9 @@
             'include_dirs' : [
                 'include',
             ],
+			'library' : {
+				'user32.lib'
+			},
             'defines' : [
                 'UNICODE',
                 '_UNICODE',
