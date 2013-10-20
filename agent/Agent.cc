@@ -214,6 +214,10 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
     LPCWSTR envArg = env.empty() ? NULL : env.c_str();
 
+    if(envArg != NULL && wcscmp(envArg, L"")) {
+       envArg = NULL;
+    }
+
     STARTUPINFO sui;
     PROCESS_INFORMATION pi;
     memset(&sui, 0, sizeof(sui));
