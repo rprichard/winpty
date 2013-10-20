@@ -192,7 +192,7 @@ void Agent::handlePacket(ReadBuffer &packet)
 
 int Agent::handleStartProcessPacket(ReadBuffer &packet)
 {
-    BOOL success;
+     BOOL success;
     ASSERT(m_childProcess == NULL);
 
     std::wstring program = packet.getWString();
@@ -203,27 +203,17 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     ASSERT(packet.eof());
 
     LPCWSTR programArg = program.empty() ? NULL : program.c_str();
-    LPWSTR cmdlineArg = NULL;
-    LPWSTR envArg = NULL;
-
     std::vector<wchar_t> cmdlineCopy;
-    std::vector<wchar_t> envCopy;
-
+    LPWSTR cmdlineArg = NULL;
     if (!cmdline.empty()) {
         cmdlineCopy.resize(cmdline.size() + 1);
         cmdline.copy(&cmdlineCopy[0], cmdline.size());
         cmdlineCopy[cmdline.size()] = L'\0';
         cmdlineArg = &cmdlineCopy[0];
     }
+    LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
+    LPCWSTR envArg = env.empty() ? NULL : env.c_str();
 
-    if (!env.empty()) {
-        envCopy.resize(env.size() + 1);
-        env.copy(&envCopy[0], env.size());
-        envCopy[env.size()] = L'\0';
-        envArg = &envCopy[0];
-    }
-
-    
     STARTUPINFO sui;
     PROCESS_INFORMATION pi;
     memset(&sui, 0, sizeof(sui));
@@ -235,12 +225,12 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
                             /*bInheritHandles=*/FALSE,
                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
                             /*CREATE_NEW_PROCESS_GROUP*/0,
-                            envArg, cmdlineArg, &sui, &pi);
-    DWORD ret = success ? 0 : GetLastError();
+                            (LPVOID)envArg, cwdArg, &sui, &pi);
+    int ret = success ? 0 : GetLastError();
 
-    trace("CreateProcess: %s code: %d pid: %d", 
-      success == ERROR_SUCCESS ? "success" : "fail", 
-      ret, pi.dwProcessId);
+    trace("CreateProcess: %s %d",
+          (success ? "success" : "fail"),
+          (int)pi.dwProcessId);
 
     if (success) {
         CloseHandle(pi.hThread);
