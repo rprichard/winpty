@@ -52,11 +52,11 @@ static HMODULE getCurrentModule()
 {
     HMODULE module;
     if (!GetModuleHandleEx(
-                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                (LPCTSTR)getCurrentModule,
-                &module)) {
-        assert(false);
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+        GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        (LPCTSTR)getCurrentModule,
+        &module)) {
+            assert(false);
     }
     return module;
 }
@@ -92,26 +92,58 @@ static std::wstring findAgentProgram()
     return ret;
 }
 
-// Call ConnectNamedPipe and block, even for an overlapped pipe.  If the
-// pipe is overlapped, create a temporary event for use connecting.
-static bool connectNamedPipe(HANDLE handle, bool overlapped)
+static bool connectNamedPipe(HANDLE handle, bool overlapped) 
 {
-    OVERLAPPED over, *pover = NULL;
-    if (overlapped) {
-        pover = &over;
-        memset(&over, 0, sizeof(over));
-        over.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-        assert(over.hEvent != NULL);
+    HANDLE m_ConnectCompleteEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+
+    OVERLAPPED ovl;
+
+    memset(&ovl, 0, sizeof(ovl));
+    ovl.hEvent = m_ConnectCompleteEvent;
+
+    bool success = ConnectNamedPipe(handle, &ovl);
+
+    if (!success) {
+        DWORD const code = GetLastError();
+
+        int timeout = 10000;
+
+        switch (code)
+        {
+        case ERROR_PIPE_CONNECTED:
+            success = TRUE;
+            break;
+        case ERROR_IO_PENDING:
+            HANDLE objects_to_wait[1];
+
+            if (WaitForSingleObject(m_ConnectCompleteEvent, timeout) != WAIT_OBJECT_0)
+            {
+                CancelIo(handle);
+
+                DWORD partSize;
+
+                if (!GetOverlappedResult(handle, &ovl, &partSize, TRUE))
+                {
+                    DWORD const code = GetLastError();
+
+                    assert(code == ERROR_OPERATION_ABORTED);
+
+                    success = FALSE;
+                } else {
+                    success = TRUE;
+                }
+            } else {
+                success = TRUE;
+            }
+            break;
+        default:
+            assert("Can't connect named pipe");
+            success = FALSE;
+        }
     }
-    bool success = ConnectNamedPipe(handle, pover);
-    if (overlapped && !success && GetLastError() == ERROR_IO_PENDING) {
-        DWORD actual;
-        success = GetOverlappedResult(handle, pover, &actual, TRUE);
-    }
-    if (!success && GetLastError() == ERROR_PIPE_CONNECTED)
-        success = TRUE;
-    if (overlapped)
-        CloseHandle(over.hEvent);
+
+    CloseHandle(ovl.hEvent);
     return success;
 }
 
@@ -138,16 +170,16 @@ static int32_t readInt32(winpty_t *pc)
 static HANDLE createNamedPipe(const std::wstring &name, bool overlapped)
 {
     return CreateNamedPipe(name.c_str(),
-                           /*dwOpenMode=*/
-                           PIPE_ACCESS_DUPLEX |
-                           FILE_FLAG_FIRST_PIPE_INSTANCE |
-                           (overlapped ? FILE_FLAG_OVERLAPPED : 0),
-                           /*dwPipeMode=*/0,
-                           /*nMaxInstances=*/1,
-                           /*nOutBufferSize=*/0,
-                           /*nInBufferSize=*/0,
-                           /*nDefaultTimeOut=*/3000,
-                           NULL);
+        /*dwOpenMode=*/
+        PIPE_ACCESS_DUPLEX |
+        FILE_FLAG_FIRST_PIPE_INSTANCE |
+        (overlapped ? FILE_FLAG_OVERLAPPED : 0),
+        /*dwPipeMode=*/0,
+        /*nMaxInstances=*/1,
+        /*nOutBufferSize=*/0,
+        /*nInBufferSize=*/0,
+        /*nDefaultTimeOut=*/3000,
+        NULL);
 }
 
 struct BackgroundDesktop {
@@ -162,13 +194,13 @@ static std::wstring getObjectName(HANDLE object)
     BOOL success;
     DWORD lengthNeeded = 0;
     GetUserObjectInformation(object, UOI_NAME,
-                             NULL, 0,
-                             &lengthNeeded);
+        NULL, 0,
+        &lengthNeeded);
     assert(lengthNeeded % sizeof(wchar_t) == 0);
     wchar_t *tmp = new wchar_t[lengthNeeded / 2];
     success = GetUserObjectInformation(object, UOI_NAME,
-                                       tmp, lengthNeeded,
-                                       NULL);
+        tmp, lengthNeeded,
+        NULL);
     assert(success);
     std::wstring ret = tmp;
     delete [] tmp;
@@ -221,8 +253,8 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     std::wstring agentProgram = findAgentProgram();
     std::wstringstream agentCmdLineStream;
     agentCmdLineStream << L"\"" << agentProgram << L"\" "
-                       << controlPipeName << " " << dataPipeName << " "
-                       << cols << " " << rows;
+        << controlPipeName << " " << dataPipeName << " "
+        << cols << " " << rows;
     std::wstring agentCmdLine = agentCmdLineStream.str();
 
     // Start the agent.
@@ -236,17 +268,17 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     agentCmdLine.copy(&cmdline[0], agentCmdLine.size());
     cmdline[agentCmdLine.size()] = L'\0';
     success = CreateProcess(agentProgram.c_str(),
-                            &cmdline[0],
-                            NULL, NULL,
-                            /*bInheritHandles=*/FALSE,
-                            /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
-                            NULL, NULL,
-                            &sui, &pi);
+        &cmdline[0],
+        NULL, NULL,
+        /*bInheritHandles=*/FALSE,
+        /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
+        NULL, NULL,
+        &sui, &pi);
     if (!success) {
         fprintf(stderr,
-                "Error %#x starting %ls\n",
-                (unsigned int)GetLastError(),
-                agentCmdLine.c_str());
+            "Error %#x starting %ls\n",
+            (unsigned int)GetLastError(),
+            agentCmdLine.c_str());
         exit(1);
     }
 
@@ -261,10 +293,10 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     // Start pipes.
     std::wstringstream pipeName;
     pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
-             << L"-" << InterlockedIncrement(&consoleCounter);
+        << L"-" << InterlockedIncrement(&consoleCounter);
     std::wstring controlPipeName = pipeName.str() + L"-control";
     std::wstring dataPipeName = pipeName.str() + L"-data";
-    pc->controlPipe = createNamedPipe(controlPipeName, false);
+    pc->controlPipe = createNamedPipe(controlPipeName, true);
     if (pc->controlPipe == INVALID_HANDLE_VALUE) {
         delete pc;
         return NULL;
@@ -288,7 +320,7 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
 
     // Connect the pipes.
     bool success;
-    success = connectNamedPipe(pc->controlPipe, false);
+    success = connectNamedPipe(pc->controlPipe, true);
     if (!success) {
         delete pc;
         return NULL;
