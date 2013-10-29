@@ -24,7 +24,9 @@
 #define WINPTY_H
 
 #include <stdlib.h>
+#define NOMINMAX
 #include <windows.h>
+
 
 #ifdef WINPTY
 #define WINPTY_API __declspec(dllexport)
