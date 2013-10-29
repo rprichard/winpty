@@ -22,10 +22,7 @@
 #include "NamedPipe.h"
 #include "AgentAssert.h"
 #include "../shared/DebugClient.h"
-
-#undef min
-#undef max
-
+#include <algorithm>
 
 EventLoop::EventLoop() : m_exiting(false), m_pollInterval(0)
 {
