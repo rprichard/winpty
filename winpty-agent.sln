@@ -1,6 +1,8 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual C++ Express 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.20617.1 PREVIEW
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "winpty-agent", "agent\winpty-agent.vcxproj", "{BCE260FB-1F99-4197-B247-870BAB71C31F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libwinpty", "libwinpty\libwinpty.vcxproj", "{44858608-CC9A-47CD-A581-BCB5F3030D7B}"
@@ -13,16 +15,16 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Debug|Win32.ActiveCfg = Debug|x64
-		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Debug|Win32.Build.0 = Debug|x64
+		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Debug|Win32.Build.0 = Debug|Win32
 		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Debug|x64.ActiveCfg = Debug|x64
 		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Debug|x64.Build.0 = Debug|x64
-		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Release|Win32.ActiveCfg = Release|x64
-		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Release|Win32.Build.0 = Release|x64
+		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Release|Win32.ActiveCfg = Release|Win32
+		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Release|Win32.Build.0 = Release|Win32
 		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Release|x64.ActiveCfg = Release|x64
 		{BCE260FB-1F99-4197-B247-870BAB71C31F}.Release|x64.Build.0 = Release|x64
-		{44858608-CC9A-47CD-A581-BCB5F3030D7B}.Debug|Win32.ActiveCfg = Debug|x64
-		{44858608-CC9A-47CD-A581-BCB5F3030D7B}.Debug|Win32.Build.0 = Debug|x64
+		{44858608-CC9A-47CD-A581-BCB5F3030D7B}.Debug|Win32.ActiveCfg = Debug|Win32
+		{44858608-CC9A-47CD-A581-BCB5F3030D7B}.Debug|Win32.Build.0 = Debug|Win32
 		{44858608-CC9A-47CD-A581-BCB5F3030D7B}.Debug|x64.ActiveCfg = Debug|x64
 		{44858608-CC9A-47CD-A581-BCB5F3030D7B}.Debug|x64.Build.0 = Debug|x64
 		{44858608-CC9A-47CD-A581-BCB5F3030D7B}.Release|Win32.ActiveCfg = Release|Win32
