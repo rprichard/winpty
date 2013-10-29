@@ -443,5 +443,5 @@ WINPTY_API void winpty_close(winpty_t *pc)
 {
     CloseHandle(pc->controlPipe);
     CloseHandle(pc->dataPipe);
-    delete pc;
+    //delete pc;
 }
