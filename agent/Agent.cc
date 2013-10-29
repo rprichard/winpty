@@ -70,8 +70,9 @@ Agent::Agent(LPCWSTR controlPipeName,
                 SmallRect(0, 0, initialCols, initialRows));
     m_console->setCursorPosition(Coord(0, 0));
 
-    m_controlSocket = makeSocket(controlPipeName);
     m_dataSocket = makeSocket(dataPipeName);
+    m_controlSocket = makeSocket(controlPipeName);
+    
     m_terminal = new Terminal(m_dataSocket);
     m_consoleInput = new ConsoleInput(m_console, this);
 

@@ -42,6 +42,7 @@ struct winpty_s {
     winpty_s();
     HANDLE controlPipe;
     HANDLE dataPipe;
+    bool open;
 };
 
 winpty_s::winpty_s() : controlPipe(NULL), dataPipe(NULL)
@@ -94,17 +95,19 @@ static std::wstring findAgentProgram()
 
 static bool connectNamedPipe(HANDLE handle, bool overlapped) 
 {
-    HANDLE m_ConnectCompleteEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    HANDLE connectEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
+    OVERLAPPED ovl, *povl = NULL;
 
-    OVERLAPPED ovl;
+    if (overlapped) {
+        povl = &ovl;
+        memset(&ovl, 0, sizeof(ovl));
+        ovl.hEvent = connectEvent;
+    }
 
-    memset(&ovl, 0, sizeof(ovl));
-    ovl.hEvent = m_ConnectCompleteEvent;
+    bool success = ConnectNamedPipe(handle, povl);
 
-    bool success = ConnectNamedPipe(handle, &ovl);
-
-    if (!success) {
+    if (overlapped && !success) {
         DWORD const code = GetLastError();
 
         int timeout = 10000;
@@ -117,7 +120,7 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
         case ERROR_IO_PENDING:
             HANDLE objects_to_wait[1];
 
-            if (WaitForSingleObject(m_ConnectCompleteEvent, timeout) != WAIT_OBJECT_0)
+            if (WaitForSingleObject(connectEvent, timeout) != WAIT_OBJECT_0)
             {
                 CancelIo(handle);
 
@@ -143,7 +146,11 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
         }
     }
 
-    CloseHandle(ovl.hEvent);
+    if (!success && GetLastError() == ERROR_PIPE_CONNECTED)
+        success = TRUE;
+
+    if (overlapped)
+        CloseHandle(ovl.hEvent);
     return success;
 }
 
@@ -153,6 +160,7 @@ static void writePacket(winpty_t *pc, const WriteBuffer &packet)
     int32_t payloadSize = payload.size();
     DWORD actual;
     BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int32_t), &actual, NULL);
+
     assert(success && actual == sizeof(int32_t));
     success = WriteFile(pc->controlPipe, payload.c_str(), payloadSize, &actual, NULL);
     assert(success && (int32_t)actual == payloadSize);
@@ -296,13 +304,14 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
         << L"-" << InterlockedIncrement(&consoleCounter);
     std::wstring controlPipeName = pipeName.str() + L"-control";
     std::wstring dataPipeName = pipeName.str() + L"-data";
-    pc->controlPipe = createNamedPipe(controlPipeName, true);
-    if (pc->controlPipe == INVALID_HANDLE_VALUE) {
+
+    pc->dataPipe = createNamedPipe(dataPipeName, true);
+    if (pc->dataPipe == INVALID_HANDLE_VALUE) {
         delete pc;
         return NULL;
     }
-    pc->dataPipe = createNamedPipe(dataPipeName, true);
-    if (pc->dataPipe == INVALID_HANDLE_VALUE) {
+    pc->controlPipe = createNamedPipe(controlPipeName, false);
+    if (pc->controlPipe == INVALID_HANDLE_VALUE) {
         delete pc;
         return NULL;
     }
@@ -313,19 +322,16 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     // Start the agent.
     startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
 
-    // TODO: Frequently, I see the CreateProcess call return successfully,
-    // but the agent immediately dies.  The following pipe connect calls then
-    // hang.  These calls should probably timeout.  Maybe this code could also
-    // poll the agent process handle?
-
     // Connect the pipes.
     bool success;
-    success = connectNamedPipe(pc->controlPipe, true);
+
+    success = connectNamedPipe(pc->dataPipe, true);
     if (!success) {
         delete pc;
         return NULL;
     }
-    success = connectNamedPipe(pc->dataPipe, true);
+
+    success = connectNamedPipe(pc->controlPipe, false);
     if (!success) {
         delete pc;
         return NULL;
@@ -383,6 +389,7 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     // handles, even when bInheritHandles is set to FALSE."  IIRC, my testing
     // showed that the KB article was correct.
 
+    pc->open = true;
     return pc;
 }
 
@@ -418,6 +425,10 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
 
 WINPTY_API int winpty_get_exit_code(winpty_t *pc)
 {
+    if (!pc->open) { 
+        return -2;
+    }
+
     WriteBuffer packet;
     packet.putInt(AgentMsg::GetExitCode);
     writePacket(pc, packet);
@@ -431,6 +442,9 @@ WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc)
 
 WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows)
 {
+    if (!pc->open) {
+        return -1;        
+    }
     WriteBuffer packet;
     packet.putInt(AgentMsg::SetSize);
     packet.putInt(cols);
@@ -441,7 +455,9 @@ WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows)
 
 WINPTY_API void winpty_close(winpty_t *pc)
 {
+    pc->open = false;
     CloseHandle(pc->controlPipe);
     CloseHandle(pc->dataPipe);
+
     //delete pc;
 }
