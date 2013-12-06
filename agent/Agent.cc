@@ -186,6 +186,10 @@ void Agent::handlePacket(ReadBuffer &packet)
         ASSERT(packet.eof());
         result = m_childExitCode;
         break;
+    case AgentMsg::SetConsoleMode:
+        m_terminal->setConsoleMode(packet.getInt());
+        result = 0;
+        break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
