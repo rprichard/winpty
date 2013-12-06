@@ -191,6 +191,10 @@ void Agent::handlePacket(ReadBuffer &packet)
         else
             result = GetProcessId(m_childProcess);
         break;
+    case AgentMsg::SetConsoleMode:
+        m_terminal->setConsoleMode(packet.getInt());
+        result = 0;
+        break;
     default:
         trace("Unrecognized message, id:%d", type);
     }

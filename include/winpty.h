@@ -92,6 +92,11 @@ WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc);
 WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows);
 
 /*
+ * Toggle the console mode. If in console mode, no terminal escape sequences are send.
+ */
+WINPTY_API int winpty_set_console_mode(winpty_t *pc, int mode);
+
+/*
  * Closes the winpty.
  */
 WINPTY_API void winpty_close(winpty_t *pc);

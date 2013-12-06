@@ -50,13 +50,22 @@ Terminal::Terminal(NamedPipe *output) :
     m_output(output),
     m_remoteLine(0),
     m_cursorHidden(false),
-    m_remoteColor(-1)
+    m_remoteColor(-1),
+    m_consoleMode(false)
 {
+}
+
+void Terminal::setConsoleMode(int mode)
+{
+    if (mode == 1)
+        m_consoleMode = true;
+    else
+        m_consoleMode = false;
 }
 
 void Terminal::reset(bool sendClearFirst, int newLine)
 {
-    if (sendClearFirst)
+    if (sendClearFirst && !m_consoleMode)
         m_output->write(CSI"1;1H"CSI"2J");
     m_remoteLine = newLine;
     m_cursorHidden = false;
@@ -70,7 +79,8 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     moveTerminalToLine(line);
 
     // Erase in Line -- erase entire line.
-    m_output->write(CSI"2K");
+    if (!m_consoleMode)
+        m_output->write(CSI"2K");
 
     std::string termLine;
     termLine.reserve(width + 32);
@@ -125,7 +135,8 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
                     strcat(buffer, ";1");
             }
             strcat(buffer, "m");
-            termLine.append(buffer);
+            if (!m_consoleMode)
+                termLine.append(buffer);
             length = termLine.size();
             m_remoteColor = color;
         }
@@ -163,7 +174,8 @@ void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)
         moveTerminalToLine(newCursorPos.second);
         char buffer[32];
         sprintf(buffer, CSI"%dG"CSI"?25h", newCursorPos.first + 1);
-        m_output->write(buffer);
+        if (!m_consoleMode)
+            m_output->write(buffer);
         m_cursorHidden = false;
     }
     m_cursorPos = newCursorPos;
@@ -173,7 +185,8 @@ void Terminal::hideTerminalCursor()
 {
     if (m_cursorHidden)
         return;
-    m_output->write(CSI"?25l");
+    if (!m_consoleMode)
+        m_output->write(CSI"?25l");
     m_cursorHidden = true;
 }
 
@@ -188,11 +201,13 @@ void Terminal::moveTerminalToLine(int line)
         // CUrsor Up (CUU)
         char buffer[32];
         sprintf(buffer, "\r"CSI"%dA", m_remoteLine - line);
-        m_output->write(buffer);
+        if (!m_consoleMode)
+            m_output->write(buffer);
         m_remoteLine = line;
     } else if (line > m_remoteLine) {
         while (line > m_remoteLine) {
-            m_output->write("\r\n");
+            if (!m_consoleMode)
+                m_output->write("\r\n");
             m_remoteLine++;
         }
     } else {

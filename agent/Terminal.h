@@ -34,6 +34,7 @@ public:
     void reset(bool sendClearFirst, int newLine);
     void sendLine(int line, CHAR_INFO *lineData, int width);
     void finishOutput(const std::pair<int, int> &newCursorPos);
+    void setConsoleMode(int mode);
 
 private:
     void hideTerminalCursor();
@@ -45,6 +46,7 @@ private:
     bool m_cursorHidden;
     std::pair<int, int> m_cursorPos;
     int m_remoteColor;
+    bool m_consoleMode;
 };
 
 #endif // TERMINAL_H
