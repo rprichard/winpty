@@ -420,3 +420,12 @@ WINPTY_API void winpty_close(winpty_t *pc)
     CloseHandle(pc->dataPipe);
     delete pc;
 }
+
+WINPTY_API int winpty_set_console_mode(winpty_t *pc, int mode)
+{
+    WriteBuffer packet;
+    packet.putInt(AgentMsg::SetConsoleMode);
+    packet.putInt(mode);
+    writePacket(pc, packet);
+    return readInt32(pc);
+}
