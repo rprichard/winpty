@@ -34,6 +34,7 @@
 // TODO: Error handling, handle out-of-memory.
 
 #define AGENT_EXE L"winpty-agent.exe"
+#define FILE_FLAG_FIRST_PIPE_INSTANCE 0x00080000
 
 static volatile LONG consoleCounter;
 
