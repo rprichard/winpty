@@ -52,8 +52,22 @@ case $(uname -s) in
     CYGWIN*)
         echo 'uname -s identifies a Cygwin environment.'
         IS_CYGWIN=1
-        UNIX_GPP=i686-pc-cygwin-g++
-        MINGW_GPP="i686-pc-mingw32-g++ i686-w64-mingw32-g++"
+        case $(uname -m) in
+            i686)
+                echo 'uname -m identifies a i686 environment.'
+                UNIX_GPP=i686-pc-cygwin-g++
+                MINGW_GPP="i686-pc-mingw32-g++ i686-w64-mingw32-g++"
+                ;;
+            x86_64)
+                echo 'uname -m identifies a x86_64 environment.'
+                UNIX_GPP=x86_64-pc-cygwin-g++
+                MINGW_GPP="x86_64-pc-mingw32-g++ x86_64-w64-mingw32-g++"
+                ;;
+            *)
+                echo 'Error: uname -m did not match either i686 or x86_64.'
+                exit 1
+                ;;
+        esac
         UNIX_LDFLAGS_STATIC_LIBSTDCXX="-static-libgcc -static-libstdc++"
         ;;
     MINGW*)
