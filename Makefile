@@ -26,6 +26,7 @@ all :
 	cd unix-adapter && $(MAKE)
 
 install : all
+	cp /usr/x86_64-w64-mingw32/lib/default-manifest.o /usr/x86_64-w64-mingw32/sys-root/mingw/lib/ || true
 	mkdir -p $(PREFIX)/bin
 	cp build/* $(PREFIX)/bin
 
