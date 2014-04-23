@@ -70,8 +70,10 @@ Build
 In the project directory, run ``./configure``, then ``make``.
 
 In recent Cygwin versions the default manifest file is not in the right place:
+
 * ``cp /usr/x86_64-w64-mingw32/lib/default-manifest.o /usr/x86_64-w64-mingw32/sys-root/mingw/lib/``
 * ``cp /usr/i686-w64-mingw32/lib/default-manifest.o /usr/i686-w64-mingw32/sys-root/mingw/lib/``
+
 
 This will produce three binaries:
 
