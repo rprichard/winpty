@@ -55,12 +55,12 @@ this writing, the necessary packages are:
 MinGW packages
 --------------
 
-The default g++ compiler for MinGW targets native Windows, but the MinGW 
+The default g++ compiler for MinGW targets native Windows, but the MinGW
 project also packages compilers to target the MSYS environment itself. The
 required packages are:
 
-* ``mingw32-make`` 
-* ``g++`` 
+* ``mingw32-make``
+* ``g++``
 * ``msys-dvlpr``
 
 
@@ -68,6 +68,10 @@ Build
 =====
 
 In the project directory, run ``./configure``, then ``make``.
+
+In recent Cygwin versions the default manifest file is not in the right place:
+* ``cp /usr/x86_64-w64-mingw32/lib/default-manifest.o /usr/x86_64-w64-mingw32/sys-root/mingw/lib/``
+* ``cp /usr/i686-w64-mingw32/lib/default-manifest.o /usr/i686-w64-mingw32/sys-root/mingw/lib/``
 
 This will produce three binaries:
 
@@ -78,7 +82,7 @@ This will produce three binaries:
 Using the Unix adapter
 ======================
 
-To run a Windows console program in ``mintty`` or Cygwin ``sshd``, prepend 
+To run a Windows console program in ``mintty`` or Cygwin ``sshd``, prepend
 ``console.exe`` to the command-line::
 
     $ build/console.exe c:/Python27/python.exe
