@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2012 Ryan Prichard
+// Copyright (c) 2011-2014 Ryan Prichard
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -86,6 +86,7 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     termLine.reserve(width + 32);
 
     int length = 0;
+    int nchars = 0;
     for (int i = 0; i < width; ++i) {
         int color = lineData[i].Attributes & COLOR_ATTRIBUTE_MASK;
         if (color != m_remoteColor) {
@@ -160,10 +161,15 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
         } else {
             termLine.append(mbstr, mblen);
             length = termLine.size();
+            nchars = i+1;
         }
     }
-
     m_output->write(termLine.data(), length);
+
+    if (nchars == width && !m_consoleMode) {
+        // Line wrap: cursor moves to next line
+        m_remoteLine++;
+    }
 }
 
 void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)
