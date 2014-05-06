@@ -35,7 +35,6 @@ static wchar_t *heapMbsToWcs(const char *text)
 
 int main(int argc, char *argv[])
 {
-    return 0;
     if (argc != 5) {
         fprintf(stderr,
             "Usage: %s controlPipeName dataPipeName cols rows\n"
