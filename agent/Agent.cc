@@ -49,6 +49,23 @@ static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
     return FALSE;
 }
 
+static std::string wstringToUtf8String(const std::wstring &input)
+{
+    int mblen = WideCharToMultiByte(CP_UTF8, 0,
+                                    input.c_str(), input.size() + 1,
+                                    NULL, 0, NULL, NULL);
+    if (mblen <= 0) {
+        return std::string();
+    }
+    std::vector<char> tmp(mblen);
+    int mblen2 = WideCharToMultiByte(CP_UTF8, 0,
+                                     input.c_str(), input.size() + 1,
+                                     tmp.data(), tmp.size(),
+                                     NULL, NULL);
+    ASSERT(mblen2 == mblen);
+    return tmp.data();
+}
+
 Agent::Agent(LPCWSTR controlPipeName,
              LPCWSTR dataPipeName,
              int initialCols,
@@ -69,6 +86,7 @@ Agent::Agent(LPCWSTR controlPipeName,
                 Coord(initialCols, BUFFER_LINE_COUNT),
                 SmallRect(0, 0, initialCols, initialRows));
     m_console->setCursorPosition(Coord(0, 0));
+    m_console->setTitle(m_currentTitle);
 
     m_controlSocket = makeSocket(controlPipeName);
     m_dataSocket = makeSocket(dataPipeName);
@@ -381,6 +399,14 @@ void Agent::resizeWindow(int cols, int rows)
 void Agent::scrapeOutput()
 {
     freezeConsole();
+
+    std::wstring newTitle = m_console->title();
+    if (newTitle != m_currentTitle) {
+        std::string command = std::string("\x1b]0;") +
+                wstringToUtf8String(newTitle) + "\x07";
+        m_dataSocket->write(command.c_str());
+        m_currentTitle = newTitle;
+    }
 
     const Coord cursor = m_console->cursorPosition();
     const SmallRect windowRect = m_console->windowRect();

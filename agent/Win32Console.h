@@ -21,6 +21,9 @@
 #ifndef WIN32CONSOLE_H
 #define WIN32CONSOLE_H
 
+#include <vector>
+#include <string>
+#include <wchar.h>
 #include <windows.h>
 #include "Coord.h"
 #include "SmallRect.h"
@@ -56,9 +59,14 @@ public:
     void read(const SmallRect &rect, CHAR_INFO *data);
     void write(const SmallRect &rect, const CHAR_INFO *data);
 
+    // Title.
+    std::wstring title();
+    void setTitle(const std::wstring &title);
+
 private:
     HANDLE m_conin;
     HANDLE m_conout;
+    std::vector<wchar_t> m_titleWorkBuf;
 };
 
 #endif // WIN32CONSOLE_H

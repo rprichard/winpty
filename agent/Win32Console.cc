@@ -21,9 +21,11 @@
 #include "Win32Console.h"
 #include "AgentAssert.h"
 #include "../shared/DebugClient.h"
+#include <string>
+#include <wchar.h>
 #include <windows.h>
 
-Win32Console::Win32Console()
+Win32Console::Win32Console() : m_titleWorkBuf(16)
 {
     m_conin = GetStdHandle(STD_INPUT_HANDLE);
     m_conout = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -295,5 +297,33 @@ void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
     SmallRect tmp(rect);
     if (!WriteConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp)) {
         trace("WriteConsoleOutput failed");
+    }
+}
+
+std::wstring Win32Console::title()
+{
+    while (true) {
+        // The MSDN documentation for GetConsoleTitle is wrong.  It documents
+        // nSize as the "size of the buffer pointed to by the lpConsoleTitle
+        // parameter, in characters" and the successful return value as "the
+        // length of the console window's title, in characters."  In fact,
+        // nSize is in *bytes*.  In contrast, the return value is a count of
+        // UTF-16 code units.  Make the buffer extra large so we can
+        // technically match the documentation.
+        DWORD count = GetConsoleTitleW(m_titleWorkBuf.data(),
+                                       m_titleWorkBuf.size());
+        if (count >= m_titleWorkBuf.size() / sizeof(wchar_t)) {
+            m_titleWorkBuf.resize((count + 1) * sizeof(wchar_t));
+            continue;
+        }
+        m_titleWorkBuf[count] = L'\0';
+        return m_titleWorkBuf.data();
+    }
+}
+
+void Win32Console::setTitle(const std::wstring &title)
+{
+    if (!SetConsoleTitleW(title.c_str())) {
+        trace("SetConsoleTitleW failed");
     }
 }

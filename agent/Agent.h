@@ -21,6 +21,7 @@
 #ifndef AGENT_H
 #define AGENT_H
 
+#include <string>
 #include <windows.h>
 #include "EventLoop.h"
 #include "DsrSender.h"
@@ -89,6 +90,8 @@ private:
     CHAR_INFO (*m_bufferData)[MAX_CONSOLE_WIDTH];
     int m_dirtyWindowTop;
     int m_dirtyLineCount;
+
+    std::wstring m_currentTitle;
 };
 
 #endif // AGENT_H
