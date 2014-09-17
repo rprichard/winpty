@@ -218,7 +218,7 @@ static std::wstring getDesktopFullName()
 
 static void startAgentProcess(const BackgroundDesktop &desktop,
                               std::wstring &controlPipeName,
-                              std::wstring &dataPipeName, 
+                              std::wstring &dataPipeName,
                               int cols, int rows)
 {
     bool success;
