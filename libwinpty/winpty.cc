@@ -31,6 +31,12 @@
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 
+// Work around a bug with mingw-gcc-g++.  mingw-w64 is unaffected.  See
+// GitHub issue 27.
+#ifndef FILE_FLAG_FIRST_PIPE_INSTANCE
+#define FILE_FLAG_FIRST_PIPE_INSTANCE 0x00080000
+#endif
+
 // TODO: Error handling, handle out-of-memory.
 
 #define AGENT_EXE L"winpty-agent.exe"
