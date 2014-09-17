@@ -50,7 +50,7 @@ this writing, the necessary packages are:
 
 * Either ``mingw-gcc-g++`` or ``mingw64-i686-gcc-g++`` (but not
   ``mingw64-x86_64-gcc-g++``)
-* ``gcc4-g++``
+* ``gcc-g++``
 
 MinGW packages
 --------------
