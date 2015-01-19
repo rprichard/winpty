@@ -252,6 +252,7 @@ static std::wstring getDesktopFullName()
 }
 
 static void startAgentProcess(const BackgroundDesktop &desktop,
+                              bool consoleMode,
                               std::wstring &controlPipeName,
                               std::wstring &dataPipeName, 
                               int cols, int rows)
@@ -261,8 +262,8 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     std::wstring agentProgram = findAgentProgram();
     std::wstringstream agentCmdLineStream;
     agentCmdLineStream << L"\"" << agentProgram << L"\" "
-        << controlPipeName << " " << dataPipeName << " "
-        << cols << " " << rows;
+        << (consoleMode ? "1" : "0") << " " << controlPipeName << " " << dataPipeName << " ";
+    agentCmdLineStream << cols << " " << rows;
     std::wstring agentCmdLine = agentCmdLineStream.str();
 
     // Start the agent.
@@ -294,7 +295,7 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     CloseHandle(pi.hThread);
 }
 
-WINPTY_API winpty_t *winpty_open(int cols, int rows)
+WINPTY_API winpty_t *winpty_open(int cols, int rows, bool consoleMode)
 {
     winpty_t *pc = new winpty_t;
 
@@ -320,7 +321,7 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     BackgroundDesktop desktop = setupBackgroundDesktop();
 
     // Start the agent.
-    startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
+    startAgentProcess(desktop, consoleMode, controlPipeName, dataPipeName, cols, rows);
 
     // Connect the pipes.
     bool success;
@@ -460,13 +461,4 @@ WINPTY_API void winpty_close(winpty_t *pc)
     CloseHandle(pc->dataPipe);
 
     //delete pc;
-}
-
-WINPTY_API int winpty_set_console_mode(winpty_t *pc, int mode)
-{
-    WriteBuffer packet;
-    packet.putInt(AgentMsg::SetConsoleMode);
-    packet.putInt(mode);
-    writePacket(pc, packet);
-    return readInt32(pc);
 }

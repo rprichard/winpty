@@ -49,7 +49,8 @@ static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
     return FALSE;
 }
 
-Agent::Agent(LPCWSTR controlPipeName,
+Agent::Agent(bool consoleMode,
+             LPCWSTR controlPipeName,
              LPCWSTR dataPipeName,
              int initialCols,
              int initialRows) :
@@ -74,6 +75,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_controlSocket = makeSocket(controlPipeName);
     
     m_terminal = new Terminal(m_dataSocket);
+    m_terminal->setConsoleMode(consoleMode);
     m_consoleInput = new ConsoleInput(m_console, this);
 
     resetConsoleTracking(false);
@@ -185,10 +187,6 @@ void Agent::handlePacket(ReadBuffer &packet)
     case AgentMsg::GetExitCode:
         ASSERT(packet.eof());
         result = m_childExitCode;
-        break;
-    case AgentMsg::SetConsoleMode:
-        m_terminal->setConsoleMode(packet.getInt());
-        result = 0;
         break;
     default:
         trace("Unrecognized message, id:%d", type);

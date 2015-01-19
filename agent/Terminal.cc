@@ -209,8 +209,7 @@ void Terminal::moveTerminalToLine(int line)
         m_remoteLine = line;
     } else if (line > m_remoteLine) {
         while (line > m_remoteLine) {
-            if (!m_consoleMode)
-                m_output->write("\r\n");
+            m_output->write("\r\n");
             m_remoteLine++;
         }
     } else {

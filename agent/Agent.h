@@ -37,7 +37,8 @@ const int MAX_CONSOLE_WIDTH = 500;
 class Agent : public EventLoop, public DsrSender
 {
 public:
-    Agent(LPCWSTR controlPipeName,
+    Agent(bool consoleMode,
+          LPCWSTR controlPipeName,
           LPCWSTR dataPipeName,
           int initialCols,
           int initialRows);
