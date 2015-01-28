@@ -73,7 +73,7 @@ void Terminal::reset(bool sendClearFirst, int newLine)
     m_remoteColor = -1;
 
 	//use mouse
-	m_output->write(CSI"?1000h");
+    if (!m_consoleMode) m_output->write(CSI"?1000h");
 }
 
 void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
