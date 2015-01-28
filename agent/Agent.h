@@ -24,6 +24,7 @@
 #include <windows.h>
 #include "EventLoop.h"
 #include "DsrSender.h"
+#include "Win32Console.h"
 
 class Win32Console;
 class ConsoleInput;
@@ -34,11 +35,28 @@ class NamedPipe;
 const int BUFFER_LINE_COUNT = 3000; // TODO: Use something like 9000.
 const int MAX_CONSOLE_WIDTH = 500;
 
+struct con_status_s {
+    int syncRow;
+    int syncCounter;
+
+    int scrapedLineCount;
+    int scrolledCount;
+    int maxBufferedLine;
+    CHAR_INFO (*bufferData)[MAX_CONSOLE_WIDTH];
+    int dirtyWindowTop;
+    int dirtyLineCount;
+
+    con_buffer_type type;
+    Terminal *terminal;
+};
+
 class Agent : public EventLoop, public DsrSender
 {
 public:
-    Agent(LPCWSTR controlPipeName,
+    Agent(bool consoleMode,
+          LPCWSTR controlPipeName,
           LPCWSTR dataPipeName,
+          LPCWSTR errDataPipeName,
           int initialCols,
           int initialRows);
     virtual ~Agent();
@@ -46,7 +64,7 @@ public:
 
 private:
     NamedPipe *makeSocket(LPCWSTR pipeName);
-    void resetConsoleTracking(bool sendClear = true);
+    void resetConsoleTracking(con_status_s &con, bool sendClear = true);
 
 private:
     void pollControlSocket();
@@ -60,35 +78,30 @@ protected:
     virtual void onPipeIo(NamedPipe *namedPipe);
 
 private:
-    void markEntireWindowDirty();
-    void scanForDirtyLines();
-    void resizeWindow(int cols, int rows);
-    void scrapeOutput();
+    void initConsole(con_status_s con, int initialCols, int initialRows);
+    void markEntireWindowDirty(con_status_s &con);
+    void scanForDirtyLines(con_status_s &con);
+    void resizeWindow(con_status_s &con, int cols, int rows);
+    void scrapeOutput(con_status_s &con);
     void freezeConsole();
     void unfreezeConsole();
-    void syncMarkerText(CHAR_INFO *output);
-    int findSyncMarker();
-    void createSyncMarker(int row);
+    void syncMarkerText(con_status_s con, CHAR_INFO *output);
+    int findSyncMarker(con_status_s con);
+    void createSyncMarker(con_status_s con, int row);
 
 private:
     Win32Console *m_console;
     NamedPipe *m_controlSocket;
     NamedPipe *m_dataSocket;
+    NamedPipe *m_errDataSocket;
     bool m_closingDataSocket;
-    Terminal *m_terminal;
+    bool m_consoleMode;
     ConsoleInput *m_consoleInput;
     HANDLE m_childProcess;
     int m_childExitCode;
 
-    int m_syncRow;
-    int m_syncCounter;
-
-    int m_scrapedLineCount;
-    int m_scrolledCount;
-    int m_maxBufferedLine;
-    CHAR_INFO (*m_bufferData)[MAX_CONSOLE_WIDTH];
-    int m_dirtyWindowTop;
-    int m_dirtyLineCount;
+    con_status_s m_conout;
+    con_status_s m_conerr;
 };
 
 #endif // AGENT_H

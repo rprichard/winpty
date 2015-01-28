@@ -49,7 +49,7 @@ typedef struct winpty_s winpty_t;
  *
  * This function creates a new agent process and connects to it.
  */
-WINPTY_API winpty_t *winpty_open(int cols, int rows);
+WINPTY_API winpty_t *winpty_open(int cols, int rows, bool consoleMode);
 
 /*
  * Start a child process.  Either (but not both) of appname and cmdline may
