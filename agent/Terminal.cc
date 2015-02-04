@@ -201,11 +201,12 @@ void Terminal::moveTerminalToLine(int line)
     // cursor is on the last line already.
 
     if (line < m_remoteLine) {
-        // CUrsor Up (CUU)
-        char buffer[32];
-        sprintf(buffer, "\r"CSI"%dA", m_remoteLine - line);
-        if (!m_consoleMode)
+        if (!m_consoleMode) {
+            // CUrsor Up (CUU)
+            char buffer[32];
+            sprintf(buffer, "\r"CSI"%dA", m_remoteLine - line);
             m_output->write(buffer);
+        }
         m_remoteLine = line;
     } else if (line > m_remoteLine) {
         while (line > m_remoteLine) {
@@ -213,6 +214,7 @@ void Terminal::moveTerminalToLine(int line)
             m_remoteLine++;
         }
     } else {
-        m_output->write("\r");
+        if (!m_consoleMode)
+            m_output->write("\r");
     }
 }
