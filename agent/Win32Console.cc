@@ -30,7 +30,6 @@ Win32Console::Win32Console(bool consoleMode): m_conerr(NULL)
     if (consoleMode) {
         m_conerr = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                 CONSOLE_TEXTMODE_BUFFER, NULL);
-        SetStdHandle(STD_ERROR_HANDLE, m_conerr);
     }
 
     m_curConout = m_conout;
@@ -300,4 +299,16 @@ void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
 void Win32Console::switchConsoleBuffer(con_buffer_type buffer)
 {
     m_curConout = buffer == CONERR ? m_conerr : m_conout;
+}
+
+HANDLE Win32Console::conin() {
+    return m_conin;
+}
+
+HANDLE Win32Console::conout() {
+    return m_conout;
+}
+
+HANDLE Win32Console::conerr() {
+    return m_conerr;
 }
