@@ -221,14 +221,16 @@ static BackgroundDesktop setupBackgroundDesktop()
     BackgroundDesktop ret;
     ret.originalStation = GetProcessWindowStation();
     ret.station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
-    bool success = SetProcessWindowStation(ret.station);
-    assert(success);
-    ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
-    assert(ret.originalStation != NULL);
-    assert(ret.station != NULL);
-    assert(ret.desktop != NULL);
-    ret.desktopName =
-        getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
+    if (ret.station != NULL) {
+        bool success = SetProcessWindowStation(ret.station);
+        assert(success);
+        ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
+        assert(ret.originalStation != NULL);
+        assert(ret.station != NULL);
+        assert(ret.desktop != NULL);
+        ret.desktopName =
+            getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
+    }
     return ret;
 }
 
