@@ -58,6 +58,10 @@ public:
     void read(const SmallRect &rect, CHAR_INFO *data);
     void write(const SmallRect &rect, const CHAR_INFO *data);
 
+    HANDLE conin();
+    HANDLE conout();
+    HANDLE conerr();
+
 private:
     HANDLE m_conin;
     HANDLE m_conout;

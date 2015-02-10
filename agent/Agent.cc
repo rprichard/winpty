@@ -250,9 +250,15 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     memset(&pi, 0, sizeof(pi));
     sui.cb = sizeof(STARTUPINFO);
     sui.lpDesktop = desktop.empty() ? NULL : (LPWSTR)desktop.c_str();
+    if (m_consoleMode) {
+        sui.dwFlags = STARTF_USESTDHANDLES;
+        DuplicateHandle(GetCurrentProcess(), m_console->conin(), GetCurrentProcess(), &sui.hStdInput, 0, TRUE, DUPLICATE_SAME_ACCESS);
+        DuplicateHandle(GetCurrentProcess(), m_console->conout(), GetCurrentProcess(), &sui.hStdOutput, 0, TRUE, DUPLICATE_SAME_ACCESS);
+        DuplicateHandle(GetCurrentProcess(), m_console->conerr(), GetCurrentProcess(), &sui.hStdError, 0, TRUE, DUPLICATE_SAME_ACCESS);
+    }
 
     success = CreateProcess(programArg, cmdlineArg, NULL, NULL,
-                            /*bInheritHandles=*/FALSE,
+                            /*bInheritHandles=*/m_consoleMode,
                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
                             /*CREATE_NEW_PROCESS_GROUP*/0,
                             (LPVOID)envArg, cwdArg, &sui, &pi);
