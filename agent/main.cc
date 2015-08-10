@@ -35,17 +35,27 @@ static wchar_t *heapMbsToWcs(const char *text)
 
 int main(int argc, char *argv[])
 {
-    if (argc != 5) {
+    if (argc < 6) {
         fprintf(stderr,
-            "Usage: %s controlPipeName dataPipeName cols rows\n"
+            "Usage: %s consoleMode controlPipeName dataPipeName [errDataPipeName] cols rows\n"
             "(Note: This program is intended to be run by libwinpty.dll.)\n",
             argv[0]);
         return 1;
     }
 
-    Agent agent(heapMbsToWcs(argv[1]),
-                heapMbsToWcs(argv[2]),
-                atoi(argv[3]),
-                atoi(argv[4]));
+    int argIndex = 1;
+
+    bool consoleMode = (bool)atoi(argv[argIndex++]);
+    wchar_t *controlPipeName = heapMbsToWcs(argv[argIndex++]);
+    wchar_t *dataPipeName = heapMbsToWcs(argv[argIndex++]);
+    wchar_t *errDataPipeName = consoleMode ? heapMbsToWcs(argv[argIndex++]) : NULL;
+    int initialCols = atoi(argv[argIndex++]);
+    int initialRows = atoi(argv[argIndex++]);
+    Agent agent(consoleMode,
+                controlPipeName,
+                dataPipeName,
+                errDataPipeName,
+                initialCols,
+                initialRows);
     agent.run();
 }

@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
     winsize sz;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
 
-    winpty_t *winpty = winpty_open(sz.ws_col, sz.ws_row);
+    winpty_t *winpty = winpty_open(sz.ws_col, sz.ws_row, false);
     if (winpty == NULL) {
         fprintf(stderr, "Error creating winpty.\n");
         exit(1);

@@ -25,17 +25,19 @@
 #include "Coord.h"
 #include "SmallRect.h"
 
+enum con_buffer_type { CONOUT, CONERR };
+
 class Win32Console
 {
 public:
-    Win32Console();
+    Win32Console(bool consoleMode);
     ~Win32Console();
 
-    HANDLE conin();
-    HANDLE conout();
     HWND hwnd();
     void postCloseMessage();
     void setSmallFont();
+
+    void switchConsoleBuffer(con_buffer_type buffer);
 
     // Buffer and window sizes.
     Coord bufferSize();
@@ -56,9 +58,15 @@ public:
     void read(const SmallRect &rect, CHAR_INFO *data);
     void write(const SmallRect &rect, const CHAR_INFO *data);
 
+    HANDLE conin();
+    HANDLE conout();
+    HANDLE conerr();
+
 private:
     HANDLE m_conin;
     HANDLE m_conout;
+    HANDLE m_conerr;
+    HANDLE m_curConout;
 };
 
 #endif // WIN32CONSOLE_H

@@ -42,10 +42,11 @@ struct winpty_s {
     winpty_s();
     HANDLE controlPipe;
     HANDLE dataPipe;
+    HANDLE errDataPipe;
     bool open;
 };
 
-winpty_s::winpty_s() : controlPipe(NULL), dataPipe(NULL)
+winpty_s::winpty_s() : controlPipe(NULL), dataPipe(NULL), errDataPipe(NULL)
 {
 }
 
@@ -118,8 +119,6 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
             success = TRUE;
             break;
         case ERROR_IO_PENDING:
-            HANDLE objects_to_wait[1];
-
             if (WaitForSingleObject(connectEvent, timeout) != WAIT_OBJECT_0)
             {
                 CancelIo(handle);
@@ -222,14 +221,16 @@ static BackgroundDesktop setupBackgroundDesktop()
     BackgroundDesktop ret;
     ret.originalStation = GetProcessWindowStation();
     ret.station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
-    bool success = SetProcessWindowStation(ret.station);
-    assert(success);
-    ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
-    assert(ret.originalStation != NULL);
-    assert(ret.station != NULL);
-    assert(ret.desktop != NULL);
-    ret.desktopName =
-        getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
+    if (ret.station != NULL) {
+        bool success = SetProcessWindowStation(ret.station);
+        assert(success);
+        ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
+        assert(ret.originalStation != NULL);
+        assert(ret.station != NULL);
+        assert(ret.desktop != NULL);
+        ret.desktopName =
+            getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
+    }
     return ret;
 }
 
@@ -252,8 +253,10 @@ static std::wstring getDesktopFullName()
 }
 
 static void startAgentProcess(const BackgroundDesktop &desktop,
+                              bool consoleMode,
                               std::wstring &controlPipeName,
-                              std::wstring &dataPipeName, 
+                              std::wstring &dataPipeName,
+                              std::wstring &errDataPipeName,
                               int cols, int rows)
 {
     bool success;
@@ -261,8 +264,9 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     std::wstring agentProgram = findAgentProgram();
     std::wstringstream agentCmdLineStream;
     agentCmdLineStream << L"\"" << agentProgram << L"\" "
-        << controlPipeName << " " << dataPipeName << " "
-        << cols << " " << rows;
+        << (consoleMode ? "1" : "0") << " " << controlPipeName << " " << dataPipeName << " ";
+    if (consoleMode) agentCmdLineStream << errDataPipeName << " ";
+    agentCmdLineStream << cols << " " << rows;
     std::wstring agentCmdLine = agentCmdLineStream.str();
 
     // Start the agent.
@@ -294,7 +298,7 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     CloseHandle(pi.hThread);
 }
 
-WINPTY_API winpty_t *winpty_open(int cols, int rows)
+WINPTY_API winpty_t *winpty_open(int cols, int rows, bool consoleMode)
 {
     winpty_t *pc = new winpty_t;
 
@@ -304,11 +308,18 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
         << L"-" << InterlockedIncrement(&consoleCounter);
     std::wstring controlPipeName = pipeName.str() + L"-control";
     std::wstring dataPipeName = pipeName.str() + L"-data";
-
+    std::wstring errDataPipeName = pipeName.str() + L"-errData";
     pc->dataPipe = createNamedPipe(dataPipeName, true);
     if (pc->dataPipe == INVALID_HANDLE_VALUE) {
         delete pc;
         return NULL;
+    }
+    if (consoleMode) {
+        pc->errDataPipe = createNamedPipe(errDataPipeName, true);
+        if (pc->errDataPipe == INVALID_HANDLE_VALUE) {
+            delete pc;
+            return NULL;
+        }
     }
     pc->controlPipe = createNamedPipe(controlPipeName, false);
     if (pc->controlPipe == INVALID_HANDLE_VALUE) {
@@ -320,7 +331,7 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     BackgroundDesktop desktop = setupBackgroundDesktop();
 
     // Start the agent.
-    startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
+    startAgentProcess(desktop, consoleMode, controlPipeName, dataPipeName, errDataPipeName, cols, rows);
 
     // Connect the pipes.
     bool success;
@@ -329,6 +340,14 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     if (!success) {
         delete pc;
         return NULL;
+    }
+
+    if (consoleMode) {
+        success = connectNamedPipe(pc->errDataPipe, true);
+        if (!success) {
+            delete pc;
+            return NULL;
+        }
     }
 
     success = connectNamedPipe(pc->controlPipe, false);
@@ -458,6 +477,7 @@ WINPTY_API void winpty_close(winpty_t *pc)
     pc->open = false;
     CloseHandle(pc->controlPipe);
     CloseHandle(pc->dataPipe);
+    if (pc->errDataPipe != NULL) CloseHandle(pc->errDataPipe);
 
     //delete pc;
 }

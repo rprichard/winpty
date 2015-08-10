@@ -23,26 +23,24 @@
 #include "../shared/DebugClient.h"
 #include <windows.h>
 
-Win32Console::Win32Console()
+Win32Console::Win32Console(bool consoleMode): m_conerr(NULL)
 {
     m_conin = GetStdHandle(STD_INPUT_HANDLE);
     m_conout = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (consoleMode) {
+        m_conerr = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                CONSOLE_TEXTMODE_BUFFER, NULL);
+    }
+
+    m_curConout = m_conout;
 }
 
 Win32Console::~Win32Console()
 {
     CloseHandle(m_conin);
     CloseHandle(m_conout);
-}
-
-HANDLE Win32Console::conin()
-{
-    return m_conin;
-}
-
-HANDLE Win32Console::conout()
-{
-    return m_conout;
+    if (m_conerr != NULL) CloseHandle(m_conerr);
+    m_curConout = NULL;
 }
 
 HWND Win32Console::hwnd()
@@ -124,12 +122,12 @@ void Win32Console::setSmallFont()
     }
 
     AGENT_CONSOLE_FONT_INFO fi;
-    success = pGetCurrentConsoleFont(m_conout, FALSE, &fi);
+    success = pGetCurrentConsoleFont(m_curConout, FALSE, &fi);
     if (!success) {
         trace("error: GetCurrentConsoleFont failed");
         return;
     }
-    COORD smallest = pGetConsoleFontSize(m_conout, 0);
+    COORD smallest = pGetConsoleFontSize(m_curConout, 0);
     if (smallest.X == 0 || smallest.Y == 0) {
         trace("error: GetConsoleFontSize failed");
         return;
@@ -146,7 +144,7 @@ void Win32Console::setSmallFont()
         fix.cbSize = sizeof(fix);
         fix.nFont = 0;
         fix.dwFontSize = smallest;
-        success = pSetCurrentConsoleFontEx(m_conout, FALSE, &fix);
+        success = pSetCurrentConsoleFontEx(m_curConout, FALSE, &fix);
         trace("SetCurrentConsoleFontEx call %s",
               success ? "succeeded" : "failed");
         return;
@@ -158,7 +156,7 @@ void Win32Console::setSmallFont()
     // http://blogs.microsoft.co.il/blogs/pavely/archive/2009/07/23/changing-console-fonts.aspx
     //
     if (pSetConsoleFont != NULL) {
-        success = pSetConsoleFont(m_conout, 0);
+        success = pSetConsoleFont(m_curConout, 0);
         trace("SetConsoleFont call %s", success ? "succeeded" : "failed");
         return;
     }
@@ -172,7 +170,7 @@ Coord Win32Console::bufferSize()
     // TODO: error handling
     CONSOLE_SCREEN_BUFFER_INFO info;
     memset(&info, 0, sizeof(info));
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
+    if (!GetConsoleScreenBufferInfo(m_curConout, &info)) {
         trace("GetConsoleScreenBufferInfo failed");
     }
     return info.dwSize;
@@ -183,7 +181,7 @@ SmallRect Win32Console::windowRect()
     // TODO: error handling
     CONSOLE_SCREEN_BUFFER_INFO info;
     memset(&info, 0, sizeof(info));
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
+    if (!GetConsoleScreenBufferInfo(m_curConout, &info)) {
         trace("GetConsoleScreenBufferInfo failed");
     }
     return info.srWindow;
@@ -192,7 +190,7 @@ SmallRect Win32Console::windowRect()
 void Win32Console::resizeBuffer(const Coord &size)
 {
     // TODO: error handling
-    if (!SetConsoleScreenBufferSize(m_conout, size)) {
+    if (!SetConsoleScreenBufferSize(m_curConout, size)) {
         trace("SetConsoleScreenBufferSize failed");
     }
 }
@@ -200,7 +198,7 @@ void Win32Console::resizeBuffer(const Coord &size)
 void Win32Console::moveWindow(const SmallRect &rect)
 {
     // TODO: error handling
-    if (!SetConsoleWindowInfo(m_conout, TRUE, &rect)) {
+    if (!SetConsoleWindowInfo(m_curConout, TRUE, &rect)) {
         trace("SetConsoleWindowInfo failed");
     }
 }
@@ -246,7 +244,7 @@ Coord Win32Console::cursorPosition()
     // TODO: error handling
     CONSOLE_SCREEN_BUFFER_INFO info;
     memset(&info, 0, sizeof(info));
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
+    if (!GetConsoleScreenBufferInfo(m_curConout, &info)) {
         trace("GetConsoleScreenBufferInfo failed");
     }
     return info.dwCursorPosition;
@@ -255,7 +253,7 @@ Coord Win32Console::cursorPosition()
 void Win32Console::setCursorPosition(const Coord &coord)
 {
     // TODO: error handling
-    if (!SetConsoleCursorPosition(m_conout, coord)) {
+    if (!SetConsoleCursorPosition(m_curConout, coord)) {
         trace("SetConsoleCursorPosition failed");
     }
 }
@@ -283,7 +281,7 @@ void Win32Console::read(const SmallRect &rect, CHAR_INFO *data)
 {
     // TODO: error handling
     SmallRect tmp(rect);
-    if (!ReadConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp)) {
+    if (!ReadConsoleOutput(m_curConout, data, rect.size(), Coord(), &tmp)) {
         trace("ReadConsoleOutput failed [x:%d,y:%d,w:%d,h:%d]",
               rect.Left, rect.Top, rect.width(), rect.height());
     }
@@ -293,7 +291,24 @@ void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
 {
     // TODO: error handling
     SmallRect tmp(rect);
-    if (!WriteConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp)) {
+    if (!WriteConsoleOutput(m_curConout, data, rect.size(), Coord(), &tmp)) {
         trace("WriteConsoleOutput failed");
     }
+}
+
+void Win32Console::switchConsoleBuffer(con_buffer_type buffer)
+{
+    m_curConout = buffer == CONERR ? m_conerr : m_conout;
+}
+
+HANDLE Win32Console::conin() {
+    return m_conin;
+}
+
+HANDLE Win32Console::conout() {
+    return m_conout;
+}
+
+HANDLE Win32Console::conerr() {
+    return m_conerr;
 }
