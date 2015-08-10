@@ -409,8 +409,8 @@ void Agent::resizeWindow(con_status_s &con, int cols, int rows)
         markEntireWindowDirty(con);
     con.dirtyWindowTop = newWindowRect.top();
 
-    m_console->reposition(newBufferSize, newWindowRect);
     unfreezeConsole();
+    m_console->reposition(newBufferSize, newWindowRect);
 }
 
 void Agent::scrapeOutput(con_status_s &con)
