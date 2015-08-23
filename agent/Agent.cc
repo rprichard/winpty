@@ -392,8 +392,11 @@ void Agent::resizeWindow(int cols, int rows)
         markEntireWindowDirty();
     m_dirtyWindowTop = newWindowRect.top();
 
-    m_console->reposition(newBufferSize, newWindowRect);
     unfreezeConsole();
+
+    // In general, console resizing must happen with the console unfrozen to
+    // avoid a hang.  See misc/Win10ResizeWhileFrozen.cc.
+    m_console->reposition(newBufferSize, newWindowRect);
 }
 
 void Agent::scrapeOutput()
