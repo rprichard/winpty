@@ -42,7 +42,9 @@ int main(int argc, char *argv[]) {
     // sufficient.)
     //
     // The same hang occurs whether line resizing is off or on.  It happens
-    // with both "Mark" and "Select All".
+    // with both "Mark" and "Select All".  Calling setBufferSize with the
+    // existing buffer size does not hang, but calling it with only a changed
+    // buffer height *does* hang.  Calling setWindowPos does not hang.
     setBufferSize(120, 25);
 
     printf("Done...\n");
