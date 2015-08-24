@@ -156,11 +156,17 @@ static HANDLE createNamedPipe(const std::wstring &name, bool overlapped)
 }
 
 struct BackgroundDesktop {
+    BackgroundDesktop();
     HWINSTA originalStation;
     HWINSTA station;
     HDESK desktop;
     std::wstring desktopName;
 };
+
+BackgroundDesktop::BackgroundDesktop() :
+        originalStation(NULL), station(NULL), desktop(NULL)
+{
+}
 
 static std::wstring getObjectName(HANDLE object)
 {
@@ -180,29 +186,46 @@ static std::wstring getObjectName(HANDLE object)
     return ret;
 }
 
+// For debugging purposes, provide a way to keep the console on the main window
+// station, visible.
+static bool shouldShowConsoleWindow()
+{
+    char buf[32];
+    return GetEnvironmentVariableA("WINPTY_SHOW_CONSOLE", buf, sizeof(buf)) > 0;
+}
+
 // Get a non-interactive window station for the agent.
 // TODO: review security w.r.t. windowstation and desktop.
 static BackgroundDesktop setupBackgroundDesktop()
 {
     BackgroundDesktop ret;
     ret.originalStation = GetProcessWindowStation();
-    ret.station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
-    bool success = SetProcessWindowStation(ret.station);
-    assert(success);
-    ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
-    assert(ret.originalStation != NULL);
-    assert(ret.station != NULL);
-    assert(ret.desktop != NULL);
-    ret.desktopName =
-        getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
+
+    if (!shouldShowConsoleWindow()) {
+        ret.station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
+        if (ret.station != NULL) {
+            bool success = SetProcessWindowStation(ret.station);
+            assert(success);
+            ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
+            assert(ret.originalStation != NULL);
+            assert(ret.station != NULL);
+            assert(ret.desktop != NULL);
+            ret.desktopName =
+                getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
+        } else {
+            trace("CreateWindowStation failed");
+        }
+    }
     return ret;
 }
 
 static void restoreOriginalDesktop(const BackgroundDesktop &desktop)
 {
-    SetProcessWindowStation(desktop.originalStation);
-    CloseDesktop(desktop.desktop);
-    CloseWindowStation(desktop.station);
+    if (desktop.station != NULL) {
+        SetProcessWindowStation(desktop.originalStation);
+        CloseDesktop(desktop.desktop);
+        CloseWindowStation(desktop.station);
+    }
 }
 
 static std::wstring getDesktopFullName()
