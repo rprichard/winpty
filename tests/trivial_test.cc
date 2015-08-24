@@ -19,11 +19,13 @@
 // IN THE SOFTWARE.
 
 #include <windows.h>
-#include <stdio.h>
-#include <stdlib.h>
 
-#include <vector>
 #include <cassert>
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cwchar>
+#include <vector>
 
 #include "../include/winpty.h"
 #include "../shared/DebugClient.h"
@@ -86,7 +88,8 @@ static void parentTest() {
     wchar_t program[1024];
     wchar_t cmdline[1024];
     GetModuleFileNameW(NULL, program, 1024);
-    swprintf(cmdline, L"\"%s\" CHILD", program);
+    snwprintf(cmdline, sizeof(cmdline) / sizeof(cmdline[0]),
+              L"\"%s\" CHILD", program);
 
     winpty_t *pty = winpty_open(80, 25);
     assert(pty != NULL);

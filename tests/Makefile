@@ -24,6 +24,7 @@ include ../config-mingw.mk
 LDFLAGS += -static-libgcc -static-libstdc++
 
 ../build/%.exe : %.cc
+	@echo Building $@
 	@$(CXX) $(CXXFLAGS) -std=c++11 -o $@ $^ $(LDFLAGS) ../build/winpty.dll
 
 TEST_PROGRAMS := \
