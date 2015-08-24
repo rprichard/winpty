@@ -39,6 +39,7 @@ public:
     HWND hwnd();
     void postCloseMessage();
     void setSmallFont();
+    void clearLines(int row, int count);
 
     // Buffer and window sizes.
     Coord bufferSize();

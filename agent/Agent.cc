@@ -487,8 +487,12 @@ void Agent::scrapeOutput()
 
     m_scrapedLineCount = windowRect.top() + m_scrolledCount;
 
-    if (windowRect.top() > 200) { // TODO: replace hard-coded constant
-        createSyncMarker(windowRect.top() - 200);
+    // Creating a new sync row requires clearing part of the console buffer, so
+    // avoid doing it if there's already a sync row that's good enough.
+    // TODO: replace hard-coded constants
+    const int newSyncRow = static_cast<int>(windowRect.top()) - 200;
+    if (newSyncRow >= 1 && newSyncRow >= m_syncRow + 200) {
+        createSyncMarker(newSyncRow);
     }
 
     m_terminal->finishOutput(std::pair<int, int>(cursor.X,
@@ -541,6 +545,12 @@ int Agent::findSyncMarker()
 
 void Agent::createSyncMarker(int row)
 {
+    ASSERT(row >= 1);
+
+    // Clear the lines around the marker to ensure that Windows 10's rewrapping
+    // does not affect the marker.
+    m_console->clearLines(row - 1, SYNC_MARKER_LEN + 1);
+
     // Write a new marker.
     m_syncCounter++;
     CHAR_INFO marker[SYNC_MARKER_LEN];

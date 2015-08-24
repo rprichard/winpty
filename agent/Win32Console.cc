@@ -169,6 +169,28 @@ void Win32Console::setSmallFont()
           "neither SetConsoleFont nor SetCurrentConsoleFontEx API exists");
 }
 
+void Win32Console::clearLines(int row, int count)
+{
+    // TODO: error handling
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    memset(&info, 0, sizeof(info));
+    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
+        trace("GetConsoleScreenBufferInfo failed");
+    }
+    const int width = SmallRect(info.srWindow).width();
+    DWORD actual = 0;
+    if (!FillConsoleOutputCharacterW(
+            m_conout, L' ', width * count, Coord(0, row),
+            &actual) || static_cast<int>(actual) != width * count) {
+        trace("FillConsoleOutputCharacterW failed");
+    }
+    if (!FillConsoleOutputAttribute(
+            m_conout, info.wAttributes, width * count, Coord(0, row),
+            &actual) || static_cast<int>(actual) != width * count) {
+        trace("FillConsoleOutputAttribute failed");
+    }
+}
+
 Coord Win32Console::bufferSize()
 {
     // TODO: error handling
