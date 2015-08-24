@@ -43,6 +43,12 @@ static void setWindowPos(int x, int y, int w, int h) {
     trace("setWindowPos: (%d,%d,%d,%d), result=%d", x, y, w, h, success);
 }
 
+static void setCursorPos(int x, int y) {
+    COORD coord = { x, y };
+    HANDLE conout = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleCursorPosition(conout, coord);
+}
+
 static void countDown(int sec) {
     for (int i = sec; i > 0; --i) {
         printf("%d.. ", i);
