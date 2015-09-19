@@ -410,13 +410,7 @@ void Win32Console::reposition(const Coord &newBufferSize,
 
 Coord Win32Console::cursorPosition()
 {
-    // TODO: error handling
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    memset(&info, 0, sizeof(info));
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        trace("GetConsoleScreenBufferInfo failed");
-    }
-    return info.dwCursorPosition;
+    return bufferInfo().dwCursorPosition;
 }
 
 void Win32Console::setCursorPosition(const Coord &coord)
