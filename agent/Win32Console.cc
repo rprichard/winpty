@@ -336,26 +336,24 @@ void Win32Console::clearLines(int row, int count)
     }
 }
 
-Coord Win32Console::bufferSize()
+ConsoleScreenBufferInfo Win32Console::bufferInfo()
 {
     // TODO: error handling
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    memset(&info, 0, sizeof(info));
+    ConsoleScreenBufferInfo info;
     if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
         trace("GetConsoleScreenBufferInfo failed");
     }
-    return info.dwSize;
+    return info;
+}
+
+Coord Win32Console::bufferSize()
+{
+    return bufferInfo().bufferSize();
 }
 
 SmallRect Win32Console::windowRect()
 {
-    // TODO: error handling
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    memset(&info, 0, sizeof(info));
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        trace("GetConsoleScreenBufferInfo failed");
-    }
-    return info.srWindow;
+    return bufferInfo().windowRect();
 }
 
 void Win32Console::resizeBuffer(const Coord &size)

@@ -28,6 +28,24 @@
 #include "Coord.h"
 #include "SmallRect.h"
 
+struct ConsoleScreenBufferInfo : CONSOLE_SCREEN_BUFFER_INFO
+{
+    ConsoleScreenBufferInfo()
+    {
+        memset(this, 0, sizeof(*this));
+    }
+
+    Coord bufferSize() const
+    {
+        return dwSize;
+    }
+
+    SmallRect windowRect() const
+    {
+        return srWindow;
+    }
+};
+
 class Win32Console
 {
 public:
@@ -48,6 +66,7 @@ public:
     void clearLines(int row, int count);
 
     // Buffer and window sizes.
+    ConsoleScreenBufferInfo bufferInfo();
     Coord bufferSize();
     SmallRect windowRect();
     void resizeBuffer(const Coord &size);
