@@ -307,7 +307,7 @@ void Win32Console::read(const SmallRect &rect, CHAR_INFO *data)
 {
     // TODO: error handling
     SmallRect tmp(rect);
-    if (!ReadConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp)) {
+    if (!ReadConsoleOutputW(m_conout, data, rect.size(), Coord(), &tmp)) {
         trace("ReadConsoleOutput failed [x:%d,y:%d,w:%d,h:%d]",
               rect.Left, rect.Top, rect.width(), rect.height());
     }
@@ -317,7 +317,7 @@ void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
 {
     // TODO: error handling
     SmallRect tmp(rect);
-    if (!WriteConsoleOutput(m_conout, data, rect.size(), Coord(), &tmp)) {
+    if (!WriteConsoleOutputW(m_conout, data, rect.size(), Coord(), &tmp)) {
         trace("WriteConsoleOutput failed");
     }
 }

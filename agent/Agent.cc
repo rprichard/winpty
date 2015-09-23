@@ -359,7 +359,7 @@ void Agent::scanForDirtyLines()
         m_console->read(lineRect, lineData);
         for (int col = 0; col < windowRect.width(); ++col) {
             int newAttr = lineData[col].Attributes;
-            if (lineData[col].Char.AsciiChar != ' ' || attr!= newAttr)
+            if (lineData[col].Char.UnicodeChar != L' ' || attr != newAttr)
                 m_dirtyLineCount = line + 1;
             newAttr = attr;
         }
@@ -482,7 +482,7 @@ void Agent::scrapeOutput()
             memcpy(bufLine, curLine, sizeof(CHAR_INFO) * w);
             for (int col = w; col < MAX_CONSOLE_WIDTH; ++col) {
                 bufLine[col].Attributes = curLine[w - 1].Attributes;
-                bufLine[col].Char.AsciiChar = ' ';
+                bufLine[col].Char.UnicodeChar = L' ';
             }
             m_maxBufferedLine = std::max(m_maxBufferedLine, line);
             sawModifiedLine = true;
@@ -521,7 +521,7 @@ void Agent::syncMarkerText(CHAR_INFO *output)
     sprintf(str, "S*Y*N*C*%08x", m_syncCounter);
     memset(output, 0, sizeof(CHAR_INFO) * SYNC_MARKER_LEN);
     for (int i = 0; i < SYNC_MARKER_LEN; ++i) {
-        output[i].Char.AsciiChar = str[i];
+        output[i].Char.UnicodeChar = str[i];
         output[i].Attributes = 7;
     }
 }
@@ -538,7 +538,7 @@ int Agent::findSyncMarker()
     for (i = m_syncRow; i >= 0; --i) {
         int j;
         for (j = 0; j < SYNC_MARKER_LEN; ++j) {
-            if (column[i + j].Char.AsciiChar != marker[j].Char.AsciiChar)
+            if (column[i + j].Char.UnicodeChar != marker[j].Char.UnicodeChar)
                 break;
         }
         if (j == SYNC_MARKER_LEN)
