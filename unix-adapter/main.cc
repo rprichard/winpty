@@ -357,6 +357,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    setlocale(LC_ALL, "");
     setupWin32Environment();
 
     winsize sz;
