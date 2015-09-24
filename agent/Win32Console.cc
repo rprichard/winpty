@@ -219,6 +219,8 @@ bool Win32Console::setConsoleFont(const wchar_t *faceName, int pixelSize)
 //
 bool Win32Console::setSmallConsoleFontVista()
 {
+    trace("setSmallConsoleFontVista was called");
+
     OsModule dll(L"kernel32.dll");
     GET_MODULE_PROC(dll, GetConsoleFontSize);
     GET_MODULE_PROC(dll, SetCurrentConsoleFontEx);
@@ -228,6 +230,7 @@ bool Win32Console::setSmallConsoleFontVista()
     }
     dumpConsoleFont("setSmallConsoleFontVista: cur font: ");
     COORD smallest = pGetConsoleFontSize(m_conout, 0);
+    trace("setSmallConsoleFontVista: smallest=%d,%d", smallest.X, smallest.Y);
     if (smallest.X == 0 || smallest.Y == 0) {
         trace("setSmallConsoleFontVista failed: GetConsoleFontSize call failed");
         return false;
