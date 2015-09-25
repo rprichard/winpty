@@ -1,3 +1,27 @@
+//
+// 2015-09-25
+// I measured these limits on the size of a single ReadConsoleOutputW call.
+// The limit seems to more-or-less disppear with Windows 8, which is the first
+// OS to stop using ALPCs for console I/O.  My guess is that the new I/O
+// method does not use the 64KiB shared memory buffer that the ALPC method
+// uses.
+//
+// I'm guessing the remaining difference between Windows 8/8.1 and Windows 10
+// might be related to the 32-vs-64-bitness.
+//
+// Windows XP 32-bit VM ==> up to 13304 characters
+//    13304x1 works, but 13305x1 fails instantly
+// Windows 7 32-bit VM ==> between 16-17 thousand characters
+//    16000x1 works, 17000x1 fails instantly
+//    163x100 *crashes* conhost.exe but leaves VeryLargeRead.exe running
+// Windows 8 32-bit VM ==> between 240-250 million characters
+//    10000x24000 works, but 10000x25000 does not
+// Windows 8.1 32-bit VM ==> between 240-250 million characters
+//    10000x24000 works, but 10000x25000 does not
+// Windows 10 64-bit VM ==> no limit (tested to 576 million characters)
+//    24000x24000 works
+//
+
 #include <windows.h>
 #include <assert.h>
 #include <vector>
