@@ -9,11 +9,11 @@
 #include "../shared/DebugClient.h"
 
 // Launch this test program again, in a new console that we will destroy.
-static void startChildProcess(const wchar_t *arg) {
+static void startChildProcess(const wchar_t *args) {
     wchar_t program[1024];
     wchar_t cmdline[1024];
     GetModuleFileNameW(NULL, program, 1024);
-    swprintf(cmdline, L"\"%s\" %s", program, arg);
+    swprintf(cmdline, L"\"%ls\" %ls", program, args);
 
     STARTUPINFOW sui;
     PROCESS_INFORMATION pi;
