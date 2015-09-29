@@ -257,7 +257,9 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     STARTUPINFO sui;
     memset(&sui, 0, sizeof(sui));
     sui.cb = sizeof(sui);
-    sui.lpDesktop = (LPWSTR)desktop.desktopName.c_str();
+    if (desktop.station != NULL) {
+        sui.lpDesktop = (LPWSTR)desktop.desktopName.c_str();
+    }
     PROCESS_INFORMATION pi;
     memset(&pi, 0, sizeof(pi));
     std::vector<wchar_t> cmdline(agentCmdLine.size() + 1);
@@ -270,11 +272,14 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
                             /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
                             NULL, NULL,
                             &sui, &pi);
-    if (!success) {
-        fprintf(stderr,
-                "Error %#x starting %ls\n",
-                (unsigned int)GetLastError(),
-                agentCmdLine.c_str());
+    if (success) {
+        trace("Created agent successfully, pid=%ld, cmdline=%ls",
+              (long)pi.dwProcessId, agentCmdLine.c_str());
+    } else {
+        unsigned int err = GetLastError();
+        trace("Error creating agent, err=%#x, cmdline=%ls",
+              err, agentCmdLine.c_str());
+        fprintf(stderr, "Error %#x starting %ls\n", err, agentCmdLine.c_str());
         exit(1);
     }
 
