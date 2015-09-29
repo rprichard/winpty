@@ -59,6 +59,7 @@ ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
     {   ESC"\x7F",      VK_BACK,    '\x08', LEFT_ALT_PRESSED,   },
     {   ESC"OH",        VK_HOME,    0,  0,                      }, // gnome-terminal
     {   ESC"OF",        VK_END,     0,  0,                      }, // gnome-terminal
+    {   ESC"[Z",        VK_TAB,     '\t', SHIFT_PRESSED         },
 };
 
 ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
