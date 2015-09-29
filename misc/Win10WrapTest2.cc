@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     repeatChar(WIDTH * 5, '.');
     repeatChar(10, '\n');
     setWindowPos(0, 20, WIDTH, 20);
-    fillBox(0, 5, 1, 10, '|');
+    writeBox(0, 5, 1, 10, '|');
 
     Sleep(120000);
 }

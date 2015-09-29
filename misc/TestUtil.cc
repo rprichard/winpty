@@ -29,24 +29,33 @@ static void startChildProcess(const wchar_t *args) {
                    &sui, &pi);
 }
 
-static void setBufferSize(int x, int y) {
+static void setBufferSize(HANDLE conout, int x, int y) {
     COORD size = { x, y };
-    HANDLE conout = GetStdHandle(STD_OUTPUT_HANDLE);
     BOOL success = SetConsoleScreenBufferSize(conout, size);
     trace("setBufferSize: (%d,%d), result=%d", x, y, success);
 }
 
-static void setWindowPos(int x, int y, int w, int h) {
+static void setWindowPos(HANDLE conout, int x, int y, int w, int h) {
     SMALL_RECT r = { x, y, x + w - 1, y + h - 1 };
-    HANDLE conout = GetStdHandle(STD_OUTPUT_HANDLE);
     BOOL success = SetConsoleWindowInfo(conout, /*bAbsolute=*/TRUE, &r);
     trace("setWindowPos: (%d,%d,%d,%d), result=%d", x, y, w, h, success);
 }
 
-static void setCursorPos(int x, int y) {
+static void setCursorPos(HANDLE conout, int x, int y) {
     COORD coord = { x, y };
-    HANDLE conout = GetStdHandle(STD_OUTPUT_HANDLE);
     SetConsoleCursorPosition(conout, coord);
+}
+
+static void setBufferSize(int x, int y) {
+    setBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), x, y);
+}
+
+static void setWindowPos(int x, int y, int w, int h) {
+    setWindowPos(GetStdHandle(STD_OUTPUT_HANDLE), x, y, w, h);
+}
+
+static void setCursorPos(int x, int y) {
+    setCursorPos(GetStdHandle(STD_OUTPUT_HANDLE), x, y);
 }
 
 static void countDown(int sec) {
@@ -58,7 +67,7 @@ static void countDown(int sec) {
     printf("\n");
 }
 
-static void fillBox(int x, int y, int w, int h, char ch, int attributes=7) {
+static void writeBox(int x, int y, int w, int h, char ch, int attributes=7) {
     CHAR_INFO info = { 0 };
     info.Char.AsciiChar = ch;
     info.Attributes = attributes;
@@ -71,7 +80,15 @@ static void fillBox(int x, int y, int w, int h, char ch, int attributes=7) {
 }
 
 static void setChar(int x, int y, char ch, int attributes=7) {
-    fillBox(x, y, 1, 1, ch, attributes);
+    writeBox(x, y, 1, 1, ch, attributes);
+}
+
+static void fillChar(int x, int y, int repeat, char ch) {
+    COORD coord = { x, y };
+    DWORD actual = 0;
+    FillConsoleOutputCharacterA(
+        GetStdHandle(STD_OUTPUT_HANDLE),
+        ch, repeat, coord, &actual);
 }
 
 static void repeatChar(int count, char ch) {

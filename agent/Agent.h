@@ -25,15 +25,19 @@
 #include <windows.h>
 #include "EventLoop.h"
 #include "DsrSender.h"
+#include "Coord.h"
+#include "SmallRect.h"
 
 class Win32Console;
 class ConsoleInput;
 class Terminal;
 class ReadBuffer;
 class NamedPipe;
+struct ConsoleScreenBufferInfo;
 
 const int BUFFER_LINE_COUNT = 3000; // TODO: Use something like 9000.
 const int MAX_CONSOLE_WIDTH = 500;
+const int SYNC_MARKER_LEN = 16;
 
 class Agent : public EventLoop, public DsrSender
 {
@@ -61,10 +65,16 @@ protected:
     virtual void onPipeIo(NamedPipe *namedPipe);
 
 private:
-    void markEntireWindowDirty();
+    void markEntireWindowDirty(const SmallRect &windowRect);
     void scanForDirtyLines();
+    void clearBufferLines(int firstRow, int count, WORD attributes);
+    void resizeImpl(const ConsoleScreenBufferInfo &origInfo);
     void resizeWindow(int cols, int rows);
-    void scrapeOutput();
+    void syncConsoleContentAndSize(bool forceResize);
+    void syncConsoleTitle();
+    void directScrapeOutput(const ConsoleScreenBufferInfo &info);
+    void scrollingScrapeOutput(const ConsoleScreenBufferInfo &info);
+    void reopenConsole();
     void freezeConsole();
     void unfreezeConsole();
     void syncMarkerText(CHAR_INFO *output);
@@ -84,6 +94,8 @@ private:
     int m_syncRow;
     int m_syncCounter;
 
+    bool m_directMode;
+    Coord m_ptySize;
     int m_scrapedLineCount;
     int m_scrolledCount;
     int m_maxBufferedLine;

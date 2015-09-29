@@ -61,8 +61,8 @@ ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
     {   ESC"OF",        VK_END,     0,  0,                      }, // gnome-terminal
 };
 
-ConsoleInput::ConsoleInput(Win32Console *console, DsrSender *dsrSender) :
-    m_console(console),
+ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
+    m_console(new Win32Console),
     m_dsrSender(dsrSender),
     m_dsrSent(false),
     lastWriteTick(0)
@@ -164,6 +164,11 @@ ConsoleInput::ConsoleInput(Win32Console *console, DsrSender *dsrSender) :
         k->encodingLen = strlen(k->encoding);
         m_lookup.set(k->encoding, k);
     }
+}
+
+ConsoleInput::~ConsoleInput()
+{
+    delete m_console;
 }
 
 void ConsoleInput::writeInput(const std::string &input)

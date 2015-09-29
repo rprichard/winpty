@@ -35,15 +35,9 @@ struct ConsoleScreenBufferInfo : CONSOLE_SCREEN_BUFFER_INFO
         memset(this, 0, sizeof(*this));
     }
 
-    Coord bufferSize() const
-    {
-        return dwSize;
-    }
-
-    SmallRect windowRect() const
-    {
-        return srWindow;
-    }
+    Coord bufferSize() const        { return dwSize;    }
+    SmallRect windowRect() const    { return srWindow;  }
+    Coord cursorPosition() const    { return dwCursorPosition; }
 };
 
 class Win32Console
@@ -63,7 +57,7 @@ private:
     bool setSmallConsoleFontVista();
     void dumpConsoleFont(const char *prefix);
 public:
-    void clearLines(int row, int count);
+    void clearLines(int row, int count, const ConsoleScreenBufferInfo &info);
 
     // Buffer and window sizes.
     ConsoleScreenBufferInfo bufferInfo();
@@ -71,7 +65,6 @@ public:
     SmallRect windowRect();
     void resizeBuffer(const Coord &size);
     void moveWindow(const SmallRect &rect);
-    void reposition(const Coord &bufferSize, const SmallRect &windowRect);
 
     // Cursor.
     Coord cursorPosition();

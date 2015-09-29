@@ -55,12 +55,15 @@ namespace {
 Win32Console::Win32Console() : m_titleWorkBuf(16)
 {
     m_conin = GetStdHandle(STD_INPUT_HANDLE);
-    m_conout = GetStdHandle(STD_OUTPUT_HANDLE);
+    m_conout = CreateFileW(L"CONOUT$",
+                           GENERIC_READ | GENERIC_WRITE,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_EXISTING, 0, NULL);
+    ASSERT(m_conout != INVALID_HANDLE_VALUE);
 }
 
 Win32Console::~Win32Console()
 {
-    CloseHandle(m_conin);
     CloseHandle(m_conout);
 }
 
@@ -314,14 +317,12 @@ void Win32Console::dumpConsoleFont(const char *prefix)
     }
 }
 
-void Win32Console::clearLines(int row, int count)
+void Win32Console::clearLines(
+    int row,
+    int count,
+    const ConsoleScreenBufferInfo &info)
 {
     // TODO: error handling
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    memset(&info, 0, sizeof(info));
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        trace("GetConsoleScreenBufferInfo failed");
-    }
     const int width = SmallRect(info.srWindow).width();
     DWORD actual = 0;
     if (!FillConsoleOutputCharacterW(
@@ -370,42 +371,6 @@ void Win32Console::moveWindow(const SmallRect &rect)
     if (!SetConsoleWindowInfo(m_conout, TRUE, &rect)) {
         trace("SetConsoleWindowInfo failed");
     }
-}
-
-void Win32Console::reposition(const Coord &newBufferSize,
-                              const SmallRect &newWindowRect)
-{
-    // Windows has one API for resizing the screen buffer and a different one
-    // for resizing the window.  It seems that either API can fail if the
-    // window does not fit on the screen buffer.
-
-    const SmallRect origWindowRect(windowRect());
-    const SmallRect origBufferRect(Coord(), bufferSize());
-
-    ASSERT(!newBufferSize.isEmpty());
-    SmallRect bufferRect(Coord(), newBufferSize);
-    ASSERT(bufferRect.contains(newWindowRect));
-
-    SmallRect tempWindowRect = origWindowRect.intersected(bufferRect);
-    if (tempWindowRect.width() <= 0) {
-        tempWindowRect.setLeft(newBufferSize.X - 1);
-        tempWindowRect.setWidth(1);
-    }
-    if (tempWindowRect.height() <= 0) {
-        tempWindowRect.setTop(newBufferSize.Y - 1);
-        tempWindowRect.setHeight(1);
-    }
-
-    // Alternatively, if we can immediately use the new window size,
-    // do that instead.
-    if (origBufferRect.contains(newWindowRect))
-        tempWindowRect = newWindowRect;
-
-    if (tempWindowRect != origWindowRect)
-        moveWindow(tempWindowRect);
-    resizeBuffer(newBufferSize);
-    if (newWindowRect != tempWindowRect)
-        moveWindow(newWindowRect);
 }
 
 Coord Win32Console::cursorPosition()
