@@ -21,12 +21,16 @@
 #ifndef AGENT_H
 #define AGENT_H
 
-#include <string>
 #include <windows.h>
+
+#include <string>
+#include <vector>
+
 #include "EventLoop.h"
 #include "DsrSender.h"
 #include "Coord.h"
 #include "SmallRect.h"
+#include "ConsoleLine.h"
 
 class Win32Console;
 class ConsoleInput;
@@ -99,7 +103,7 @@ private:
     int m_scrapedLineCount;
     int m_scrolledCount;
     int m_maxBufferedLine;
-    CHAR_INFO (*m_bufferData)[MAX_CONSOLE_WIDTH];
+    std::vector<ConsoleLine> m_bufferData;
     int m_dirtyWindowTop;
     int m_dirtyLineCount;
 

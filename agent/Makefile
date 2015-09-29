@@ -34,6 +34,7 @@ OBJECTS = \
 	DebugClient.o \
 	Coord.o \
 	SmallRect.o \
+	ConsoleLine.o \
 	main.o
 
 CXXFLAGS += \

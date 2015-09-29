@@ -19,6 +19,8 @@
                 'agent/AgentAssert.cc',
                 'agent/ConsoleInput.cc',
                 'agent/ConsoleInput.h',
+                'agent/ConsoleLine.cc',
+                'agent/ConsoleLine.h',
                 'agent/Coord.h',
                 'agent/Coord.cc',
                 'agent/DsrSender.h',

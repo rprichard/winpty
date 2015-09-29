@@ -79,7 +79,7 @@ Agent::Agent(LPCWSTR controlPipeName,
 {
     trace("Agent starting...");
 
-    m_bufferData = new CHAR_INFO[BUFFER_LINE_COUNT][MAX_CONSOLE_WIDTH];
+    m_bufferData.resize(BUFFER_LINE_COUNT);
 
     m_console = new Win32Console;
     m_console->setSmallFont();
@@ -112,7 +112,6 @@ Agent::~Agent()
     m_console->postCloseMessage();
     if (m_childProcess != NULL)
         CloseHandle(m_childProcess);
-    delete [] m_bufferData;
     delete m_console;
     delete m_terminal;
     delete m_consoleInput;
@@ -140,7 +139,12 @@ NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
 
 void Agent::resetConsoleTracking(bool sendClear)
 {
-    memset(m_bufferData, 0, sizeof(CHAR_INFO) * BUFFER_LINE_COUNT * MAX_CONSOLE_WIDTH);
+    for (std::vector<ConsoleLine>::iterator
+            it = m_bufferData.begin(), itEnd = m_bufferData.end();
+            it != itEnd;
+            ++it) {
+        it->reset();
+    }
     m_syncRow = -1;
     m_scrapedLineCount = m_console->windowRect().top();
     m_scrolledCount = 0;
@@ -355,7 +359,7 @@ void Agent::scanForDirtyLines()
     } else {
         m_console->read(SmallRect(0, 0, 1, 1), &prevChar);
     }
-    int attr = prevChar.Attributes;
+    WORD attr = prevChar.Attributes;
 
     for (int line = m_dirtyLineCount;
          line < windowRect.top() + windowRect.height();
@@ -364,7 +368,7 @@ void Agent::scanForDirtyLines()
         SmallRect lineRect(0, line, windowRect.width(), 1);
         m_console->read(lineRect, lineData);
         for (int col = 0; col < windowRect.width(); ++col) {
-            int newAttr = lineData[col].Attributes;
+            WORD newAttr = lineData[col].Attributes;
             if (lineData[col].Char.UnicodeChar != L' ' || attr != newAttr)
                 m_dirtyLineCount = line + 1;
             newAttr = attr;
@@ -380,15 +384,10 @@ void Agent::clearBufferLines(
         const WORD attributes)
 {
     ASSERT(!m_directMode);
-    CHAR_INFO blankLine[MAX_CONSOLE_WIDTH];
-    memset(&blankLine, 0, sizeof(blankLine));
-    for (int col = 0; col < MAX_CONSOLE_WIDTH; ++col) {
-        blankLine[col].Char.UnicodeChar = L' ';
-        blankLine[col].Attributes = attributes;
-    }
     for (int row = firstRow; row < firstRow + count; ++row) {
-        int bufRow = (row + m_scrolledCount) % BUFFER_LINE_COUNT;
-        memcpy(&m_bufferData[bufRow], &blankLine, sizeof(blankLine));
+        const int bufLine = row + m_scrolledCount;
+        m_maxBufferedLine = std::max(m_maxBufferedLine, bufLine);
+        m_bufferData[bufLine % BUFFER_LINE_COUNT].blank(attributes);
     }
 }
 
@@ -565,26 +564,20 @@ void Agent::directScrapeOutput(const ConsoleScreenBufferInfo &info)
     bool sawModifiedLine = false;
 
     for (int line = 0; line < stopLine; ++line) {
-        CHAR_INFO curLine[MAX_CONSOLE_WIDTH]; // TODO: bufoverflow
+        ASSERT(m_ptySize.X <= MAX_CONSOLE_WIDTH);
+        CHAR_INFO curLine[MAX_CONSOLE_WIDTH];
         const int w = std::min(windowRect.width(), m_ptySize.X);
         m_console->read(SmallRect(0, windowRect.top() + line, w, 1), curLine);
 
-        // TODO: The memcpy can overflow the m_bufferData buffer.
-        CHAR_INFO (&bufLine)[MAX_CONSOLE_WIDTH] =
-                m_bufferData[line % BUFFER_LINE_COUNT];
-        if (sawModifiedLine ||
-                line > m_maxBufferedLine ||
-                memcmp(curLine, bufLine, sizeof(CHAR_INFO) * w) != 0) {
+        ConsoleLine &bufLine = m_bufferData[line % BUFFER_LINE_COUNT];
+        if (sawModifiedLine) {
+            bufLine.setLine(curLine, w);
+        } else {
+            sawModifiedLine = bufLine.detectChangeAndSetLine(curLine, w);
+        }
+        if (sawModifiedLine) {
             //trace("sent line %d", line);
-            m_terminal->sendLine(line, curLine, windowRect.width());
-            memset(bufLine, 0, sizeof(bufLine));
-            memcpy(bufLine, curLine, sizeof(CHAR_INFO) * w);
-            for (int col = w; col < MAX_CONSOLE_WIDTH; ++col) {
-                bufLine[col].Attributes = curLine[w - 1].Attributes;
-                bufLine[col].Char.UnicodeChar = ' ';
-            }
-            m_maxBufferedLine = std::max(m_maxBufferedLine, line);
-            sawModifiedLine = true;
+            m_terminal->sendLine(line, curLine, w);
         }
     }
 
@@ -652,30 +645,24 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
     bool sawModifiedLine = false;
 
     for (int line = firstLine; line < stopLine; ++line) {
-        CHAR_INFO curLine[MAX_CONSOLE_WIDTH]; // TODO: bufoverflow
+        CHAR_INFO curLine[MAX_CONSOLE_WIDTH];
         const int w = windowRect.width();
         ASSERT(w >= 1 && w <= MAX_CONSOLE_WIDTH);
         m_console->read(SmallRect(0, line - m_scrolledCount, w, 1), curLine);
 
-        CHAR_INFO trailing;
-        memset(&trailing, 0, sizeof(trailing));
-        trailing.Attributes = curLine[w - 1].Attributes;
-        trailing.Char.UnicodeChar = L' ';
-        for (int col = w; col < MAX_CONSOLE_WIDTH; ++col) {
-            curLine[col] = trailing;
-        }
-
-        // TODO: The memcpy can overflow the m_bufferData buffer.
-        CHAR_INFO (&bufLine)[MAX_CONSOLE_WIDTH] =
-                m_bufferData[line % BUFFER_LINE_COUNT];
-        if (sawModifiedLine ||
-                line > m_maxBufferedLine ||
-                memcmp(curLine, bufLine, sizeof(curLine)) != 0) {
-            //trace("sent line %d", line);
-            m_terminal->sendLine(line, curLine, windowRect.width());
-            memcpy(bufLine, curLine, sizeof(curLine));
-            m_maxBufferedLine = std::max(m_maxBufferedLine, line);
+        ConsoleLine &bufLine = m_bufferData[line % BUFFER_LINE_COUNT];
+        if (line > m_maxBufferedLine) {
+            m_maxBufferedLine = line;
             sawModifiedLine = true;
+        }
+        if (sawModifiedLine) {
+            bufLine.setLine(curLine, w);
+        } else {
+            sawModifiedLine = bufLine.detectChangeAndSetLine(curLine, w);
+        }
+        if (sawModifiedLine) {
+            //trace("sent line %d", line);
+            m_terminal->sendLine(line, curLine, w);
         }
     }
 
