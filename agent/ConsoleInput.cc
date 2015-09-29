@@ -173,7 +173,7 @@ ConsoleInput::~ConsoleInput()
 
 void ConsoleInput::writeInput(const std::string &input)
 {
-    trace("writeInput: %d bytes", input.size());
+    //trace("writeInput: %d bytes", input.size());
     if (input.size() == 0)
         return;
     m_byteQueue.append(input);
@@ -247,7 +247,7 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
                                int inputSize,
                                bool isEof)
 {
-    trace("scanKeyPress: %d bytes", inputSize);
+    //trace("scanKeyPress: %d bytes", inputSize);
 
     // Ctrl-C.
     if (input[0] == '\x03' && m_console->processedInputMode()) {
@@ -434,9 +434,9 @@ int ConsoleInput::utf8CharLength(char firstByte)
 const ConsoleInput::KeyDescriptor *
 ConsoleInput::lookupKey(const char *encoding, bool isEof, bool *incomplete)
 {
-    trace("lookupKey");
-    for (int i = 0; encoding[i] != '\0'; ++i)
-        trace("%d", encoding[i]);
+    //trace("lookupKey");
+    //for (int i = 0; encoding[i] != '\0'; ++i)
+    //   trace("%d", encoding[i]);
 
     *incomplete = false;
     KeyLookup *node = &m_lookup;
@@ -444,7 +444,7 @@ ConsoleInput::lookupKey(const char *encoding, bool isEof, bool *incomplete)
     for (int i = 0; encoding[i] != '\0'; ++i) {
         unsigned char ch = encoding[i];
         node = node->getChild(ch);
-        trace("ch: %d --> node:%p", ch, node);
+        //trace("ch: %d --> node:%p", ch, node);
         if (node == NULL) {
             return longestMatch;
         } else if (node->getMatch() != NULL) {
