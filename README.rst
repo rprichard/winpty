@@ -51,6 +51,7 @@ this writing, the necessary packages are:
   ``mingw64-x86_64-gcc-g++``.  Select the appropriate compiler for your
   CPU architecture.
 * ``gcc-g++``
+* ``make``
 
 MSYS packages
 -------------
@@ -70,7 +71,7 @@ For MSYS2, use ``pacman`` and install at least these packages:
 * ``msys/gcc``
 * ``mingw32/mingw-w64-i686-gcc`` or ``mingw64/mingw-w64-x86_64-gcc``.  Select
   the appropriate compiler for your CPU architecture.
-
+* ``make``
 
 Build
 =====
