@@ -23,7 +23,7 @@ include ../config-mingw.mk
 
 LIBRARY = ../build/winpty.dll
 OBJECTS = winpty.o DebugClient.o
-LDFLAGS += -shared -static-libgcc -static-libstdc++
+LDFLAGS += -shared -static -static-libgcc -static-libstdc++
 
 CXXFLAGS += \
 	-I../include \

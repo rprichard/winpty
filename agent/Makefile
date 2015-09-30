@@ -44,7 +44,7 @@ CXXFLAGS += \
 	-fno-exceptions \
 	-fno-rtti
 
-LDFLAGS += -static-libgcc -static-libstdc++
+LDFLAGS += -static -static-libgcc -static-libstdc++
 
 all : $(PROGRAM)
 

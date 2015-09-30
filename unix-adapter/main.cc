@@ -223,7 +223,10 @@ static void setFdNonBlock(int fd)
 static std::string convertPosixPathToWin(const std::string &path)
 {
     char *tmp;
-#if !defined(__MSYS__) && CYGWIN_VERSION_API_MINOR >= 181
+#if defined(CYGWIN_VERSION_CYGWIN_CONV) && \
+        CYGWIN_VERSION_API_MINOR >= CYGWIN_VERSION_CYGWIN_CONV
+    // MSYS2 and versions of Cygwin released after 2009 or so use this API.
+    // The original MSYS still lacks this API.
     ssize_t newSize = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
                                        path.c_str(), NULL, 0);
     assert(newSize >= 0);
