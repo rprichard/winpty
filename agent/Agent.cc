@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2012 Ryan Prichard
+// Copyright (c) 2011-2015 Ryan Prichard
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -543,6 +543,7 @@ void Agent::syncConsoleContentAndSize(bool forceResize)
     }
 
     unfreezeConsole();
+    m_console->reposition(newBufferSize, newWindowRect);
 }
 
 void Agent::syncConsoleTitle()
