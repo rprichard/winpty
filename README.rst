@@ -58,6 +58,7 @@ MSYS packages
 
 For the original MSYS, use the ``mingw-get`` tool (MinGW Installation Manager),
 and select at least these components:
+
 * ``mingw-developer-toolkit``
 * ``mingw32-base``
 * ``mingw32-gcc-g++``
@@ -68,6 +69,7 @@ When running ``./configure``, make sure that ``mingw32-g++`` is in your
 ``PATH``.  It will be in the ``C:\MinGW\bin`` directory.
 
 For MSYS2, use ``pacman`` and install at least these packages:
+
 * ``msys/gcc``
 * ``mingw32/mingw-w64-i686-gcc`` or ``mingw64/mingw-w64-x86_64-gcc``.  Select
   the appropriate compiler for your CPU architecture.
