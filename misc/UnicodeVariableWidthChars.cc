@@ -39,7 +39,8 @@ static void dumpChars(int x, int y, int w, int h) {
 
     printf("\n");
     for (int i = 0; i < w * h; ++i) {
-        printf("CHAR: 0x%04x 0x%04x -- 0x%02x 0x%04x\n",
+        printf("(%02d,%02d) CHAR: %04x %4x -- %02x %4x\n",
+            x + i % w, y + i / w,
             (unsigned short)unicodeData[i].Char.UnicodeChar,
             (unsigned short)unicodeData[i].Attributes,
             (unsigned char)mbcsData[i].Char.AsciiChar,
@@ -50,16 +51,19 @@ static void dumpChars(int x, int y, int w, int h) {
 int main(int argc, char *argv[]) {
     system("cls");
     setWindowPos(0, 0, 1, 1);
-    setBufferSize(80, 20);
-    setWindowPos(0, 0, 80, 20);
+    setBufferSize(80, 36);
+    setWindowPos(0, 0, 80, 36);
 
     // Write text.
     const wchar_t text1[] = {
         0x3044, // U+3044 (HIRAGANA LETTER I)
         0xFF2D, // U+FF2D (FULLWIDTH LATIN CAPITAL LETTER M)
         0x30FC, // U+30FC (KATAKANA-HIRAGANA PROLONGED SOUND MARK)
-        0x0033, // U+0033 (DIGIT THREE)
+        0x0031, // U+3031 (DIGIT ONE)
+        0x2014, // U+2014 (EM DASH)
+        0x0032, // U+0032 (DIGIT TWO)
         0x005C, // U+005C (REVERSE SOLIDUS)
+        0x3044, // U+3044 (HIRAGANA LETTER I)
         0
     };
     setCursorPos(0, 0);
@@ -76,7 +80,12 @@ int main(int argc, char *argv[]) {
     setCursorPos(78, 1);
     writeChars(text2);
 
-    dumpChars(0, 0, 8, 1);
+    system("pause");
+
+    dumpChars(0, 0, 13, 1);
+    dumpChars(2, 0, 2, 1);
+    dumpChars(2, 0, 1, 1);
+    dumpChars(3, 0, 1, 1);
     dumpChars(78, 1, 2, 1);
     dumpChars(0, 2, 2, 1);
 
@@ -101,6 +110,7 @@ int main(int argc, char *argv[]) {
         0
     };
     writeChars(text3);
+    system("pause");
     {
         const COORD bufSize = {80, 2};
         const COORD bufCoord = {0, 0};
