@@ -17,7 +17,7 @@ static void writeChars(const wchar_t *text) {
     BOOL ret = WriteConsoleW(
         GetStdHandle(STD_OUTPUT_HANDLE),
         text, len, &actual, NULL);
-    assert(ret && actual == len);
+    trace("writeChars: ret=%d, actual=%lld", ret, (long long)actual);
 }
 
 static void dumpChars(int x, int y, int w, int h) {
@@ -57,7 +57,8 @@ int main(int argc, char *argv[]) {
     const wchar_t text1[] = {
         0x3044, // U+3044 (HIRAGANA LETTER I)
         0xFF2D, // U+FF2D (FULLWIDTH LATIN CAPITAL LETTER M)
-        0x0033, // U+0030 (DIGIT THREE)
+        0x30FC, // U+30FC (KATAKANA-HIRAGANA PROLONGED SOUND MARK)
+        0x0033, // U+0033 (DIGIT THREE)
         0x005C, // U+005C (REVERSE SOLIDUS)
         0
     };
@@ -75,9 +76,44 @@ int main(int argc, char *argv[]) {
     setCursorPos(78, 1);
     writeChars(text2);
 
-    dumpChars(0, 0, 6, 1);
+    dumpChars(0, 0, 8, 1);
     dumpChars(78, 1, 2, 1);
     dumpChars(0, 2, 2, 1);
+
+    system("pause");
+    system("cls");
+
+    const wchar_t text3[] = {
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 1
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 2
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 3
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 4
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 5
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 6
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 7
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 8
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 9
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 10
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 11
+        0x30FC, 0x30FC, 0x30FC, 0xFF2D, // 12
+        L'\r', '\n',
+        L'\r', '\n',
+        0
+    };
+    writeChars(text3);
+    {
+        const COORD bufSize = {80, 2};
+        const COORD bufCoord = {0, 0};
+        SMALL_RECT readRegion = {0, 0, 79, 1};
+        CHAR_INFO unicodeData[160];
+        BOOL ret = ReadConsoleOutputW(GetStdHandle(STD_OUTPUT_HANDLE), unicodeData,
+                                 bufSize, bufCoord, &readRegion);
+        assert(ret);
+        for (int i = 0; i < 96; ++i) {
+            printf("%04x ", unicodeData[i].Char.UnicodeChar);
+        }
+        printf("\n");
+    }
 
     return 0;
 }
