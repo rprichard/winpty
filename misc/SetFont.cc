@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
@@ -22,44 +23,49 @@ static void setConsoleFont(const wchar_t *faceName, int pixelSize)
         GetStdHandle(STD_OUTPUT_HANDLE),
         FALSE,
         &fontex);
-    printf("SetCurrentConsoleFontEx returned %d\n", ret);
+    cprintf(L"SetCurrentConsoleFontEx returned %d\n", ret);
 }
 
-int main(int argc, char *argv[]) {
+int main() {
+    setlocale(LC_ALL, "");
+    wchar_t *cmdline = GetCommandLineW();
+    int argc = 0;
+    wchar_t **argv = CommandLineToArgvW(cmdline, &argc);
+
     if (argc == 1) {
-        printf("Usage:\n");
-        printf("  SetFont <index>\n");
-        printf("  SetFont options\n");
-        printf("\n");
-        printf("Options for SetCurrentConsoleFontEx:\n");
-        printf("  -idx INDEX\n");
-        printf("  -w WIDTH\n");
-        printf("  -h HEIGHT\n");
-        printf("  -weight (normal|bold|NNN)\n");
-        printf("  -face FACENAME\n");
-        printf("  -tt\n");
-        printf("  -vec\n");
-        printf("  -vp\n");
-        printf("  -dev\n");
-        printf("  -roman\n");
-        printf("  -swiss\n");
-        printf("  -modern\n");
-        printf("  -script\n");
-        printf("  -decorative\n");
+        cprintf(L"Usage:\n");
+        cprintf(L"  SetFont <index>\n");
+        cprintf(L"  SetFont options\n");
+        cprintf(L"\n");
+        cprintf(L"Options for SetCurrentConsoleFontEx:\n");
+        cprintf(L"  -idx INDEX\n");
+        cprintf(L"  -w WIDTH\n");
+        cprintf(L"  -h HEIGHT\n");
+        cprintf(L"  -weight (normal|bold|NNN)\n");
+        cprintf(L"  -face FACENAME\n");
+        cprintf(L"  -tt\n");
+        cprintf(L"  -vec\n");
+        cprintf(L"  -vp\n");
+        cprintf(L"  -dev\n");
+        cprintf(L"  -roman\n");
+        cprintf(L"  -swiss\n");
+        cprintf(L"  -modern\n");
+        cprintf(L"  -script\n");
+        cprintf(L"  -decorative\n");
         return 0;
     }
 
     if (isdigit(argv[1][0])) {
-        int index = atoi(argv[1]);
+        int index = _wtoi(argv[1]);
         HMODULE kernel32 = LoadLibraryW(L"kernel32.dll");
         FARPROC proc = GetProcAddress(kernel32, "SetConsoleFont");
         if (proc == NULL) {
-            printf("Couldn't get address of SetConsoleFont\n");
+            cprintf(L"Couldn't get address of SetConsoleFont\n");
         } else {
             const HANDLE conout = GetStdHandle(STD_OUTPUT_HANDLE);
             BOOL ret = reinterpret_cast<BOOL WINAPI(*)(HANDLE, DWORD)>(proc)(
                     conout, index);
-            printf("SetFont returned %d\n", ret);
+            cprintf(L"SetFont returned %d\n", ret);
         }
         return 0;
     }
@@ -68,63 +74,60 @@ int main(int argc, char *argv[]) {
     fontex.cbSize = sizeof(fontex);
 
     for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
+        std::wstring arg = argv[i];
         if (i + 1 < argc) {
-            std::string next = argv[i + 1];
-            if (arg == "-idx") {
-                fontex.nFont = atoi(next.c_str());
+            std::wstring next = argv[i + 1];
+            if (arg == L"-idx") {
+                fontex.nFont = _wtoi(next.c_str());
                 ++i; continue;
-            } else if (arg == "-w") {
-                fontex.dwFontSize.X = atoi(next.c_str());
+            } else if (arg == L"-w") {
+                fontex.dwFontSize.X = _wtoi(next.c_str());
                 ++i; continue;
-            } else if (arg == "-h") {
-                fontex.dwFontSize.Y = atoi(next.c_str());
+            } else if (arg == L"-h") {
+                fontex.dwFontSize.Y = _wtoi(next.c_str());
                 ++i; continue;
-            } else if (arg == "-weight") {
-                if (next == "normal") {
+            } else if (arg == L"-weight") {
+                if (next == L"normal") {
                     fontex.FontWeight = 400;
-                } else if (next == "bold") {
+                } else if (next == L"bold") {
                     fontex.FontWeight = 700;
                 } else {
-                    fontex.FontWeight = atoi(next.c_str());
+                    fontex.FontWeight = _wtoi(next.c_str());
                 }
                 ++i; continue;
-            } else if (arg == "-face") {
-                memset(&fontex.FaceName, 0, sizeof(fontex.FaceName));
-                mbstowcs(fontex.FaceName, next.c_str(), COUNT_OF(fontex.FaceName) - 1);
-                fontex.FaceName[COUNT_OF(fontex.FaceName) - 1] = L'\0';
+            } else if (arg == L"-face") {
+                wcsncpy(fontex.FaceName, next.c_str(), COUNT_OF(fontex.FaceName));
                 ++i; continue;
             }
         }
-        if (arg == "-tt") {
+        if (arg == L"-tt") {
             fontex.FontFamily |= TMPF_TRUETYPE;
-        } else if (arg == "-vec") {
+        } else if (arg == L"-vec") {
             fontex.FontFamily |= TMPF_VECTOR;
-        } else if (arg == "-vp") {
+        } else if (arg == L"-vp") {
             // Setting the TMPF_FIXED_PITCH bit actually indicates variable
             // pitch.
             fontex.FontFamily |= TMPF_FIXED_PITCH;
-        } else if (arg == "-dev") {
+        } else if (arg == L"-dev") {
             fontex.FontFamily |= TMPF_DEVICE;
-        } else if (arg == "-roman") {
+        } else if (arg == L"-roman") {
             fontex.FontFamily = (fontex.FontFamily & ~0xF0) | FF_ROMAN;
-        } else if (arg == "-swiss") {
+        } else if (arg == L"-swiss") {
             fontex.FontFamily = (fontex.FontFamily & ~0xF0) | FF_SWISS;
-        } else if (arg == "-modern") {
+        } else if (arg == L"-modern") {
             fontex.FontFamily = (fontex.FontFamily & ~0xF0) | FF_MODERN;
-        } else if (arg == "-script") {
+        } else if (arg == L"-script") {
             fontex.FontFamily = (fontex.FontFamily & ~0xF0) | FF_SCRIPT;
-        } else if (arg == "-decorative") {
+        } else if (arg == L"-decorative") {
             fontex.FontFamily = (fontex.FontFamily & ~0xF0) | FF_DECORATIVE;
-        } else if (arg == "-face-gothic") {
+        } else if (arg == L"-face-gothic") {
             // ＭＳ ゴシック
             const wchar_t gothicFace[] = {
                 0xFF2D, 0xFF33, 0x20, 0x30B4, 0x30B7, 0x30C3, 0x30AF, 0x0
             };
-            memset(&fontex.FaceName, 0, sizeof(fontex.FaceName));
-            wcscpy(fontex.FaceName, gothicFace);
+            wcsncpy(fontex.FaceName, gothicFace, COUNT_OF(fontex.FaceName));
         } else {
-            printf("Unrecognized argument: %s\n", arg.c_str());
+            cprintf(L"Unrecognized argument: %ls\n", arg.c_str());
             exit(1);
         }
     }
@@ -141,7 +144,7 @@ int main(int argc, char *argv[]) {
         GetStdHandle(STD_OUTPUT_HANDLE),
         FALSE,
         &fontex);
-    printf("SetCurrentConsoleFontEx returned %d\n", ret);
+    cprintf(L"SetCurrentConsoleFontEx returned %d\n", ret);
 
     return 0;
 }
