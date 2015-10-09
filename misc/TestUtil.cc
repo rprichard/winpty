@@ -97,3 +97,26 @@ static void repeatChar(int count, char ch) {
     }
     fflush(stdout);
 }
+
+// I don't know why, but wprintf fails to print this face name,
+// "ＭＳ ゴシック" (aka MS Gothic).  It helps to use wprintf instead of printf, and
+// it helps to call `setlocale(LC_ALL, "")`, but the Japanese symbols are
+// ultimately converted to `?` symbols, even though MS Gothic is able to
+// display its own name, and the current code page is 932 (Shift-JIS).
+static void cvprintf(const wchar_t *fmt, va_list ap) {
+    wchar_t buffer[256];
+    vswprintf(buffer, 256 - 1, fmt, ap);
+    buffer[255] = L'\0';
+    DWORD actual = 0;
+    if (!WriteConsoleW(GetStdHandle(STD_OUTPUT_HANDLE),
+                       buffer, wcslen(buffer), &actual, NULL)) {
+        wprintf(L"WriteConsoleW call failed!\n");
+    }
+}
+
+static void cprintf(const wchar_t *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    cvprintf(fmt, ap);
+    va_end(ap);
+}
