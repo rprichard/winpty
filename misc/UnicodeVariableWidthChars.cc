@@ -51,11 +51,13 @@ static void dumpChars(int x, int y, int w, int h) {
 int main(int argc, char *argv[]) {
     system("cls");
     setWindowPos(0, 0, 1, 1);
-    setBufferSize(80, 36);
-    setWindowPos(0, 0, 80, 36);
+    setBufferSize(80, 38);
+    setWindowPos(0, 0, 80, 38);
 
     // Write text.
     const wchar_t text1[] = {
+        0x3044, // U+3044 (HIRAGANA LETTER I)
+        0x2014, // U+2014 (EM DASH)
         0x3044, // U+3044 (HIRAGANA LETTER I)
         0xFF2D, // U+FF2D (FULLWIDTH LATIN CAPITAL LETTER M)
         0x30FC, // U+30FC (KATAKANA-HIRAGANA PROLONGED SOUND MARK)
@@ -82,7 +84,7 @@ int main(int argc, char *argv[]) {
 
     system("pause");
 
-    dumpChars(0, 0, 13, 1);
+    dumpChars(0, 0, 17, 1);
     dumpChars(2, 0, 2, 1);
     dumpChars(2, 0, 1, 1);
     dumpChars(3, 0, 1, 1);
