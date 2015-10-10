@@ -1,6 +1,7 @@
 // This file is included into test programs using #include
 
 #include <windows.h>
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <wchar.h>
