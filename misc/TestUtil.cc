@@ -5,6 +5,7 @@
 #include <string.h>
 #include <wchar.h>
 #include <vector>
+#include <string>
 
 #include "../shared/DebugClient.h"
 
@@ -119,4 +120,23 @@ static void cprintf(const wchar_t *fmt, ...) {
     va_start(ap, fmt);
     cvprintf(fmt, ap);
     va_end(ap);
+}
+
+std::string narrowString(const std::wstring &input)
+{
+    int mblen = WideCharToMultiByte(
+        CP_UTF8, 0,
+        input.data(), input.size(),
+        NULL, 0, NULL, NULL);
+    if (mblen <= 0) {
+        return std::string();
+    }
+    std::vector<char> tmp(mblen);
+    int mblen2 = WideCharToMultiByte(
+        CP_UTF8, 0,
+        input.data(), input.size(),
+        tmp.data(), tmp.size(),
+        NULL, NULL);
+    assert(mblen2 == mblen);
+    return std::string(tmp.data(), tmp.size());
 }

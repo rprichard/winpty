@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
     for (int px = 1; px < 50; ++px) {
         setFont(kFaceName, px);
         if (!performTest()) {
-            trace("FAILURE: %ls %dpx", kFaceName, px);
+            trace("FAILURE: %s %dpx", narrowString(kFaceName).c_str(), px);
         }
     }
     trace("Test complete");
