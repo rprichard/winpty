@@ -50,13 +50,6 @@ public:
     HANDLE conout();
     HWND hwnd();
     void postCloseMessage();
-    void setSmallFont();
-    bool setConsoleFont(const wchar_t *faceName, int pointSize);
-private:
-    bool setSmallConsoleFontXP();
-    bool setSmallConsoleFontVista();
-    void dumpConsoleFont(const char *prefix);
-public:
     void clearLines(int row, int count, const ConsoleScreenBufferInfo &info);
 
     // Buffer and window sizes.

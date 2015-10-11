@@ -35,6 +35,8 @@ OBJECTS = \
 	Coord.o \
 	SmallRect.o \
 	ConsoleLine.o \
+	ConsoleFont.o \
+	winpty_wcsnlen.o \
 	main.o
 
 CXXFLAGS += \

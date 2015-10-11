@@ -24,6 +24,7 @@
 #include "Terminal.h"
 #include "NamedPipe.h"
 #include "AgentAssert.h"
+#include "ConsoleFont.h"
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
@@ -82,7 +83,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_bufferData.resize(BUFFER_LINE_COUNT);
 
     m_console = new Win32Console;
-    m_console->setSmallFont();
+    setSmallFont(m_console->conout());
     m_console->moveWindow(SmallRect(0, 0, 1, 1));
     m_console->resizeBuffer(Coord(initialCols, BUFFER_LINE_COUNT));
     m_console->moveWindow(SmallRect(0, 0, initialCols, initialRows));
