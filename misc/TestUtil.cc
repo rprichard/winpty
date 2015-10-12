@@ -32,19 +32,23 @@ static void startChildProcess(const wchar_t *args) {
 }
 
 static void setBufferSize(HANDLE conout, int x, int y) {
-    COORD size = { x, y };
+    COORD size = { static_cast<SHORT>(x), static_cast<SHORT>(y) };
     BOOL success = SetConsoleScreenBufferSize(conout, size);
     trace("setBufferSize: (%d,%d), result=%d", x, y, success);
 }
 
 static void setWindowPos(HANDLE conout, int x, int y, int w, int h) {
-    SMALL_RECT r = { x, y, x + w - 1, y + h - 1 };
+    SMALL_RECT r = {
+        static_cast<SHORT>(x), static_cast<SHORT>(y),
+        static_cast<SHORT>(x + w - 1),
+        static_cast<SHORT>(y + h - 1)
+    };
     BOOL success = SetConsoleWindowInfo(conout, /*bAbsolute=*/TRUE, &r);
     trace("setWindowPos: (%d,%d,%d,%d), result=%d", x, y, w, h, success);
 }
 
 static void setCursorPos(HANDLE conout, int x, int y) {
-    COORD coord = { x, y };
+    COORD coord = { static_cast<SHORT>(x), static_cast<SHORT>(y) };
     SetConsoleCursorPosition(conout, coord);
 }
 
@@ -75,9 +79,14 @@ static void writeBox(int x, int y, int w, int h, char ch, int attributes=7) {
     info.Attributes = attributes;
     std::vector<CHAR_INFO> buf(w * h, info);
     HANDLE conout = GetStdHandle(STD_OUTPUT_HANDLE);
-    COORD bufSize = { w, h };
+    COORD bufSize = { static_cast<SHORT>(w), static_cast<SHORT>(h) };
     COORD bufCoord = { 0, 0 };
-    SMALL_RECT writeRegion = { x, y, x + w - 1, y + h - 1 };
+    SMALL_RECT writeRegion = {
+        static_cast<SHORT>(x),
+        static_cast<SHORT>(y),
+        static_cast<SHORT>(x + w - 1),
+        static_cast<SHORT>(y + h - 1)
+    };
     WriteConsoleOutputA(conout, buf.data(), bufSize, bufCoord, &writeRegion);
 }
 
@@ -86,7 +95,7 @@ static void setChar(int x, int y, char ch, int attributes=7) {
 }
 
 static void fillChar(int x, int y, int repeat, char ch) {
-    COORD coord = { x, y };
+    COORD coord = { static_cast<SHORT>(x), static_cast<SHORT>(y) };
     DWORD actual = 0;
     FillConsoleOutputCharacterA(
         GetStdHandle(STD_OUTPUT_HANDLE),
