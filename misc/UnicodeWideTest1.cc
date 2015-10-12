@@ -220,7 +220,7 @@ static void runTest(void (&test)()) {
     system("cls");
     setCursorPos(0, 14);
     test();
-    system("pause");    
+    system("pause");
 }
 
 int main(int argc, char *argv[]) {
