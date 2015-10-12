@@ -46,6 +46,11 @@ const int TERMINAL_WHITE = 7;
 const int TERMINAL_FOREGROUND = 30;
 const int TERMINAL_BACKGROUND = 40;
 
+// Work around the old MinGW, which lacks COMMON_LVB_LEADING_BYTE and
+// COMMON_LVB_TRAILING_BYTE.
+const int WINPTY_COMMON_LVB_LEADING_BYTE = 0x100;
+const int WINPTY_COMMON_LVB_TRAILING_BYTE = 0x200;
+
 Terminal::Terminal(NamedPipe *output) :
     m_output(output),
     m_remoteLine(0),
@@ -142,6 +147,12 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
                 termLine.append(buffer);
             length = termLine.size();
             m_remoteColor = color;
+        }
+        if (lineData[i].Attributes & WINPTY_COMMON_LVB_TRAILING_BYTE) {
+            // CJK full-width characters occupy two console cells.  The first
+            // cell is marked with COMMON_LVB_LEADING_BYTE, and the second is
+            // marked with COMMON_LVB_TRAILING_BYTE.  Skip the trailing cells.
+            continue;
         }
         // TODO: Is it inefficient to call WideCharToMultiByte once per
         // character?
