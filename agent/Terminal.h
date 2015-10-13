@@ -23,6 +23,7 @@
 
 #include <windows.h>
 #include "Coord.h"
+#include <string>
 #include <utility>
 
 class NamedPipe;
@@ -47,6 +48,7 @@ private:
     std::pair<int, int> m_cursorPos;
     int m_remoteColor;
     bool m_consoleMode;
+    std::string m_termLine;
 };
 
 #endif // TERMINAL_H

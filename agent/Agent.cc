@@ -90,6 +90,11 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_console->setCursorPosition(Coord(0, 0));
     m_console->setTitle(m_currentTitle);
 
+    // For the sake of the color translation heuristic, set the console color
+    // to LtGray-on-Black.
+    m_console->setTextAttribute(7);
+    m_console->clearAllLines(m_console->bufferInfo());
+
     m_controlSocket = makeSocket(controlPipeName);
     m_dataSocket = makeSocket(dataPipeName);
     m_terminal = new Terminal(m_dataSocket);

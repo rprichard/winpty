@@ -68,7 +68,7 @@ void Win32Console::clearLines(
     const ConsoleScreenBufferInfo &info)
 {
     // TODO: error handling
-    const int width = SmallRect(info.srWindow).width();
+    const int width = info.bufferSize().X;
     DWORD actual = 0;
     if (!FillConsoleOutputCharacterW(
             m_conout, L' ', width * count, Coord(0, row),
@@ -80,6 +80,11 @@ void Win32Console::clearLines(
             &actual) || static_cast<int>(actual) != width * count) {
         trace("FillConsoleOutputAttribute failed");
     }
+}
+
+void Win32Console::clearAllLines(const ConsoleScreenBufferInfo &info)
+{
+    clearLines(0, info.bufferSize().Y, info);
 }
 
 ConsoleScreenBufferInfo Win32Console::bufferInfo()
@@ -194,5 +199,12 @@ void Win32Console::setTitle(const std::wstring &title)
 {
     if (!SetConsoleTitleW(title.c_str())) {
         trace("SetConsoleTitleW failed");
+    }
+}
+
+void Win32Console::setTextAttribute(WORD attributes)
+{
+    if (!SetConsoleTextAttribute(m_conout, attributes)) {
+        trace("SetConsoleTextAttribute failed");
     }
 }

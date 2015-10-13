@@ -51,6 +51,7 @@ public:
     HWND hwnd();
     void postCloseMessage();
     void clearLines(int row, int count, const ConsoleScreenBufferInfo &info);
+    void clearAllLines(const ConsoleScreenBufferInfo &info);
 
     // Buffer and window sizes.
     ConsoleScreenBufferInfo bufferInfo();
@@ -74,6 +75,8 @@ public:
     // Title.
     std::wstring title();
     void setTitle(const std::wstring &title);
+
+    void setTextAttribute(WORD attributes);
 
 private:
     HANDLE m_conin;
