@@ -93,6 +93,130 @@ static void outputSetColorSgrParams(std::string &out, bool isFore, int color)
     }
 }
 
+static void outputSetColor(std::string &out, int color)
+{
+    int fore = 0;
+    int back = 0;
+    if (color & FOREGROUND_RED)       fore |= FLAG_RED;
+    if (color & FOREGROUND_GREEN)     fore |= FLAG_GREEN;
+    if (color & FOREGROUND_BLUE)      fore |= FLAG_BLUE;
+    if (color & FOREGROUND_INTENSITY) fore |= FLAG_BRIGHT;
+    if (color & BACKGROUND_RED)       back |= FLAG_RED;
+    if (color & BACKGROUND_GREEN)     back |= FLAG_GREEN;
+    if (color & BACKGROUND_BLUE)      back |= FLAG_BLUE;
+    if (color & BACKGROUND_INTENSITY) back |= FLAG_BRIGHT;
+
+    // Translate the fore/back colors into terminal escape codes using
+    // a heuristic that works OK with common white-on-black or
+    // black-on-white color schemes.  We don't know which color scheme
+    // the terminal is using.  It is ugly to force white-on-black text
+    // on a black-on-white terminal, and it's even ugly to force the
+    // matching scheme.  It's probably relevant that the default
+    // fore/back terminal colors frequently do not match any of the 16
+    // palette colors.
+
+    // Typical default terminal color schemes (according to palette,
+    // when possible):
+    //  - mintty:               LtGray-on-Black(A)
+    //  - putty:                LtGray-on-Black(A)
+    //  - xterm:                LtGray-on-Black(A)
+    //  - Konsole:              LtGray-on-Black(A)
+    //  - JediTerm/JetBrains:   Black-on-White(B)
+    //  - rxvt:                 Black-on-White(B)
+
+    // If the background is the default color (black), then it will
+    // map to Black(A) or White(B).  If we translate White to White,
+    // then a Black background and a White background in the console
+    // are both White with (B).  Therefore, we should translate White
+    // using SGR 7 (Invert).  The typical finished mapping table for
+    // background grayscale colors is:
+    //
+    //  (A) White => LtGray(fore)
+    //  (A) Black => Black(back)
+    //  (A) LtGray => LtGray
+    //  (A) DkGray => DkGray
+    //
+    //  (B) White => Black(fore)
+    //  (B) Black => White(back)
+    //  (B) LtGray => LtGray
+    //  (B) DkGray => DkGray
+    //
+
+    out.append(CSI"0");
+    if (back == BLACK) {
+        if (fore == LTGRAY) {
+            // The "default" foreground color.  Use the terminal's
+            // default colors.
+        } else if (fore == WHITE) {
+            // Sending the literal color white would behave poorly if
+            // the terminal were black-on-white.  Sending Bold is not
+            // guaranteed to alter the color, but it will make the text
+            // visually distinct, so do that instead.
+            out.append(";1");
+        } else if (fore == DKGRAY) {
+            // Set the foreground color to DkGray(90) with a fallback
+            // of LtGray(37) for terminals that don't handle the 9X SGR
+            // parameters (e.g. Eclipse's TM Terminal as of this
+            // writing).
+            out.append(";37;90");
+        } else {
+            outputSetColorSgrParams(out, true, fore);
+        }
+    } else if (back == WHITE) {
+        // Set the background color using Invert on the default
+        // foreground color, and set the foreground color by setting a
+        // background color.
+
+        // Use the terminal's inverted colors.
+        out.append(";7");
+        if (fore == LTGRAY || fore == BLACK) {
+            // We're likely mapping Console White to terminal LtGray or
+            // Black.  If they are the Console foreground color, then
+            // don't set a terminal foreground color to avoid creating
+            // invisible text.
+        } else {
+            outputSetColorSgrParams(out, false, fore);
+        }
+    } else {
+        // Set the foreground and background to match exactly that in
+        // the Windows console.
+        outputSetColorSgrParams(out, true, fore);
+        outputSetColorSgrParams(out, false, back);
+    }
+    if (fore == back) {
+        // The foreground and background colors are exactly equal, so
+        // attempt to hide the text using the Conceal SGR parameter,
+        // which some terminals support.
+        out.append(";8");
+    }
+    out.push_back('m');
+}
+
+// The Windows Console has a popup window (e.g. that appears with F7)
+// that is sometimes bordered with box-drawing characters.  With the
+// Japanese and Korean system locales (CP932 and CP949), the
+// UnicodeChar values for the box-drawing characters are 1 through 6.
+// Detect this and map the values to the correct Unicode values.
+//
+// N.B. In the English locale, the UnicodeChar values are correct, and
+// they identify single-line characters rather than double-line.  In
+// the Chinese Simplified and Traditional locales, the popups use ASCII
+// characters instead.
+static inline wchar_t fixConsolePopupBoxArt(wchar_t ch)
+{
+    if (ch <= 6) {
+        switch (ch) {
+            case 1: return 0x2554; // BOX DRAWINGS DOUBLE DOWN AND RIGHT
+            case 2: return 0x2557; // BOX DRAWINGS DOUBLE DOWN AND LEFT
+            case 3: return 0x255A; // BOX DRAWINGS DOUBLE UP AND RIGHT
+            case 4: return 0x255D; // BOX DRAWINGS DOUBLE UP AND LEFT
+            case 5: return 0x2551; // BOX DRAWINGS DOUBLE VERTICAL
+            case 6: return 0x2550; // BOX DRAWINGS DOUBLE HORIZONTAL
+        }
+    }
+    return ch;
+}
+
 } // anonymous namespace
 
 Terminal::Terminal(NamedPipe *output) :
@@ -141,101 +265,7 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     for (int i = 0; i < width; ++i) {
         int color = lineData[i].Attributes & COLOR_ATTRIBUTE_MASK;
         if (color != m_remoteColor && !m_consoleMode) {
-            int fore = 0;
-            int back = 0;
-            if (color & FOREGROUND_RED)       fore |= FLAG_RED;
-            if (color & FOREGROUND_GREEN)     fore |= FLAG_GREEN;
-            if (color & FOREGROUND_BLUE)      fore |= FLAG_BLUE;
-            if (color & FOREGROUND_INTENSITY) fore |= FLAG_BRIGHT;
-            if (color & BACKGROUND_RED)       back |= FLAG_RED;
-            if (color & BACKGROUND_GREEN)     back |= FLAG_GREEN;
-            if (color & BACKGROUND_BLUE)      back |= FLAG_BLUE;
-            if (color & BACKGROUND_INTENSITY) back |= FLAG_BRIGHT;
-
-            // Translate the fore/back colors into terminal escape codes using
-            // a heuristic that works OK with common white-on-black or
-            // black-on-white color schemes.  We don't know which color scheme
-            // the terminal is using.  It is ugly to force white-on-black text
-            // on a black-on-white terminal, and it's even ugly to force the
-            // matching scheme.  It's probably relevant that the default
-            // fore/back terminal colors frequently do not match any of the 16
-            // palette colors.
-
-            // Typical default terminal color schemes (according to palette,
-            // when possible):
-            //  - mintty:               LtGray-on-Black(A)
-            //  - putty:                LtGray-on-Black(A)
-            //  - xterm:                LtGray-on-Black(A)
-            //  - Konsole:              LtGray-on-Black(A)
-            //  - JediTerm/JetBrains:   Black-on-White(B)
-            //  - rxvt:                 Black-on-White(B)
-
-            // If the background is the default color (black), then it will
-            // map to Black(A) or White(B).  If we translate White to White,
-            // then a Black background and a White background in the console
-            // are both White with (B).  Therefore, we should translate White
-            // using SGR 7 (Invert).  The typical finished mapping table for
-            // background grayscale colors is:
-            //
-            //  (A) White => LtGray(fore)
-            //  (A) Black => Black(back)
-            //  (A) LtGray => LtGray
-            //  (A) DkGray => DkGray
-            //
-            //  (B) White => Black(fore)
-            //  (B) Black => White(back)
-            //  (B) LtGray => LtGray
-            //  (B) DkGray => DkGray
-            //
-
-            m_termLine.append(CSI"0");
-            if (back == BLACK) {
-                if (fore == LTGRAY) {
-                    // The "default" foreground color.  Use the terminal's
-                    // default colors.
-                } else if (fore == WHITE) {
-                    // Sending the literal color white would behave poorly if
-                    // the terminal were black-on-white.  Sending Bold is not
-                    // guaranteed to alter the color, but it will make the text
-                    // visually distinct, so do that instead.
-                    m_termLine.append(";1");
-                } else if (fore == DKGRAY) {
-                    // Set the foreground color to DkGray(90) with a fallback
-                    // of LtGray(37) for terminals that don't handle the 9X SGR
-                    // parameters (e.g. Eclipse's TM Terminal as of this
-                    // writing).
-                    m_termLine.append(";37;90");
-                } else {
-                    outputSetColorSgrParams(m_termLine, true, fore);
-                }
-            } else if (back == WHITE) {
-                // Set the background color using Invert on the default
-                // foreground color, and set the foreground color by setting a
-                // background color.
-
-                // Use the terminal's inverted colors.
-                m_termLine.append(";7");
-                if (fore == LTGRAY || fore == BLACK) {
-                    // We're likely mapping Console White to terminal LtGray or
-                    // Black.  If they are the Console foreground color, then
-                    // don't set a terminal foreground color to avoid creating
-                    // invisible text.
-                } else {
-                    outputSetColorSgrParams(m_termLine, false, fore);
-                }
-            } else {
-                // Set the foreground and background to match exactly that in
-                // the Windows console.
-                outputSetColorSgrParams(m_termLine, true, fore);
-                outputSetColorSgrParams(m_termLine, false, back);
-            }
-            if (fore == back) {
-                // The foreground and background colors are exactly equal, so
-                // attempt to hide the text using the Conceal SGR parameter,
-                // which some terminals support.
-                m_termLine.append(";8");
-            }
-            m_termLine.push_back('m');
+            outputSetColor(m_termLine, color);
             length = m_termLine.size();
         }
         m_remoteColor = color;
@@ -247,30 +277,7 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
         }
         // TODO: Is it inefficient to call WideCharToMultiByte once per
         // character?
-
-        wchar_t ch = lineData[i].Char.UnicodeChar;
-
-        // The Windows Console has a popup window (e.g. that appears with F7)
-        // that is sometimes bordered with box-drawing characters.  With the
-        // Japanese and Korean system locales (CP932 and CP949), the
-        // UnicodeChar values for the box-drawing characters are 1..6.  Detect
-        // this and map the values to the correct Unicode values.
-        //
-        // N.B. In the English locale, the UnicodeChar values are correct, and
-        // they identify single-line characters rather than double-line.  In
-        // the Chinese Simplified and Traditional locales, the popups use ASCII
-        // characters instead.
-        if (ch <= 6) {
-            switch (ch) {
-                case 1: ch = 0x2554; break; // BOX DRAWINGS DOUBLE DOWN AND RIGHT
-                case 2: ch = 0x2557; break; // BOX DRAWINGS DOUBLE DOWN AND LEFT
-                case 3: ch = 0x255A; break; // BOX DRAWINGS DOUBLE UP AND RIGHT
-                case 4: ch = 0x255D; break; // BOX DRAWINGS DOUBLE UP AND LEFT
-                case 5: ch = 0x2551; break; // BOX DRAWINGS DOUBLE VERTICAL
-                case 6: ch = 0x2550; break; // BOX DRAWINGS DOUBLE HORIZONTAL
-            }
-        }
-
+        wchar_t ch = fixConsolePopupBoxArt(lineData[i].Char.UnicodeChar);
         char mbstr[16];
         int mblen = WideCharToMultiByte(CP_UTF8,
                                         0,
