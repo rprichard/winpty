@@ -302,7 +302,7 @@ void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)
     if (m_cursorHidden) {
         moveTerminalToLine(newCursorPos.second);
         char buffer[32];
-        sprintf(buffer, CSI"%dG"CSI"?25h", newCursorPos.first + 1);
+        sprintf(buffer, CSI"%dG" CSI"?25h", newCursorPos.first + 1);
         if (!m_consoleMode)
             m_output->write(buffer);
         m_cursorHidden = false;
@@ -329,7 +329,7 @@ void Terminal::moveTerminalToLine(int line)
     if (line < m_remoteLine) {
         // CUrsor Up (CUU)
         char buffer[32];
-        sprintf(buffer, "\r"CSI"%dA", m_remoteLine - line);
+        sprintf(buffer, "\r" CSI"%dA", m_remoteLine - line);
         if (!m_consoleMode)
             m_output->write(buffer);
         m_remoteLine = line;
