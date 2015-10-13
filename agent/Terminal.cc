@@ -115,9 +115,10 @@ void Terminal::setConsoleMode(int mode)
 void Terminal::reset(bool sendClearFirst, int newLine)
 {
     if (sendClearFirst && !m_consoleMode) {
+        // 0m   ==> reset SGR parameters
         // 1;1H ==> move cursor to top-left position
         // 2J   ==> clear the entire screen
-        m_output->write(CSI"1;1H"CSI"2J");
+        m_output->write(CSI"0m" CSI"1;1H" CSI"2J");
     }
     m_remoteLine = newLine;
     m_cursorHidden = false;
