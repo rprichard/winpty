@@ -156,10 +156,34 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
         }
         // TODO: Is it inefficient to call WideCharToMultiByte once per
         // character?
+
+        wchar_t ch = lineData[i].Char.UnicodeChar;
+
+        // The Windows Console has a popup window (e.g. that appears with F7)
+        // that is sometimes bordered with box-drawing characters.  With the
+        // Japanese and Korean system locales (CP932 and CP949), the
+        // UnicodeChar values for the box-drawing characters are 1..6.  Detect
+        // this and map the values to the correct Unicode values.
+        //
+        // N.B. In the English locale, the UnicodeChar values are correct, and
+        // they identify single-line characters rather than double-line.  In
+        // the Chinese Simplified and Traditional locales, the popups use ASCII
+        // characters instead.
+        if (ch <= 6) {
+            switch (ch) {
+                case 1: ch = 0x2554; break; // BOX DRAWINGS DOUBLE DOWN AND RIGHT
+                case 2: ch = 0x2557; break; // BOX DRAWINGS DOUBLE DOWN AND LEFT
+                case 3: ch = 0x255A; break; // BOX DRAWINGS DOUBLE UP AND RIGHT
+                case 4: ch = 0x255D; break; // BOX DRAWINGS DOUBLE UP AND LEFT
+                case 5: ch = 0x2551; break; // BOX DRAWINGS DOUBLE VERTICAL
+                case 6: ch = 0x2550; break; // BOX DRAWINGS DOUBLE HORIZONTAL
+            }
+        }
+
         char mbstr[16];
         int mblen = WideCharToMultiByte(CP_UTF8,
                                         0,
-                                        &lineData[i].Char.UnicodeChar,
+                                        &ch,
                                         1,
                                         mbstr,
                                         sizeof(mbstr),
