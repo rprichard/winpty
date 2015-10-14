@@ -309,12 +309,9 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     hideTerminalCursor();
     moveTerminalToLine(line);
 
-    // Erase in Line -- erase entire line.
-    if (!m_consoleMode)
-        m_output->write(CSI"2K");
-
     m_termLine.clear();
     int trimmedLineLength = 0;
+    bool alreadyErasedLine = false;
 
     int cellCount = 1;
     for (int i = 0; i < width; i += cellCount) {
@@ -331,6 +328,19 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
         if (ch == ' ') {
             m_termLine.push_back(' ');
         } else {
+            if (i + cellCount == width) {
+                // We'd like to erase the line after outputting all non-blank
+                // characters, but this doesn't work if the last cell in the
+                // line is non-blank.  At the point, the cursor is positioned
+                // just past the end of the line, but in many terminals,
+                // issuing a CSI 0K at that point also erases the last cell in
+                // the line.  Work around this behavior by issuing the erase
+                // one character early in that case.
+                if (!m_consoleMode) {
+                    m_termLine.append(CSI"0K"); // Erase from cursor to EOL
+                }
+                alreadyErasedLine = true;
+            }
             ch = fixConsolePopupBoxArt(ch);
             char enc[4];
             int enclen = encodeUtf8(enc, ch);
@@ -344,6 +354,10 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
     }
 
     m_output->write(m_termLine.data(), trimmedLineLength);
+
+    if (!alreadyErasedLine && !m_consoleMode) {
+        m_output->write(CSI"0K"); // Erase from cursor to EOL
+    }
 }
 
 void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)
