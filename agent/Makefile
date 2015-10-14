@@ -44,7 +44,8 @@ CXXFLAGS += \
 	-D_UNICODE \
 	-D_WIN32_WINNT=0x0501 \
 	-fno-exceptions \
-	-fno-rtti
+	-fno-rtti \
+	-O2
 
 LDFLAGS += -static -static-libgcc -static-libstdc++
 

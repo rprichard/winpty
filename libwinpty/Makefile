@@ -32,7 +32,8 @@ CXXFLAGS += \
 	-D_WIN32_WINNT=0x0501 \
 	-DWINPTY \
 	-fno-exceptions \
-	-fno-rtti
+	-fno-rtti \
+	-O2
 
 $(LIBRARY) : $(OBJECTS)
 	@echo Linking $@
