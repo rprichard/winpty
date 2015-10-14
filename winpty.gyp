@@ -33,6 +33,7 @@
                 'agent/SmallRect.cc',
                 'agent/Terminal.h',
                 'agent/Terminal.cc',
+                'agent/UnicodeEncoding.h',
                 'agent/Win32Console.cc',
                 'agent/Win32Console.h',
                 'agent/main.cc',

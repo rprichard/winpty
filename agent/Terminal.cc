@@ -19,7 +19,9 @@
 // IN THE SOFTWARE.
 
 #include "Terminal.h"
+#include "AgentAssert.h"
 #include "NamedPipe.h"
+#include "UnicodeEncoding.h"
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
@@ -202,7 +204,7 @@ static void outputSetColor(std::string &out, int color)
 // they identify single-line characters rather than double-line.  In
 // the Chinese Simplified and Traditional locales, the popups use ASCII
 // characters instead.
-static inline wchar_t fixConsolePopupBoxArt(wchar_t ch)
+static inline unsigned int fixConsolePopupBoxArt(unsigned int ch)
 {
     if (ch <= 6) {
         switch (ch) {
@@ -215,6 +217,58 @@ static inline wchar_t fixConsolePopupBoxArt(wchar_t ch)
         }
     }
     return ch;
+}
+
+static inline bool isFullWidthCharacter(const CHAR_INFO *data, int width)
+{
+    if (width < 2) {
+        return false;
+    }
+    return
+        (data[0].Attributes & WINPTY_COMMON_LVB_LEADING_BYTE) &&
+        (data[1].Attributes & WINPTY_COMMON_LVB_TRAILING_BYTE) &&
+        data[0].Char.UnicodeChar == data[1].Char.UnicodeChar;
+}
+
+// Scan to find a single Unicode Scalar Value.  Full-width characters occupy
+// two console cells, and this code also tries to handle UTF-16 surrogate
+// pairs.
+//
+// Windows expands at least some wide characters outside the Basic
+// Multilingual Plane into four cells, such as U+20000:
+//   1. 0xD840, attr=0x107
+//   2. 0xD840, attr=0x207
+//   3. 0xDC00, attr=0x107
+//   4. 0xDC00, attr=0x207
+// Even in the Traditional Chinese locale on Windows 10, this text is rendered
+// as two boxes, but if those boxes are copied-and-pasted, the character is
+// copied correctly.
+static inline void scanUnicodeScalarValue(
+    const CHAR_INFO *data, int width,
+    int &outCellCount, unsigned int &outCharValue)
+{
+    ASSERT(width >= 1);
+
+    const int w1 = isFullWidthCharacter(data, width) ? 2 : 1;
+    const wchar_t c1 = data[0].Char.UnicodeChar;
+
+    if ((c1 & 0xF800) == 0xD800) {
+        // The first cell is either a leading or trailing surrogate pair.
+        if ((c1 & 0xFC00) != 0xD800 ||
+                width <= w1 ||
+                ((data[w1].Char.UnicodeChar & 0xFC00) != 0xDC00)) {
+            // Invalid surrogate pair
+            outCellCount = w1;
+            outCharValue = '?';
+        } else {
+            // Valid surrogate pair
+            outCellCount = w1 + (isFullWidthCharacter(&data[w1], width - w1) ? 2 : 1);
+            outCharValue = decodeSurrogatePair(c1, data[w1].Char.UnicodeChar);
+        }
+    } else {
+        outCellCount = w1;
+        outCharValue = c1;
+    }
 }
 
 } // anonymous namespace
@@ -260,46 +314,36 @@ void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
         m_output->write(CSI"2K");
 
     m_termLine.clear();
+    int trimmedLineLength = 0;
 
-    int length = 0;
-    for (int i = 0; i < width; ++i) {
+    int cellCount = 1;
+    for (int i = 0; i < width; i += cellCount) {
         int color = lineData[i].Attributes & COLOR_ATTRIBUTE_MASK;
-        if (color != m_remoteColor && !m_consoleMode) {
-            outputSetColor(m_termLine, color);
-            length = m_termLine.size();
+        if (color != m_remoteColor) {
+            if (!m_consoleMode) {
+                outputSetColor(m_termLine, color);
+            }
+            trimmedLineLength = m_termLine.size();
+            m_remoteColor = color;
         }
-        m_remoteColor = color;
-        if (lineData[i].Attributes & WINPTY_COMMON_LVB_TRAILING_BYTE) {
-            // CJK full-width characters occupy two console cells.  The first
-            // cell is marked with COMMON_LVB_LEADING_BYTE, and the second is
-            // marked with COMMON_LVB_TRAILING_BYTE.  Skip the trailing cells.
-            continue;
-        }
-        // TODO: Is it inefficient to call WideCharToMultiByte once per
-        // character?
-        wchar_t ch = fixConsolePopupBoxArt(lineData[i].Char.UnicodeChar);
-        char mbstr[16];
-        int mblen = WideCharToMultiByte(CP_UTF8,
-                                        0,
-                                        &ch,
-                                        1,
-                                        mbstr,
-                                        sizeof(mbstr),
-                                        NULL,
-                                        NULL);
-        if (mblen <= 0) {
-            mbstr[0] = '?';
-            mblen = 1;
-        }
-        if (mblen == 1 && mbstr[0] == ' ') {
+        unsigned int ch;
+        scanUnicodeScalarValue(&lineData[i], width - i, cellCount, ch);
+        if (ch == ' ') {
             m_termLine.push_back(' ');
         } else {
-            m_termLine.append(mbstr, mblen);
-            length = m_termLine.size();
+            ch = fixConsolePopupBoxArt(ch);
+            char enc[4];
+            int enclen = encodeUtf8(enc, ch);
+            if (enclen == 0) {
+                enc[0] = '?';
+                enclen = 1;
+            }
+            m_termLine.append(enc, enclen);
+            trimmedLineLength = m_termLine.size();
         }
     }
 
-    m_output->write(m_termLine.data(), length);
+    m_output->write(m_termLine.data(), trimmedLineLength);
 }
 
 void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)

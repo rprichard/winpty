@@ -314,8 +314,8 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
 
 void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
                                   const char *charBuffer,
-                                  int charLen,
-                                  int keyState)
+                                  const int charLen,
+                                  const int keyState)
 {
     WCHAR wideInput[2];
     int wideLen = MultiByteToWideChar(CP_UTF8,
@@ -324,22 +324,21 @@ void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
                                       charLen,
                                       wideInput,
                                       sizeof(wideInput) / sizeof(wideInput[0]));
-    // TODO: Characters outside the BMP.
-    if (wideLen != 1)
-        return;
-
-    short charScan = VkKeyScan(wideInput[0]);
-    int virtualKey = 0;
-    if (charScan != -1) {
-        virtualKey = charScan & 0xFF;
-        if (charScan & 0x100)
-            keyState |= SHIFT_PRESSED;
-        else if (charScan & 0x200)
-            keyState |= LEFT_CTRL_PRESSED;
-        else if (charScan & 0x400)
-            keyState |= LEFT_ALT_PRESSED;
+    for (int i = 0; i < wideLen; ++i) {
+        short charScan = VkKeyScan(wideInput[i]);
+        int virtualKey = 0;
+        int charKeyState = keyState;
+        if (charScan != -1) {
+            virtualKey = charScan & 0xFF;
+            if (charScan & 0x100)
+                charKeyState |= SHIFT_PRESSED;
+            else if (charScan & 0x200)
+                charKeyState |= LEFT_CTRL_PRESSED;
+            else if (charScan & 0x400)
+                charKeyState |= LEFT_ALT_PRESSED;
+        }
+        appendKeyPress(records, virtualKey, wideInput[i], charKeyState);
     }
-    appendKeyPress(records, virtualKey, wideInput[0], keyState);
 }
 
 void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
