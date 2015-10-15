@@ -357,9 +357,8 @@ void Agent::markEntireWindowDirty(const SmallRect &windowRect)
 
 // Scan the screen buffer and advance the dirty line count when we find
 // non-empty lines.
-void Agent::scanForDirtyLines()
+void Agent::scanForDirtyLines(const SmallRect &windowRect)
 {
-    const SmallRect windowRect = m_console->windowRect();
     CHAR_INFO prevChar;
     if (m_dirtyLineCount >= 1) {
         m_console->read(SmallRect(windowRect.width() - 1,
@@ -641,7 +640,7 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
     m_dirtyWindowTop = windowRect.top();
     m_dirtyLineCount = std::max(m_dirtyLineCount, cursor.Y + 1);
     m_dirtyLineCount = std::max(m_dirtyLineCount, (int)windowRect.top());
-    scanForDirtyLines();
+    scanForDirtyLines(windowRect);
 
     // Note that it's possible for all the lines on the current window to
     // be non-dirty.

@@ -71,7 +71,7 @@ protected:
 
 private:
     void markEntireWindowDirty(const SmallRect &windowRect);
-    void scanForDirtyLines();
+    void scanForDirtyLines(const SmallRect &windowRect);
     void clearBufferLines(int firstRow, int count, WORD attributes);
     void resizeImpl(const ConsoleScreenBufferInfo &origInfo);
     void resizeWindow(int cols, int rows);
