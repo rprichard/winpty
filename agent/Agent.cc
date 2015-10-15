@@ -28,6 +28,7 @@
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
+#include "../shared/c99_snprintf.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,8 @@
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
+
+#define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
 
 static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
 {
@@ -704,11 +707,12 @@ void Agent::unfreezeConsole()
     SendMessage(m_console->hwnd(), WM_CHAR, 27, 0x00010001);
 }
 
-void Agent::syncMarkerText(CHAR_INFO *output)
+void Agent::syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN])
 {
-    char str[SYNC_MARKER_LEN + 1];// TODO: use a random string
-    sprintf(str, "S*Y*N*C*%08x", m_syncCounter);
-    memset(output, 0, sizeof(CHAR_INFO) * SYNC_MARKER_LEN);
+    // XXX: The marker text generated here could easily collide with ordinary
+    // console output.  Does it make sense to try to avoid the collision?
+    char str[SYNC_MARKER_LEN];
+    c99_snprintf(str, COUNT_OF(str), "S*Y*N*C*%08x", m_syncCounter);
     for (int i = 0; i < SYNC_MARKER_LEN; ++i) {
         output[i].Char.UnicodeChar = str[i];
         output[i].Attributes = 7;

@@ -81,7 +81,7 @@ private:
     void reopenConsole();
     void freezeConsole();
     void unfreezeConsole();
-    void syncMarkerText(CHAR_INFO *output);
+    void syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN]);
     int findSyncMarker();
     void createSyncMarker(int row);
 
