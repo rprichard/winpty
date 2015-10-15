@@ -184,3 +184,29 @@ s 31 42; printf '\033[4C\033[3A'; pn "bb"
 pn "cccc"
 pn "dddd"
 s; pn
+
+pn "Test modifying colored+inverted+bold line with plain text:"
+s 42 31 7 1; printf 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\r';
+s; pn "This text is plain and followed by green-on-red -->"
+pn
+
+
+
+### Full-width character overwriting
+
+pn 'Overwrite part of a full-width char with a half-width char'
+p 'initial U+4000 ideographs -->'; s 31 42; p '䀀䀀'; s; pn
+p 'write X to index #1 -->'; s 31 42; p '䀀䀀'; s 35 44; printf '\033[24G'; p X; s; pn
+p 'write X to index #2 -->'; s 31 42; p '䀀䀀'; s 35 44; printf '\033[25G'; p X; s; pn
+p 'write X to index #3 -->'; s 31 42; p '䀀䀀'; s 35 44; printf '\033[26G'; p X; s; pn
+p 'write X to index #4 -->'; s 31 42; p '䀀䀀'; s 35 44; printf '\033[27G'; p X; s; pn
+pn
+
+pn 'Verify that Erase-in-Line can "fix" last char in line'
+p 'original                  -->'; s 31 42; p '䀀䀀'; s; pn
+p 'overwrite                 -->'; s 31 42; p '䀀䀀'; s 35 44; printf '\033[30G'; p 'XXX'; s; pn
+p 'overwrite + Erase-in-Line -->'; s 31 42; p '䀀䀀'; s 35 44; printf '\033[30G'; p 'XXX'; s; printf '\033[0K'; pn
+p 'original                  -->'; s 31 42; p 'X䀀䀀'; s; pn
+p 'overwrite                 -->'; s 31 42; p 'X䀀䀀'; s 35 44; printf '\033[30G'; p 'ーー'; s; pn
+p 'overwrite + Erase-in-Line -->'; s 31 42; p 'X䀀䀀'; s 35 44; printf '\033[30G'; p 'ーー'; s; printf '\033[0K'; pn
+pn
