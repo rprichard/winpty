@@ -31,7 +31,10 @@ tests :
 
 install : all
 	mkdir -p $(PREFIX)/bin
-	cp build/* $(PREFIX)/bin
+	install -m 755 -p -s build/console.exe $(PREFIX)/bin
+	install -m 755 -p -s build/winpty.dll $(PREFIX)/bin
+	install -m 755 -p -s build/winpty-agent.exe $(PREFIX)/bin
+	install -m 755 -p -s build/winpty-debugserver.exe $(PREFIX)/bin
 
 clean :
 	cd agent && $(MAKE) clean
