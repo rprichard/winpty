@@ -31,10 +31,10 @@
 #include "Coord.h"
 #include "SmallRect.h"
 #include "ConsoleLine.h"
+#include "Terminal.h"
 
 class Win32Console;
 class ConsoleInput;
-class Terminal;
 class ReadBuffer;
 class NamedPipe;
 struct ConsoleScreenBufferInfo;
@@ -55,7 +55,8 @@ public:
 
 private:
     NamedPipe *makeSocket(LPCWSTR pipeName);
-    void resetConsoleTracking(bool sendClear = true);
+    void resetConsoleTracking(
+        Terminal::SendClearFlag sendClear, const SmallRect &windowRect);
 
 private:
     void pollControlSocket();

@@ -290,9 +290,9 @@ void Terminal::setConsoleMode(int mode)
         m_consoleMode = false;
 }
 
-void Terminal::reset(bool sendClearFirst, int newLine)
+void Terminal::reset(SendClearFlag sendClearFirst, int newLine)
 {
-    if (sendClearFirst && !m_consoleMode) {
+    if (sendClearFirst == SendClear && !m_consoleMode) {
         // 0m   ==> reset SGR parameters
         // 1;1H ==> move cursor to top-left position
         // 2J   ==> clear the entire screen

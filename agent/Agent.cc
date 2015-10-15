@@ -103,7 +103,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_terminal = new Terminal(m_dataSocket);
     m_consoleInput = new ConsoleInput(this);
 
-    resetConsoleTracking(false);
+    resetConsoleTracking(Terminal::OmitClear, m_console->windowRect());
 
     // Setup Ctrl-C handling.  First restore default handling of Ctrl-C.  This
     // attribute is inherited by child processes.  Then register a custom
@@ -146,7 +146,8 @@ NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
     return pipe;
 }
 
-void Agent::resetConsoleTracking(bool sendClear)
+void Agent::resetConsoleTracking(
+    Terminal::SendClearFlag sendClear, const SmallRect &windowRect)
 {
     for (std::vector<ConsoleLine>::iterator
             it = m_bufferData.begin(), itEnd = m_bufferData.end();
@@ -155,7 +156,7 @@ void Agent::resetConsoleTracking(bool sendClear)
         it->reset();
     }
     m_syncRow = -1;
-    m_scrapedLineCount = m_console->windowRect().top();
+    m_scrapedLineCount = windowRect.top();
     m_scrolledCount = 0;
     m_maxBufferedLine = -1;
     m_dirtyWindowTop = -1;
@@ -531,7 +532,7 @@ void Agent::syncConsoleContentAndSize(bool forceResize)
     const bool newDirectMode = (info.bufferSize().Y != BUFFER_LINE_COUNT);
     if (newDirectMode != m_directMode) {
         trace("Entering %s mode", newDirectMode ? "direct" : "scrolling");
-        resetConsoleTracking();
+        resetConsoleTracking(Terminal::SendClear, info.windowRect());
         m_directMode = newDirectMode;
 
         // When we switch from direct->scrolling mode, make sure the console is
@@ -608,7 +609,7 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
             trace("Sync marker has disappeared -- resetting the terminal"
                   " (m_syncCounter=%d)",
                   m_syncCounter);
-            resetConsoleTracking();
+            resetConsoleTracking(Terminal::SendClear, windowRect);
         } else if (markerRow != m_syncRow) {
             ASSERT(markerRow < m_syncRow);
             m_scrolledCount += (m_syncRow - markerRow);
@@ -634,7 +635,7 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
             trace("Window moved upward -- resetting the terminal"
                   " (m_syncCounter=%d)",
                   m_syncCounter);
-            resetConsoleTracking();
+            resetConsoleTracking(Terminal::SendClear, windowRect);
         }
     }
     m_dirtyWindowTop = windowRect.top();
