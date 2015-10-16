@@ -12,6 +12,9 @@
                 '_WIN32_WINNT=0x0501',
                 'NOMINMAX',
             ],
+            'libraries' : [
+                '-luser32.lib',
+            ],
             'sources' : [
                 'agent/Agent.h',
                 'agent/Agent.cc',
@@ -59,6 +62,9 @@
                 'NOMINMAX',
                 'WINPTY',
             ],
+            'libraries' : [
+                '-luser32.lib',
+            ],
             'sources' : [
                 'include/winpty.h',
                 'libwinpty/winpty.cc',
@@ -69,5 +75,18 @@
                 'shared/c99_snprintf.h',
             ],
         },
+        {
+            'target_name' : 'winpty-debugserver',
+            'type' : 'executable',
+            'defines' : [
+                'UNICODE',
+                '_UNICODE',
+                '_WIN32_WINNT=0x0501',
+                'NOMINMAX',
+            ],
+            'sources' : [
+                'debugserver/DebugServer.cc',
+            ],
+        }
     ],
 }

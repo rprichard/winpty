@@ -19,6 +19,9 @@
 // IN THE SOFTWARE.
 
 #include "EventLoop.h"
+
+#include <algorithm>
+
 #include "NamedPipe.h"
 #include "AgentAssert.h"
 #include "../shared/DebugClient.h"
