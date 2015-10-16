@@ -30,6 +30,8 @@
                 'agent/Coord.cc',
                 'agent/DsrSender.h',
                 'agent/EventLoop.cc',
+                'agent/LargeConsoleRead.h',
+                'agent/LargeConsoleRead.cc',
                 'agent/NamedPipe.h',
                 'agent/NamedPipe.cc',
                 'agent/SmallRect.h',

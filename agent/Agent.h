@@ -32,6 +32,7 @@
 #include "SmallRect.h"
 #include "ConsoleLine.h"
 #include "Terminal.h"
+#include "LargeConsoleRead.h"
 
 class Win32Console;
 class ConsoleInput;
@@ -39,8 +40,11 @@ class ReadBuffer;
 class NamedPipe;
 struct ConsoleScreenBufferInfo;
 
-const int BUFFER_LINE_COUNT = 3000; // TODO: Use something like 9000.
-const int MAX_CONSOLE_WIDTH = 500;
+// We must be able to issue a single ReadConsoleOutputW call of
+// MAX_CONSOLE_WIDTH characters, and a single read of approximately several
+// hundred fewer characters than BUFFER_LINE_COUNT.
+const int BUFFER_LINE_COUNT = 3000;
+const int MAX_CONSOLE_WIDTH = 2500;
 const int SYNC_MARKER_LEN = 16;
 
 class Agent : public EventLoop, public DsrSender
@@ -104,6 +108,7 @@ private:
     int m_scrapedLineCount;
     int m_scrolledCount;
     int m_maxBufferedLine;
+    LargeConsoleReadBuffer m_readBuffer;
     std::vector<ConsoleLine> m_bufferData;
     int m_dirtyWindowTop;
     int m_dirtyLineCount;

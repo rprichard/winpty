@@ -36,6 +36,7 @@ OBJECTS = \
 	SmallRect.o \
 	ConsoleLine.o \
 	ConsoleFont.o \
+	LargeConsoleRead.o \
 	winpty_wcsnlen.o \
 	main.o
 

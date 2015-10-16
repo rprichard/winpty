@@ -304,7 +304,7 @@ void Terminal::reset(SendClearFlag sendClearFirst, int newLine)
     m_remoteColor = -1;
 }
 
-void Terminal::sendLine(int line, CHAR_INFO *lineData, int width)
+void Terminal::sendLine(int line, const CHAR_INFO *lineData, int width)
 {
     hideTerminalCursor();
     moveTerminalToLine(line);

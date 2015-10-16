@@ -34,7 +34,7 @@ public:
     explicit Terminal(NamedPipe *output);
     enum SendClearFlag { OmitClear, SendClear };
     void reset(SendClearFlag sendClearFirst, int newLine);
-    void sendLine(int line, CHAR_INFO *lineData, int width);
+    void sendLine(int line, const CHAR_INFO *lineData, int width);
     void finishOutput(const std::pair<int, int> &newCursorPos);
     void setConsoleMode(int mode);
 

@@ -43,6 +43,8 @@ const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 
 #define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
 
+namespace {
+
 static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
 {
     if (dwCtrlType == CTRL_C_EVENT) {
@@ -68,6 +70,14 @@ static std::string wstringToUtf8String(const std::wstring &input)
     ASSERT(mblen2 == mblen);
     return tmp.data();
 }
+
+template <typename T>
+T constrained(T min, T val, T max) {
+    ASSERT(min <= max);
+    return std::min(std::max(min, val), max);
+}
+
+} // anonymous namespace
 
 Agent::Agent(LPCWSTR controlPipeName,
              LPCWSTR dataPipeName,
@@ -359,29 +369,24 @@ void Agent::markEntireWindowDirty(const SmallRect &windowRect)
 // non-empty lines.
 void Agent::scanForDirtyLines(const SmallRect &windowRect)
 {
-    CHAR_INFO prevChar;
-    if (m_dirtyLineCount >= 1) {
-        m_console->read(SmallRect(windowRect.width() - 1,
-                                  m_dirtyLineCount - 1,
-                                  1, 1),
-                        &prevChar);
-    } else {
-        m_console->read(SmallRect(0, 0, 1, 1), &prevChar);
-    }
-    WORD attr = prevChar.Attributes;
+    const int w = m_readBuffer.rect().width();
+    ASSERT(m_dirtyLineCount >= 1);
+    const CHAR_INFO *const prevLine =
+        m_readBuffer.lineData(m_dirtyLineCount - 1);
+    WORD prevLineAttr = prevLine[w - 1].Attributes;
+    const int stopLine = windowRect.top() + windowRect.height();
 
-    for (int line = m_dirtyLineCount;
-         line < windowRect.top() + windowRect.height();
-         ++line) {
-        CHAR_INFO lineData[MAX_CONSOLE_WIDTH]; // TODO: bufoverflow
-        SmallRect lineRect(0, line, windowRect.width(), 1);
-        m_console->read(lineRect, lineData);
-        for (int col = 0; col < windowRect.width(); ++col) {
-            WORD newAttr = lineData[col].Attributes;
-            if (lineData[col].Char.UnicodeChar != L' ' || attr != newAttr)
+    for (int line = m_dirtyLineCount; line < stopLine; ++line) {
+        const CHAR_INFO *lineData = m_readBuffer.lineData(line);
+        for (int col = 0; col < w; ++col) {
+            const WORD colAttr = lineData[col].Attributes;
+            if (lineData[col].Char.UnicodeChar != L' ' ||
+                    colAttr != prevLineAttr) {
                 m_dirtyLineCount = line + 1;
-            newAttr = attr;
+                break;
+            }
         }
+        prevLineAttr = lineData[w - 1].Attributes;
     }
 }
 
@@ -568,17 +573,24 @@ void Agent::syncConsoleTitle()
 void Agent::directScrapeOutput(const ConsoleScreenBufferInfo &info)
 {
     const Coord cursor = info.cursorPosition();
-    const SmallRect windowRect = m_console->windowRect();
-    const int stopLine = std::min(windowRect.height(), m_ptySize.Y);
+    const SmallRect windowRect = info.windowRect();
+
+    const SmallRect scrapeRect(
+        windowRect.left(), windowRect.top(),
+        std::min<SHORT>(std::min(windowRect.width(), m_ptySize.X),
+                        MAX_CONSOLE_WIDTH),
+        std::min<SHORT>(std::min(windowRect.height(), m_ptySize.Y),
+                        BUFFER_LINE_COUNT));
+    const int w = scrapeRect.width();
+    const int h = scrapeRect.height();
+
+    largeConsoleRead(m_readBuffer, *m_console, scrapeRect);
+
     bool sawModifiedLine = false;
-
-    for (int line = 0; line < stopLine; ++line) {
-        ASSERT(m_ptySize.X <= MAX_CONSOLE_WIDTH);
-        CHAR_INFO curLine[MAX_CONSOLE_WIDTH];
-        const int w = std::min(windowRect.width(), m_ptySize.X);
-        m_console->read(SmallRect(0, windowRect.top() + line, w, 1), curLine);
-
-        ConsoleLine &bufLine = m_bufferData[line % BUFFER_LINE_COUNT];
+    for (int line = 0; line < h; ++line) {
+        const CHAR_INFO *curLine =
+            m_readBuffer.lineData(scrapeRect.top() + line);
+        ConsoleLine &bufLine = m_bufferData[line];
         if (sawModifiedLine) {
             bufLine.setLine(curLine, w);
         } else {
@@ -590,8 +602,10 @@ void Agent::directScrapeOutput(const ConsoleScreenBufferInfo &info)
         }
     }
 
-    m_terminal->finishOutput(std::pair<int, int>(cursor.X,
-                                                 cursor.Y - windowRect.top()));
+    m_terminal->finishOutput(
+        std::pair<int, int>(
+            constrained(0, cursor.X - scrapeRect.Left, w - 1),
+            constrained(0, cursor.Y - scrapeRect.Top, h - 1)));
 }
 
 void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
@@ -640,25 +654,47 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
     m_dirtyWindowTop = windowRect.top();
     m_dirtyLineCount = std::max(m_dirtyLineCount, cursor.Y + 1);
     m_dirtyLineCount = std::max(m_dirtyLineCount, (int)windowRect.top());
+
+    // There will be at least one dirty line, because there is a cursor.
+    ASSERT(m_dirtyLineCount >= 1);
+
+    // The first line to scrape, in virtual line coordinates.
+    const int firstVirtLine = std::min(m_scrapedLineCount,
+                                       windowRect.top() + m_scrolledCount);
+
+    // Read all the data we will need from the console.  Start reading with the
+    // first line to scrape, but adjust the the read area upward to account for
+    // scanForDirtyLines' need to read the previous attribute.  Read to the
+    // bottom of the window.  (It's not clear to me whether the
+    // m_dirtyLineCount adjustment here is strictly necessary.  It isn't
+    // necessary so long as the cursor is inside the current window.)
+    const int firstReadLine = std::min(firstVirtLine - m_scrolledCount,
+                                       m_dirtyLineCount - 1);
+    const int stopReadLine = windowRect.top() + windowRect.height();
+    ASSERT(firstReadLine >= 0 && stopReadLine > firstReadLine);
+    largeConsoleRead(m_readBuffer,
+                     *m_console,
+                     SmallRect(0, firstReadLine,
+                               std::min<SHORT>(info.bufferSize().X,
+                                               MAX_CONSOLE_WIDTH),
+                               stopReadLine - firstReadLine));
+
     scanForDirtyLines(windowRect);
 
     // Note that it's possible for all the lines on the current window to
     // be non-dirty.
 
-    const int firstLine = std::min(m_scrapedLineCount,
-                                   windowRect.top() + m_scrolledCount);
-    const int stopLine = std::min(m_dirtyLineCount,
-                                  windowRect.top() + windowRect.height()) +
+    // The line to stop scraping at, in virtual line coordinates.
+    const int stopVirtLine = std::min(m_dirtyLineCount,
+                                      windowRect.top() + windowRect.height()) +
             m_scrolledCount;
 
     bool sawModifiedLine = false;
 
-    for (int line = firstLine; line < stopLine; ++line) {
-        CHAR_INFO curLine[MAX_CONSOLE_WIDTH];
-        const int w = windowRect.width();
-        ASSERT(w >= 1 && w <= MAX_CONSOLE_WIDTH);
-        m_console->read(SmallRect(0, line - m_scrolledCount, w, 1), curLine);
-
+    const int w = m_readBuffer.rect().width();
+    for (int line = firstVirtLine; line < stopVirtLine; ++line) {
+        const CHAR_INFO *curLine =
+            m_readBuffer.lineData(line - m_scrolledCount);
         ConsoleLine &bufLine = m_bufferData[line % BUFFER_LINE_COUNT];
         if (line > m_maxBufferedLine) {
             m_maxBufferedLine = line;
