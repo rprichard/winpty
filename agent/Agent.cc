@@ -23,12 +23,12 @@
 #include "ConsoleInput.h"
 #include "Terminal.h"
 #include "NamedPipe.h"
-#include "AgentAssert.h"
 #include "ConsoleFont.h"
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 #include "../shared/c99_snprintf.h"
+#include "../shared/WinptyAssert.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

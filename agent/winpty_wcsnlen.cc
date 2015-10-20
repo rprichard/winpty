@@ -1,6 +1,6 @@
 #include "winpty_wcsnlen.h"
 
-#include "AgentAssert.h"
+#include "../shared/WinptyAssert.h"
 
 // Workaround.  MinGW (from mingw.org) does not have wcsnlen.  MinGW-w64 *does*
 // have wcsnlen, but use this function for consistency.

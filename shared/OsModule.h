@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2012 Ryan Prichard
+// Copyright (c) 2015 Ryan Prichard
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -18,35 +18,29 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#include <stdio.h>
-#include <stdlib.h>
+#ifndef OS_MODULE_H
+#define OS_MODULE_H
 
-#include "Agent.h"
-#include "../shared/WinptyAssert.h"
+#include "WinptyAssert.h"
 
-static wchar_t *heapMbsToWcs(const char *text)
-{
-    size_t len = mbstowcs(NULL, text, 0);
-    ASSERT(len != (size_t)-1);
-    wchar_t *ret = new wchar_t[len + 1];
-    size_t len2 = mbstowcs(ret, text, len + 1);
-    ASSERT(len == len2);
-    return ret;
-}
-
-int main(int argc, char *argv[])
-{
-    if (argc != 5) {
-        fprintf(stderr,
-            "Usage: %s controlPipeName dataPipeName cols rows\n"
-            "(Note: This program is intended to be run by libwinpty.dll.)\n",
-            argv[0]);
-        return 1;
+class OsModule {
+    HMODULE m_module;
+public:
+    OsModule(const wchar_t *fileName) {
+        m_module = LoadLibraryW(fileName);
+        ASSERT(m_module != NULL);
     }
+    ~OsModule() {
+        FreeLibrary(m_module);
+    }
+    HMODULE handle() const { return m_module; }
+    FARPROC proc(const char *funcName) {
+        FARPROC ret = GetProcAddress(m_module, funcName);
+        if (ret == NULL) {
+            trace("GetProcAddress: %s is missing", funcName);
+        }
+        return ret;
+    }
+};
 
-    Agent agent(heapMbsToWcs(argv[1]),
-                heapMbsToWcs(argv[2]),
-                atoi(argv[3]),
-                atoi(argv[4]));
-    agent.run();
-}
+#endif // OS_MODULE_H

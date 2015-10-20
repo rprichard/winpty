@@ -27,7 +27,7 @@ OBJECTS = \
 	EventLoop.o \
 	NamedPipe.o \
 	Agent.o \
-	AgentAssert.o \
+	WinptyAssert.o \
 	Terminal.o \
 	Win32Console.o \
 	ConsoleInput.o \

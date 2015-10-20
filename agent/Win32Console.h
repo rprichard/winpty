@@ -21,10 +21,12 @@
 #ifndef WIN32CONSOLE_H
 #define WIN32CONSOLE_H
 
-#include <vector>
-#include <string>
-#include <wchar.h>
 #include <windows.h>
+#include <wchar.h>
+
+#include <string>
+#include <vector>
+
 #include "Coord.h"
 #include "SmallRect.h"
 

@@ -5,8 +5,8 @@
 
 #include <vector>
 
-#include "AgentAssert.h"
 #include "SmallRect.h"
+#include "../shared/WinptyAssert.h"
 
 class Win32Console;
 

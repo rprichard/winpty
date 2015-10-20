@@ -22,9 +22,11 @@
 #define TERMINAL_H
 
 #include <windows.h>
-#include "Coord.h"
+
 #include <string>
 #include <utility>
+
+#include "Coord.h"
 
 class NamedPipe;
 

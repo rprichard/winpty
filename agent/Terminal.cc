@@ -19,15 +19,17 @@
 // IN THE SOFTWARE.
 
 #include "Terminal.h"
-#include "AgentAssert.h"
-#include "NamedPipe.h"
-#include "UnicodeEncoding.h"
+
 #include <windows.h>
 #include <stdio.h>
 #include <string.h>
+
 #include <string>
 
+#include "NamedPipe.h"
+#include "UnicodeEncoding.h"
 #include "../shared/DebugClient.h"
+#include "../shared/WinptyAssert.h"
 
 #define CSI "\x1b["
 

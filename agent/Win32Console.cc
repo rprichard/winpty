@@ -19,11 +19,14 @@
 // IN THE SOFTWARE.
 
 #include "Win32Console.h"
-#include "AgentAssert.h"
-#include "../shared/DebugClient.h"
-#include <string>
-#include <wchar.h>
+
 #include <windows.h>
+#include <wchar.h>
+
+#include <string>
+
+#include "../shared/DebugClient.h"
+#include "../shared/WinptyAssert.h"
 
 Win32Console::Win32Console() : m_titleWorkBuf(16)
 {

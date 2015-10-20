@@ -30,7 +30,7 @@
 
 #include <algorithm>
 
-#include "AgentAssert.h"
+#include "../shared/WinptyAssert.h"
 
 static CHAR_INFO blankChar(WORD attributes)
 {

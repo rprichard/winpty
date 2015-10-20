@@ -18,11 +18,18 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef AGENTASSERT_H
-#define AGENTASSERT_H
+#include "WinptyAssert.h"
+#include "DebugClient.h"
+#include <stdlib.h>
 
-#define ASSERT(x) do { if (!(x)) assertFail(__FILE__, __LINE__, #x); } while(0)
+// Calling the standard assert() function does not work in the agent because
+// the error message would be printed to the console, and the only way the
+// user can see the console is via a working agent!  This custom assert
+// function instead sends the message to the DebugServer.
 
-void assertFail(const char *file, int line, const char *cond);
-
-#endif // AGENTASSERT_H
+void assertFail(const char *file, int line, const char *cond)
+{
+    trace("Assertion failed: %s, file %s, line %d",
+          cond, file, line);
+    abort();
+}
