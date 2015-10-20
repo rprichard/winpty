@@ -2,11 +2,11 @@
 
 #include <string.h>
 
-#include "HookAssert.h"
 #include "UnicodeConversions.h"
 #include "Util.h"
 
 #include <DebugClient.h>
+#include <WinptyAssert.h>
 
 namespace {
 
@@ -25,9 +25,8 @@ HANDLE spawn(const std::string &workerName, const SpawnParams &params) {
     const std::string cmdLine = "\"" + workerPath + "\" " + workerName;
     auto cmdLineWVec = wstrToWVector(widenString(cmdLine));
 
-    STARTUPINFOW sui;
-    memset(&sui, 0, sizeof(sui));
-    sui.cb = sizeof(sui);
+    auto sui = params.sui;
+    ASSERT(sui.cb == sizeof(sui));
 
     PROCESS_INFORMATION pi;
     memset(&pi, 0, sizeof(pi));

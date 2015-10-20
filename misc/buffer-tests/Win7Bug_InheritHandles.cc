@@ -9,7 +9,7 @@ int main() {
     auto cb = c.newBuffer(FALSE);
     cb.activate();
     cb.write("<-- cb -->");
-    c.dumpScreenBuffers(TRUE);
+    c.dumpConsoleHandles(TRUE);
 
     // Proposed fix: the agent somehow decides it should attach to this
     // particular child process.  Does that fix the problem?
@@ -20,7 +20,7 @@ int main() {
     // `CloseHandle`.
     p.detach();
     p.attach(c);
-    p.dumpScreenBuffers(TRUE);
+    p.dumpConsoleHandles(TRUE);
     auto pb = p.openConout();
 
     cb.close();

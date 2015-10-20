@@ -27,11 +27,12 @@ build/%.o : harness/%.cc
 COMMON_OBJECTS = \
 	build/DebugClient.o \
 	build/Event.o \
-	build/HookAssert.o \
+	build/NtHandleQuery.o \
 	build/ShmemParcel.o \
 	build/Spawn.o \
 	build/UnicodeConversions.o \
-	build/Util.o
+	build/Util.o \
+	build/WinptyAssert.o
 
 WORKER_OBJECTS = build/Worker.o
 TEST_OBJECTS = build/TestCommon.o

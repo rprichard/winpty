@@ -1,7 +1,7 @@
 #include "Util.h"
 
-#include "HookAssert.h"
 #include "UnicodeConversions.h"
+#include <WinptyAssert.h>
 
 std::string pathDirName(const std::string &path)
 {

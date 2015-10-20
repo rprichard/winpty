@@ -1,10 +1,9 @@
 #include "TestCommon.h"
 
-#include <assert.h>
-
 #include <string>
 
 #include <DebugClient.h>
+#include <WinptyAssert.h>
 
 Handle Handle::dup(HANDLE h, Worker &target, BOOL bInheritHandle) {
     HANDLE targetHandle;
@@ -18,14 +17,15 @@ Handle Handle::dup(HANDLE h, Worker &target, BOOL bInheritHandle) {
     return Handle(targetHandle, target);
 }
 
-void Handle::activate() {
+Handle &Handle::activate() {
     worker().cmd().handle = m_value;
     worker().rpc(Command::SetActiveBuffer);
+    return *this;
 }
 
 void Handle::write(const std::string &msg) {
     worker().cmd().handle = m_value;
-    worker().cmd().writeText = msg;
+    worker().cmd().u.writeText = msg;
     worker().rpc(Command::WriteText);
 }
 
@@ -60,13 +60,13 @@ Handle Handle::dup(Worker &target, BOOL bInheritHandle) {
     } else {
         // Allow the source worker to see the target worker.
         targetProcessFromSource = INVALID_HANDLE_VALUE;
-        BOOL ret = DuplicateHandle(
+        BOOL success = DuplicateHandle(
             GetCurrentProcess(),
             target.m_process,
             worker().m_process,
             &targetProcessFromSource,
             0, FALSE, DUPLICATE_SAME_ACCESS);
-        ASSERT(ret && "Process handle duplication failed");
+        ASSERT(success && "Process handle duplication failed");
     }
 
     // Do the user-level duplication in the source process.
@@ -74,22 +74,103 @@ Handle Handle::dup(Worker &target, BOOL bInheritHandle) {
     worker().cmd().targetProcess = targetProcessFromSource;
     worker().cmd().bInheritHandle = bInheritHandle;
     worker().rpc(Command::Duplicate);
+    HANDLE retHandle = worker().cmd().handle;
 
     if (&target != &worker()) {
         // Cleanup targetProcessFromSource.
         worker().cmd().handle = targetProcessFromSource;
-        worker().rpc(Command::Close);
-        ASSERT(worker().cmd().success);
+        worker().rpc(Command::CloseQuietly);
+        ASSERT(worker().cmd().success &&
+            "Error closing remote process handle");
     }
 
-    return Handle(worker().cmd().handle, target);
+    return Handle(retHandle, target);
 }
 
 CONSOLE_SCREEN_BUFFER_INFO Handle::screenBufferInfo() {
+    CONSOLE_SCREEN_BUFFER_INFO ret;
+    bool success = tryScreenBufferInfo(&ret);
+    ASSERT(success && "GetConsoleScreenBufferInfo failed");
+    return ret;
+}
+
+bool Handle::tryScreenBufferInfo(CONSOLE_SCREEN_BUFFER_INFO *info) {
     worker().cmd().handle = m_value;
     worker().rpc(Command::GetConsoleScreenBufferInfo);
+    if (worker().cmd().success && info != nullptr) {
+        *info = worker().cmd().u.consoleScreenBufferInfo;
+    }
+    return worker().cmd().success;
+}
+
+DWORD Handle::flags() {
+    DWORD ret;
+    bool success = tryFlags(&ret);
+    ASSERT(success && "GetHandleInformation failed");
+    return ret;
+}
+
+bool Handle::tryFlags(DWORD *flags) {
+    worker().cmd().handle = m_value;
+    worker().rpc(Command::GetHandleInformation);
+    if (worker().cmd().success && flags != nullptr) {
+        *flags = worker().cmd().dword;
+    }
+    return worker().cmd().success;
+}
+
+void Handle::setFlags(DWORD mask, DWORD flags) {
+    bool success = trySetFlags(mask, flags);
+    ASSERT(success && "SetHandleInformation failed");
+}
+
+bool Handle::trySetFlags(DWORD mask, DWORD flags) {
+    worker().cmd().handle = m_value;
+    worker().cmd().u.setFlags.mask = mask;
+    worker().cmd().u.setFlags.flags = flags;
+    worker().rpc(Command::SetHandleInformation);
+    return worker().cmd().success;
+}
+
+wchar_t Handle::firstChar() {
+    // The "first char" is useful for identifying which output buffer a handle
+    // refers to.
+    worker().cmd().handle = m_value;
+    const SMALL_RECT region = {};
+    auto &io = worker().cmd().u.consoleIo;
+    io.bufferSize = { 1, 1 };
+    io.bufferCoord = {};
+    io.ioRegion = region;
+    worker().rpc(Command::ReadConsoleOutput);
     ASSERT(worker().cmd().success);
-    return worker().cmd().consoleScreenBufferInfo;
+    ASSERT(!memcmp(&io.ioRegion, &region, sizeof(region)));
+    return io.buffer[0].Char.UnicodeChar;
+}
+
+Handle &Handle::setFirstChar(wchar_t ch) {
+    // The "first char" is useful for identifying which output buffer a handle
+    // refers to.
+    worker().cmd().handle = m_value;
+    const SMALL_RECT region = {};
+    auto &io = worker().cmd().u.consoleIo;
+    io.buffer[0].Char.UnicodeChar = ch;
+    io.buffer[0].Attributes = 7;
+    io.bufferSize = { 1, 1 };
+    io.bufferCoord = {};
+    io.ioRegion = region;
+    worker().rpc(Command::WriteConsoleOutput);
+    ASSERT(worker().cmd().success);
+    ASSERT(!memcmp(&io.ioRegion, &region, sizeof(region)));
+    return *this;
+}
+
+bool Handle::tryNumberOfConsoleInputEvents(DWORD *ret) {
+    worker().cmd().handle = m_value;
+    worker().rpc(Command::GetNumberOfConsoleInputEvents);
+    if (worker().cmd().success && ret != nullptr) {
+        *ret = worker().cmd().dword;
+    }
+    return worker().cmd().success;
 }
 
 static std::string timeString() {
@@ -121,12 +202,15 @@ Worker::Worker(const std::string &name) :
 Worker::Worker(SpawnParams params) : Worker(newWorkerName()) {
     params.dwCreationFlags |= CREATE_NEW_CONSOLE;
     m_process = spawn(m_name, params);
+    // Perform an RPC just to ensure that the worker process is ready, and
+    // the console exists, before returning.
+    rpc(Command::GetStdin);
 }
 
 Worker Worker::child(const SpawnParams &params) {
     Worker ret(newWorkerName());
-    cmd().spawnName = ret.m_name;
-    cmd().spawnParams = params;
+    cmd().u.spawn.spawnName = ret.m_name;
+    cmd().u.spawn.spawnParams = params;
     rpc(Command::SpawnChild);
     BOOL dupSuccess = DuplicateHandle(
         m_process,
@@ -134,31 +218,50 @@ Worker Worker::child(const SpawnParams &params) {
         GetCurrentProcess(),
         &ret.m_process,
         0, FALSE, DUPLICATE_SAME_ACCESS);
-    ASSERT(dupSuccess && "DuplicateHandle failed");
-    rpc(Command::Close);
+    ASSERT(dupSuccess && "Worker::child: DuplicateHandle failed");
+    rpc(Command::CloseQuietly);
+    ASSERT(cmd().success && "Worker::child: CloseHandle failed");
+    // Perform an RPC just to ensure that the worker process is ready, and
+    // the console exists, before returning.
+    ret.rpc(Command::GetStdin);
     return ret;
 }
 
 Worker::~Worker() {
-    if (!m_moved) {
+    cleanup();
+}
+
+void Worker::cleanup() {
+    if (m_valid) {
         cmd().dword = 0;
         rpcAsync(Command::Exit);
         DWORD result = WaitForSingleObject(m_process, INFINITE);
         ASSERT(result == WAIT_OBJECT_0 &&
             "WaitForSingleObject failed while killing worker");
         CloseHandle(m_process);
+        m_valid = false;
     }
 }
 
 CONSOLE_SELECTION_INFO Worker::selectionInfo() {
     rpc(Command::GetConsoleSelectionInfo);
     ASSERT(cmd().success);
-    return cmd().consoleSelectionInfo;
+    return cmd().u.consoleSelectionInfo;
 }
 
-void Worker::dumpScreenBuffers(BOOL writeToEach) {
+void Worker::dumpConsoleHandles(BOOL writeToEach) {
     cmd().writeToEach = writeToEach;
-    rpc(Command::DumpScreenBuffers);
+    rpc(Command::DumpConsoleHandles);
+}
+
+std::vector<Handle> Worker::scanForConsoleHandles() {
+    rpc(Command::ScanForConsoleHandles);
+    auto &rpcTable = cmd().u.scanForConsoleHandles;
+    std::vector<Handle> ret;
+    for (int i = 0; i < rpcTable.count; ++i) {
+        ret.push_back(Handle(rpcTable.table[i], *this));
+    }
+    return ret;
 }
 
 void Worker::rpc(Command::Kind kind) {

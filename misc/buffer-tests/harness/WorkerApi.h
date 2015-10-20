@@ -3,45 +3,73 @@
 #include "FixedSizeString.h"
 #include "Spawn.h"
 
+#include <array>
+
 struct Command {
     enum Kind {
         AllocConsole,
         AttachConsole,
         Close,
-        DumpHandles,
-        DumpScreenBuffers,
+        CloseQuietly,
+        DumpConsoleHandles,
+        DumpStandardHandles,
         Duplicate,
         Exit,
         FreeConsole,
         GetConsoleScreenBufferInfo,
         GetConsoleSelectionInfo,
         GetConsoleWindow,
+        GetHandleInformation,
+        GetNumberOfConsoleInputEvents,
         GetStdin,
         GetStderr,
         GetStdout,
         NewBuffer,
-        OpenConOut,
+        OpenConin,
+        OpenConout,
+        ReadConsoleOutput,
+        ScanForConsoleHandles,
+        SetHandleInformation,
         SetStdin,
         SetStderr,
         SetStdout,
         SetActiveBuffer,
         SpawnChild,
         System,
+        WriteConsoleOutput,
         WriteText,
     };
 
     Kind kind;
     HANDLE handle;
     HANDLE targetProcess;
-    FixedSizeString<128> spawnName;
-    SpawnParams spawnParams;
-    FixedSizeString<1024> writeText;
-    FixedSizeString<1024> systemText;
     DWORD dword;
     BOOL success;
     BOOL bInheritHandle;
     BOOL writeToEach;
-    CONSOLE_SCREEN_BUFFER_INFO consoleScreenBufferInfo;
-    CONSOLE_SELECTION_INFO consoleSelectionInfo;
     HWND hwnd;
+    union {
+        CONSOLE_SCREEN_BUFFER_INFO consoleScreenBufferInfo;
+        CONSOLE_SELECTION_INFO consoleSelectionInfo;
+        struct {
+            FixedSizeString<128> spawnName;
+            SpawnParams spawnParams;
+        } spawn;
+        FixedSizeString<1024> writeText;
+        FixedSizeString<1024> systemText;
+        struct {
+            DWORD mask;
+            DWORD flags;
+        } setFlags;
+        struct {
+            int count;
+            std::array<HANDLE, 1024> table;
+        } scanForConsoleHandles;
+        struct {
+            std::array<CHAR_INFO, 1024> buffer;
+            COORD bufferSize;
+            COORD bufferCoord;
+            SMALL_RECT ioRegion;
+        } consoleIo;
+    } u;
 };

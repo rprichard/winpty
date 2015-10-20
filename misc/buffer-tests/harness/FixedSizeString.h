@@ -4,7 +4,7 @@
 #include <cstring>
 #include <string>
 
-#include "HookAssert.h"
+#include <WinptyAssert.h>
 
 template <size_t N>
 struct FixedSizeString {

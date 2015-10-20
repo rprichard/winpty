@@ -1,7 +1,7 @@
 #include "Event.h"
 
-#include "HookAssert.h"
 #include "UnicodeConversions.h"
+#include <WinptyAssert.h>
 
 Event::Event(const std::string &name) {
     // Create manual-reset, not signaled initially.

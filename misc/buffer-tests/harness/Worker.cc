@@ -17,19 +17,19 @@ static const char *successOrFail(BOOL ret) {
     return ret ? "ok" : "FAILED";
 }
 
-static HANDLE openConout(BOOL bInheritHandle) {
+static HANDLE openConHandle(const wchar_t *name, BOOL bInheritHandle) {
     // If sa isn't provided, the handle defaults to not-inheritable.
     SECURITY_ATTRIBUTES sa = {0};
     sa.nLength = sizeof(sa);
     sa.bInheritHandle = bInheritHandle;
 
-    trace("%sOpening CONOUT...", g_prefix);
-    HANDLE conout = CreateFileW(L"CONOUT$",
+    trace("%sOpening %ls...", g_prefix, name);
+    HANDLE conout = CreateFileW(name,
                 GENERIC_READ | GENERIC_WRITE,
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
                 &sa,
                 OPEN_EXISTING, 0, NULL);
-    trace("%sOpening CONOUT... 0x%I64x", g_prefix, (int64_t)conout);
+    trace("%sOpening %ls... 0x%I64x", g_prefix, name, (int64_t)conout);
     return conout;
 }
 
@@ -71,14 +71,14 @@ static void setConsoleActiveScreenBuffer(HANDLE conout) {
         successOrFail(SetConsoleActiveScreenBuffer(conout)));
 }
 
-static void dumpHandles() {
+static void dumpStandardHandles() {
     trace("stdin=0x%I64x stdout=0x%I64x stderr=0x%I64x",
         (int64_t)GetStdHandle(STD_INPUT_HANDLE),
         (int64_t)GetStdHandle(STD_OUTPUT_HANDLE),
         (int64_t)GetStdHandle(STD_ERROR_HANDLE));
 }
 
-static std::vector<HANDLE> scanForScreenBuffers() {
+static std::vector<HANDLE> scanForConsoleHandles() {
     std::vector<HANDLE> ret;
     OSVERSIONINFO verinfo = {0};
     verinfo.dwOSVersionInfoSize = sizeof(verinfo);
@@ -86,22 +86,73 @@ static std::vector<HANDLE> scanForScreenBuffers() {
     ASSERT(success && "GetVersionEx failed");
     uint64_t version =
         ((uint64_t)verinfo.dwMajorVersion << 32) | verinfo.dwMinorVersion;
-    CONSOLE_SCREEN_BUFFER_INFO info;
+    DWORD mode;
     if (version >= 0x600000002) {
-        // As of Windows 8, console screen buffers are real kernel handles.
+        // As of Windows 8, console handles are real kernel handles.
         for (unsigned int h = 0x4; h <= 0x1000; h += 4) {
-            if (GetConsoleScreenBufferInfo((HANDLE)h, &info)) {
+            if (GetConsoleMode((HANDLE)h, &mode)) {
                 ret.push_back((HANDLE)h);
             }
         }
     } else {
-        for (unsigned int h = 0x1; h <= 0xfff; h += 1) {
-            if (GetConsoleScreenBufferInfo((HANDLE)h, &info)) {
+        for (unsigned int h = 0x3; h < 0x3 + 100 * 4; h += 4) {
+            if (GetConsoleMode((HANDLE)h, &mode)) {
                 ret.push_back((HANDLE)h);
             }
         }
     }
     return ret;
+}
+
+static void dumpConsoleHandles(bool writeToEach) {
+    std::string dumpLine = "";
+    for (HANDLE h : scanForConsoleHandles()) {
+        char buf[32];
+        sprintf(buf, "0x%I64x", (int64_t)h);
+        dumpLine += buf;
+        dumpLine.push_back('(');
+        CONSOLE_SCREEN_BUFFER_INFO info;
+        bool is_output = false;
+        DWORD count;
+        if (GetNumberOfConsoleInputEvents(h, &count)) {
+            dumpLine.push_back('I');
+        }
+        if (GetConsoleScreenBufferInfo(h, &info)) {
+            is_output = true;
+            dumpLine.push_back('O');
+            CHAR_INFO charInfo;
+            SMALL_RECT readRegion = {};
+            if (ReadConsoleOutputW(h, &charInfo, {1,1}, {0,0}, &readRegion)) {
+                wchar_t ch = charInfo.Char.UnicodeChar;
+                if (ch != L' ') {
+                    dumpLine.push_back((char)ch);
+                }
+            }
+        }
+        {
+            DWORD flags = 0;
+            if (GetHandleInformation(h, &flags)) {
+                dumpLine.push_back((flags & HANDLE_FLAG_INHERIT) ? '^' : '_');
+            }
+        }
+        dumpLine += ") ";
+        if (writeToEach && is_output) {
+            char msg[256];
+            sprintf(msg, "%d: Writing to 0x%I64x",
+                (int)GetCurrentProcessId(), (int64_t)h);
+            writeTest(h, msg);
+        }
+    }
+    trace("Valid console handles:%s", dumpLine.c_str());
+}
+
+template <typename T>
+void handleConsoleIoCommand(Command &cmd, T func) {
+    const auto sz = cmd.u.consoleIo.bufferSize;
+    ASSERT(static_cast<size_t>(sz.X) * sz.Y <= cmd.u.consoleIo.buffer.size());
+    cmd.success = func(cmd.handle, cmd.u.consoleIo.buffer.data(),
+        cmd.u.consoleIo.bufferSize, cmd.u.consoleIo.bufferCoord,
+        &cmd.u.consoleIo.ioRegion);
 }
 
 int main(int argc, char *argv[]) {
@@ -112,7 +163,7 @@ int main(int argc, char *argv[]) {
     Event finishEvent(workerName + "-finish");
     Command &cmd = parcel.value();
 
-    dumpHandles();
+    dumpStandardHandles();
 
     while (true) {
         startEvent.wait();
@@ -138,30 +189,15 @@ int main(int argc, char *argv[]) {
                 trace("closing 0x%I64x... %s",
                     (int64_t)cmd.handle, successOrFail(cmd.success));
                 break;
-            case Command::DumpHandles:
-                dumpHandles();
+            case Command::CloseQuietly:
+                cmd.success = CloseHandle(cmd.handle);
                 break;
-            case Command::DumpScreenBuffers: {
-                std::string dumpLine = "";
-                for (HANDLE h : scanForScreenBuffers()) {
-                    char buf[32];
-                    const char *inherit = "";
-                    DWORD flags;
-                    if (GetHandleInformation(h, &flags)) {
-                        inherit = (flags & HANDLE_FLAG_INHERIT) ? "(I)" : "(N)";
-                    }
-                    sprintf(buf, "0x%I64x%s", (int64_t)h, inherit);
-                    dumpLine += std::string(" ") + buf;
-                    if (cmd.writeToEach) {
-                        char msg[256];
-                        sprintf(msg, "%d: Writing to 0x%I64x",
-                            (int)GetCurrentProcessId(), (int64_t)h);
-                        writeTest((HANDLE)h, msg);
-                    }
-                }
-                trace("Valid screen buffers:%s", dumpLine.c_str());
+            case Command::DumpStandardHandles:
+                dumpStandardHandles();
                 break;
-            }
+            case Command::DumpConsoleHandles:
+                dumpConsoleHandles(cmd.writeToEach);
+                break;
             case Command::Duplicate: {
                 HANDLE sourceHandle = cmd.handle;
                 cmd.success = DuplicateHandle(
@@ -189,17 +225,23 @@ int main(int argc, char *argv[]) {
                 cmd.success = FreeConsole();
                 trace("Calling FreeConsole... %s", successOrFail(cmd.success));
                 break;
+            case Command::GetHandleInformation:
+                cmd.success = GetHandleInformation(cmd.handle, &cmd.dword);
+                break;
             case Command::GetConsoleScreenBufferInfo:
-                memset(&cmd.consoleScreenBufferInfo, 0, sizeof(cmd.consoleScreenBufferInfo));
+                cmd.u.consoleScreenBufferInfo = {};
                 cmd.success = GetConsoleScreenBufferInfo(
-                    cmd.handle, &cmd.consoleScreenBufferInfo);
+                    cmd.handle, &cmd.u.consoleScreenBufferInfo);
                 break;
             case Command::GetConsoleSelectionInfo:
-                memset(&cmd.consoleSelectionInfo, 0, sizeof(cmd.consoleSelectionInfo));
-                cmd.success = GetConsoleSelectionInfo(&cmd.consoleSelectionInfo);
+                cmd.u.consoleSelectionInfo = {};
+                cmd.success = GetConsoleSelectionInfo(&cmd.u.consoleSelectionInfo);
                 break;
             case Command::GetConsoleWindow:
                 cmd.hwnd = GetConsoleWindow();
+                break;
+            case Command::GetNumberOfConsoleInputEvents:
+                cmd.success = GetNumberOfConsoleInputEvents(cmd.handle, &cmd.dword);
                 break;
             case Command::GetStdin:
                 cmd.handle = GetStdHandle(STD_INPUT_HANDLE);
@@ -213,8 +255,26 @@ int main(int argc, char *argv[]) {
             case Command::NewBuffer:
                 cmd.handle = createBuffer(cmd.bInheritHandle);
                 break;
-            case Command::OpenConOut:
-                cmd.handle = openConout(cmd.bInheritHandle);
+            case Command::OpenConin:
+                cmd.handle = openConHandle(L"CONIN$", cmd.bInheritHandle);
+                break;
+            case Command::OpenConout:
+                cmd.handle = openConHandle(L"CONOUT$", cmd.bInheritHandle);
+                break;
+            case Command::ReadConsoleOutput:
+                handleConsoleIoCommand(cmd, ReadConsoleOutputW);
+                break;
+            case Command::ScanForConsoleHandles: {
+                auto ret = scanForConsoleHandles();
+                ASSERT(ret.size() <= cmd.u.scanForConsoleHandles.table.size());
+                cmd.u.scanForConsoleHandles.count = ret.size();
+                std::copy(ret.begin(), ret.end(),
+                          cmd.u.scanForConsoleHandles.table.begin());
+                break;
+            }
+            case Command::SetHandleInformation:
+                cmd.success = SetHandleInformation(
+                    cmd.handle, cmd.u.setFlags.mask, cmd.u.setFlags.flags);
                 break;
             case Command::SetStdin:
                 SetStdHandle(STD_INPUT_HANDLE, cmd.handle);
@@ -233,15 +293,19 @@ int main(int argc, char *argv[]) {
                 break;
             case Command::SpawnChild:
                 trace("Spawning child...");
-                cmd.handle = spawn(cmd.spawnName.str(), cmd.spawnParams);
+                cmd.handle = spawn(cmd.u.spawn.spawnName.str(),
+                                   cmd.u.spawn.spawnParams);
                 trace("Spawning child... pid %u",
                     (unsigned int)GetProcessId(cmd.handle));
                 break;
             case Command::System:
-                cmd.dword = system(cmd.systemText.c_str());
+                cmd.dword = system(cmd.u.systemText.c_str());
+                break;
+            case Command::WriteConsoleOutput:
+                handleConsoleIoCommand(cmd, WriteConsoleOutputW);
                 break;
             case Command::WriteText:
-                writeTest(cmd.handle, cmd.writeText.c_str());
+                writeTest(cmd.handle, cmd.u.writeText.c_str());
                 break;
         }
         finishEvent.set();

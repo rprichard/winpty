@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "HookAssert.h"
+#include <WinptyAssert.h>
 
 std::string narrowString(const std::wstring &input)
 {

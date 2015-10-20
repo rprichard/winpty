@@ -1,8 +1,8 @@
 #include "ShmemParcel.h"
 
-#include "HookAssert.h"
 #include "UnicodeConversions.h"
 #include <DebugClient.h>
+#include <WinptyAssert.h>
 
 ShmemParcel::ShmemParcel(
     const std::string &name,
