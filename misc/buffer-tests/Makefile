@@ -51,7 +51,7 @@ COMMON_OBJECTS = \
 	build/winpty_wcsnlen.o
 
 WORKER_OBJECTS = build/WorkerProgram.o
-TEST_OBJECTS = build/TestCommon.o
+TEST_OBJECTS = build/RemoteHandle.o build/RemoteWorker.o
 
 all : \
 	build/Test_GetConsoleTitleW.exe \

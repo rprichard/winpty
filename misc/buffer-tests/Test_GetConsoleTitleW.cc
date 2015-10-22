@@ -6,15 +6,7 @@
 //  * Windows 8 and up (at least to Windows 10)
 //
 
-#include <cstdlib>
-#include <cstring>
-#include <cwchar>
-#include <iostream>
-
-#include <OsVersion.h>
 #include <TestCommon.h>
-#include <UnicodeConversions.h>
-#include <winpty_wcsnlen.h>
 
 #define CHECK_EQ(actual, expected) \
     do {                                                        \

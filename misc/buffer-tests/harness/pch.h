@@ -8,11 +8,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <cwchar>
+#include <iostream>
 #include <string>
 #include <tuple>
 #include <utility>

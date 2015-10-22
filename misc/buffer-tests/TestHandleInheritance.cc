@@ -4,13 +4,7 @@
 // Windows 10, inclusive.
 //
 
-#include <cassert>
-#include <iostream>
-#include <tuple>
-#include <vector>
-
 #include <TestCommon.h>
-#include <OsVersion.h>
 
 #define CHECK(cond) \
     do { \
