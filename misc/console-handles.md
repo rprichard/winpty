@@ -153,6 +153,32 @@ with `SetActiveConsoleScreenBuffer` does not increment a refcount on the
 buffer.  If the active buffer's refcount hits zero, then Windows chooses
 another buffer and activates it.
 
+### `CREATE_NO_WINDOW` process creation flag
+
+The documentation for `CREATE_NO_WINDOW` is confusing:
+
+>  The process is a console application that is being run without a
+>  console window. Therefore, the console handle for the application is
+>  not set.
+>
+>  This flag is ignored if the application is not a console application,
+>  or if it is used with either `CREATE_NEW_CONSOLE` or `DETACHED_PROCESS`.
+
+Here's what's evident from examining the OS behavior:
+
+ * Specifying both `CREATE_NEW_CONSOLE` and `DETACHED_PROCESS` causes the
+   `CreateProcess` call to fail.
+
+ * If `CREATE_NO_WINDOW` is specified together with `CREATE_NEW_CONSOLE` or
+   `DETACHED_PROCESS`, it is quietly ignored, just as documented.
+
+ * Otherwise, `CreateProcess` behaves the same way with `CREATE_NO_WINDOW` as
+   it does with `CREATE_NEW_CONSOLE`, except that the new console either has
+   a hidden window (before Windows 7) or has no window at all (Windows 7
+   and later).  These situations can be distinguished using the
+   `GetConsoleWindow` and `IsWindowVisible` calls.  `GetConsoleWindow` returns
+   `NULL` starting with Windows 7.
+
 ### Windows Vista BSOD
 
 It is easy to cause a BSOD on Vista and Server 2008 by (1) closing all handles
