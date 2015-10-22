@@ -74,7 +74,7 @@ int main() {
             // Set the title and read it back.
             w.setTitle(narrowString(inputStr));
             readBuf = kJunk;
-            const DWORD retVal = w.getTitleInternal(readBuf, readLen);
+            const DWORD retVal = w.titleInternal(readBuf, readLen);
 
             if (readLen == 0) {
                 // When passing a buffer size 0, the API returns 0 and leaves

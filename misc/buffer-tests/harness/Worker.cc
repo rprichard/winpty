@@ -226,6 +226,10 @@ int main(int argc, char *argv[]) {
                 cmd.success = FreeConsole();
                 trace("Calling FreeConsole... %s", successOrFail(cmd.success));
                 break;
+            case Command::GetConsoleProcessList:
+                cmd.dword = GetConsoleProcessList(cmd.u.processList.data(),
+                                                  cmd.u.processList.size());
+                break;
             case Command::GetConsoleScreenBufferInfo:
                 cmd.u.consoleScreenBufferInfo = {};
                 cmd.success = GetConsoleScreenBufferInfo(

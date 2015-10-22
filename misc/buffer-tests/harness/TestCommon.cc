@@ -273,12 +273,31 @@ bool Worker::setTitleInternal(const std::wstring &wstr) {
     return cmd().success;
 }
 
-DWORD Worker::getTitleInternal(std::array<wchar_t, 1024> &buf, DWORD bufSize) {
+std::string Worker::title() {
+    std::array<wchar_t, 1024> buf;
+    DWORD ret = titleInternal(buf, buf.size());
+    ret = std::min<DWORD>(ret, buf.size() - 1);
+    buf[std::min<size_t>(buf.size() - 1, ret)] = L'\0';
+    return narrowString(std::wstring(buf.data()));
+}
+
+// This API is more low-level than typical, because GetConsoleTitleW is buggy
+// in older versions of Windows, and this method is used to test the bugs.
+DWORD Worker::titleInternal(std::array<wchar_t, 1024> &buf, DWORD bufSize) {
     cmd().dword = bufSize;
     cmd().u.consoleTitle = buf;
     rpc(Command::GetConsoleTitle);
     buf = cmd().u.consoleTitle;
     return cmd().dword;
+}
+
+std::vector<DWORD> Worker::consoleProcessList() {
+    rpc(Command::GetConsoleProcessList);
+    DWORD count = cmd().dword;
+    ASSERT(count <= cmd().u.processList.size());
+    return std::vector<DWORD>(
+        &cmd().u.processList[0],
+        &cmd().u.processList[count]);
 }
 
 void Worker::rpc(Command::Kind kind) {

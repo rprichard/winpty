@@ -16,6 +16,7 @@ struct Command {
         Duplicate,
         Exit,
         FreeConsole,
+        GetConsoleProcessList,
         GetConsoleScreenBufferInfo,
         GetConsoleSelectionInfo,
         GetConsoleTitle,
@@ -60,6 +61,7 @@ struct Command {
         FixedSizeString<1024> writeText;
         FixedSizeString<1024> systemText;
         std::array<wchar_t, 1024> consoleTitle;
+        std::array<DWORD, 1024> processList;
         struct {
             DWORD mask;
             DWORD flags;

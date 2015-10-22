@@ -108,7 +108,9 @@ public:
     std::vector<Handle> scanForConsoleHandles();
     void setTitle(const std::string &str)       { auto b = setTitleInternal(widenString(str)); ASSERT(b && "setTitle failed"); }
     bool setTitleInternal(const std::wstring &str);
-    DWORD getTitleInternal(std::array<wchar_t, 1024> &buf, DWORD bufSize);
+    std::string title();
+    DWORD titleInternal(std::array<wchar_t, 1024> &buf, DWORD bufSize);
+    std::vector<DWORD> consoleProcessList();
 
     Handle openConin(BOOL bInheritHandle=FALSE) {
         cmd().bInheritHandle = bInheritHandle;
