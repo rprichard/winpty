@@ -204,10 +204,7 @@ static void Test_CreateNoWindow() {
     // Open some handles to demonstrate the "clean slate" outcome.
     p.getStdin().dup(TRUE).setStdin();
     p.newBuffer(TRUE).setStderr().dup(TRUE).setStdout().activate();
-    SpawnParams sp;
-    sp.bInheritHandles = TRUE;
-    sp.dwCreationFlags |= CREATE_NO_WINDOW;
-    auto c = p.child(sp);
+    auto c = p.child({ true, CREATE_NO_WINDOW });
     c.dumpConsoleHandles();
     // Verify a blank slate.
     auto handles = c.scanForConsoleHandles();
@@ -263,10 +260,7 @@ static void Test_NewConsole_Resets_Everything() {
     };
 
     // A child with a new console is reset to a blank slate.
-    SpawnParams sp;
-    sp.bInheritHandles = TRUE;
-    sp.dwCreationFlags |= CREATE_NEW_CONSOLE;
-    auto c = p.child(sp);
+    auto c = p.child({ true, CREATE_NEW_CONSOLE });
     checkClean(c);
 
     // Similarly, detaching and allocating a new console resets everything.
@@ -285,10 +279,7 @@ static void Test_DetachedProcess() {
     p.getStdout().dup(TRUE).setStdout();
     p.getStderr().dup(TRUE).setStderr();
 
-    SpawnParams sp;
-    sp.bInheritHandles = TRUE;
-    sp.dwCreationFlags |= DETACHED_PROCESS;
-    auto c = p.child(sp);
+    auto c = p.child({ true, DETACHED_PROCESS });
 
     CHECK(c.getStdin().uvalue() == 0);
     CHECK(c.getStdout().uvalue() == 0);
@@ -300,9 +291,7 @@ static void Test_DetachedProcess() {
 
     // Verify that we have a blank slate even with an implicit console
     // creation.
-    sp = SpawnParams();
-    sp.bInheritHandles = TRUE;
-    auto c2 = c.child(sp);
+    auto c2 = c.child({ true });
     auto c2h = c2.scanForConsoleHandles();
     CHECK(handleValues(c2h) == (std::vector<HANDLE> {
         c2.getStdin().value(),
@@ -327,10 +316,8 @@ static void Test_Creation_bInheritHandles_Flag() {
         h.dup(FALSE);
         h.dup(TRUE);
     }
-    SpawnParams spY; spY.bInheritHandles = FALSE;
-    SpawnParams spN; spN.bInheritHandles = TRUE;
-    auto cY = p.child(spY);
-    auto cN = p.child(spN);
+    auto cY = p.child({ true });
+    auto cN = p.child({ false });
     CHECK(handleValues(cY.scanForConsoleHandles()) ==
           handleValues(cN.scanForConsoleHandles()));
 }
@@ -385,9 +372,7 @@ static void Test_InheritNothing() {
     conout.setStdout().dup().setStderr();
     p.dumpConsoleHandles();
 
-    SpawnParams sp;
-    sp.bInheritHandles = TRUE;
-    auto c = p.child(sp);
+    auto c = p.child({ true });
     // The child has no open console handles.
     CHECK(c.scanForConsoleHandles().empty());
     c.dumpConsoleHandles();
@@ -454,11 +439,9 @@ static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     conout1.setStdout();
     conout2.setStderr();
 
-    SpawnParams sp;
-    sp.bInheritHandles = TRUE;
-    auto c = p.child(sp);
+    auto c = p.child({ true });
 
-    auto c2 = c.child(sp);
+    auto c2 = c.child({ true });
     c2.detach();
     c2.attach(c);
 

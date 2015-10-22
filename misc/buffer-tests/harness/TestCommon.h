@@ -57,10 +57,10 @@ class Worker {
 private:
     Worker(const std::string &name);
 public:
-    Worker() : Worker(SpawnParams {}) {}
+    Worker() : Worker(SpawnParams { false, CREATE_NEW_CONSOLE }) {}
     Worker(SpawnParams params);
     Worker child() { return child(SpawnParams {}); }
-    Worker child(const SpawnParams &params);
+    Worker child(SpawnParams params);
     ~Worker();
 private:
     void cleanup();

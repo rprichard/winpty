@@ -201,14 +201,13 @@ Worker::Worker(const std::string &name) :
 }
 
 Worker::Worker(SpawnParams params) : Worker(newWorkerName()) {
-    params.dwCreationFlags |= CREATE_NEW_CONSOLE;
     m_process = spawn(m_name, params);
     // Perform an RPC just to ensure that the worker process is ready, and
     // the console exists, before returning.
     rpc(Command::GetStdin);
 }
 
-Worker Worker::child(const SpawnParams &params) {
+Worker Worker::child(SpawnParams params) {
     Worker ret(newWorkerName());
     cmd().u.spawn.spawnName = ret.m_name;
     cmd().u.spawn.spawnParams = params;
