@@ -287,6 +287,8 @@ static void Test_DetachedProcess() {
     CHECK(c.scanForConsoleHandles().empty());
     CHECK(c.consoleWindow() == NULL);
 
+    // XXX: With bInheritHandles=TRUE and DETACHED_PROCESS, are the standard handles always reset?
+    //  - There are multiple cases to consider.  i.e. Omitting STARTF_USESTDHANDLES vs specifying it.
     // XXX: What do GetConsoleCP and GetConsoleOutputCP do when no console is attached?
 
     // Verify that we have a blank slate even with an implicit console
