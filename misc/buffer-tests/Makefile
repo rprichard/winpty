@@ -1,7 +1,11 @@
 include ../../config-mingw.mk
 
-CFLAGS += -MMD -Wall -Iharness -I../../shared
-CXXFLAGS += -MMD -Wall -std=c++11 -Iharness -I../../shared
+# Pass -Wno-format to disable format checking because gcc complains about
+# %I64x.  I can't use %lld because it's broken on MinGW-on-WinXP, though it
+# works on later OSs.  %I64x works everywhere with MinGW, at runtime.  I
+# need to find a better way to do this int-to-string conversion.
+CFLAGS +=   -MMD -Wall  -Iharness -I../../shared
+CXXFLAGS += -MMD -Wall  -Iharness -I../../shared -std=c++11 -Wno-format
 LDFLAGS += -static -static-libgcc -static-libstdc++
 
 # Use gmake -n to see the command-lines gmake would run.
