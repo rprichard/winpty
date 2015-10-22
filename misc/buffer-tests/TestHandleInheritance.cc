@@ -426,6 +426,7 @@ static void Test_Activate_Does_Not_Change_Standard_Handles() {
 static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     printTestName("Test_AttachConsole_And_CreateProcess_Inheritance");
     Worker p;
+    Worker unrelated(SpawnParams { false, DETACHED_PROCESS });
 
     auto conin = p.getStdin().dup(TRUE);
     auto conout1 = p.getStdout().dup(TRUE);
@@ -445,6 +446,8 @@ static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     c2.detach();
     c2.attach(c);
 
+    unrelated.attach(p);
+
     // The first child will have the same standard handles as the parent.
     CHECK(c.getStdin().value() == p.getStdin().value());
     CHECK(c.getStdout().value() == p.getStdout().value());
@@ -455,14 +458,17 @@ static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     // and it attached to a process that has and also initially had
     // non-default handles.  Nevertheless, the new standard handles are the
     // defaults.
-    CHECK(c2.getStdin().uvalue() == 0x3);
-    CHECK(c2.getStdout().uvalue() == 0x7);
-    CHECK(c2.getStderr().uvalue() == 0xb);
+    for (auto proc : {&c2, &unrelated}) {
+        CHECK(proc->getStdin().uvalue() == 0x3);
+        CHECK(proc->getStdout().uvalue() == 0x7);
+        CHECK(proc->getStderr().uvalue() == 0xb);
+    }
 
     // The set of inheritable console handles in the two children exactly match
     // that of the parent.
     checkAttachHandleSet(c, p);
     checkAttachHandleSet(c2, p);
+    checkAttachHandleSet(unrelated, p);
 }
 
 static void Test_Detach_Implicitly_Closes_Handles() {
