@@ -8,23 +8,34 @@ CFLAGS +=   -MMD -Wall  -Iharness -I../../shared
 CXXFLAGS += -MMD -Wall  -Iharness -I../../shared -std=c++11 -Wno-format
 LDFLAGS += -static -static-libgcc -static-libstdc++
 
+# To disable PCH, just comment out these two lines.
+PCHFLAGS = -include build/pch.h
+PCHDEPS = build/pch.h.gch
+
 # Use gmake -n to see the command-lines gmake would run.
+
+.PHONY : default
+default : all
+
+build/pch.h.gch : harness/pch.h
+	@echo Compiling PCH $<
+	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 build/%.o : %.c
 	@echo Compiling $<
 	@$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-build/%.o : %.cc
+build/%.o : %.cc $(PCHDEPS)
 	@echo Compiling $<
-	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+	@$(CXX) $(PCHFLAGS) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-build/%.o : ../../shared/%.cc
+build/%.o : ../../shared/%.cc $(PCHDEPS)
 	@echo Compiling $<
-	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+	@$(CXX) $(PCHFLAGS) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-build/%.o : harness/%.cc
+build/%.o : harness/%.cc $(PCHDEPS)
 	@echo Compiling $<
-	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+	@$(CXX) $(PCHFLAGS) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 .PRECIOUS : build/%.o
 
@@ -59,6 +70,6 @@ Worker.exe : $(WORKER_OBJECTS) $(COMMON_OBJECTS)
 
 .PHONY : clean
 clean:
-	rm -f build/*.exe build/*.o build/*.d
+	rm -f build/*.exe build/*.o build/*.d build/*.gch
 
 -include build/*.d
