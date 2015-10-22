@@ -4,12 +4,13 @@
 // Windows 10, inclusive.
 //
 
-#include <TestCommon.h>
-
 #include <cassert>
 #include <iostream>
 #include <tuple>
 #include <vector>
+
+#include <TestCommon.h>
+#include <OsVersion.h>
 
 #define CHECK(cond) \
     do { \
@@ -19,24 +20,6 @@
                       << #cond << std::endl; \
         } \
     } while(0)
-
-static std::tuple<int, int> osversion() {
-    OSVERSIONINFO info = { sizeof(info), 0 };
-    ASSERT(GetVersionEx(&info));
-    return std::make_tuple(info.dwMajorVersion, info.dwMinorVersion);
-}
-
-static bool isWin7() {
-    return osversion() == std::make_tuple(6, 1);
-}
-
-static bool isAtLeastWin7() {
-    return osversion() >= std::make_tuple(6, 1);
-}
-
-static bool isAtLeastWin8() {
-    return osversion() >= std::make_tuple(6, 2);
-}
 
 static bool inheritable(Handle &h) {
     return h.flags() & HANDLE_FLAG_INHERIT;

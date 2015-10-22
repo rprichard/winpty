@@ -18,6 +18,7 @@ struct Command {
         FreeConsole,
         GetConsoleScreenBufferInfo,
         GetConsoleSelectionInfo,
+        GetConsoleTitle,
         GetConsoleWindow,
         GetHandleInformation,
         GetNumberOfConsoleInputEvents,
@@ -29,6 +30,7 @@ struct Command {
         OpenConout,
         ReadConsoleOutput,
         ScanForConsoleHandles,
+        SetConsoleTitle,
         SetHandleInformation,
         SetStdin,
         SetStderr,
@@ -57,6 +59,7 @@ struct Command {
         } spawn;
         FixedSizeString<1024> writeText;
         FixedSizeString<1024> systemText;
+        std::array<wchar_t, 1024> consoleTitle;
         struct {
             DWORD mask;
             DWORD flags;

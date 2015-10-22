@@ -3,6 +3,7 @@
 #include <string>
 
 #include <DebugClient.h>
+#include <UnicodeConversions.h>
 #include <WinptyAssert.h>
 
 Handle Handle::dup(HANDLE h, Worker &target, BOOL bInheritHandle) {
@@ -262,6 +263,22 @@ std::vector<Handle> Worker::scanForConsoleHandles() {
         ret.push_back(Handle(rpcTable.table[i], *this));
     }
     return ret;
+}
+
+bool Worker::setTitleInternal(const std::wstring &wstr) {
+    ASSERT(wstr.size() < cmd().u.consoleTitle.size());
+    ASSERT(wstr.size() == wcslen(wstr.c_str()));
+    wcscpy(cmd().u.consoleTitle.data(), wstr.c_str());
+    rpc(Command::SetConsoleTitle);
+    return cmd().success;
+}
+
+DWORD Worker::getTitleInternal(std::array<wchar_t, 1024> &buf, DWORD bufSize) {
+    cmd().dword = bufSize;
+    cmd().u.consoleTitle = buf;
+    rpc(Command::GetConsoleTitle);
+    buf = cmd().u.consoleTitle;
+    return cmd().dword;
 }
 
 void Worker::rpc(Command::Kind kind) {

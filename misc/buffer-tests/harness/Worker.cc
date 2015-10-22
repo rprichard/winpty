@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <algorithm>
 #include <vector>
 
 #include "Event.h"
@@ -225,9 +226,6 @@ int main(int argc, char *argv[]) {
                 cmd.success = FreeConsole();
                 trace("Calling FreeConsole... %s", successOrFail(cmd.success));
                 break;
-            case Command::GetHandleInformation:
-                cmd.success = GetHandleInformation(cmd.handle, &cmd.dword);
-                break;
             case Command::GetConsoleScreenBufferInfo:
                 cmd.u.consoleScreenBufferInfo = {};
                 cmd.success = GetConsoleScreenBufferInfo(
@@ -237,8 +235,17 @@ int main(int argc, char *argv[]) {
                 cmd.u.consoleSelectionInfo = {};
                 cmd.success = GetConsoleSelectionInfo(&cmd.u.consoleSelectionInfo);
                 break;
+            case Command::GetConsoleTitle:
+                // GetConsoleTitle is buggy, so make the worker API for it very
+                // explicit so we can test its bugginess.
+                ASSERT(cmd.dword <= cmd.u.consoleTitle.size());
+                cmd.dword = GetConsoleTitleW(cmd.u.consoleTitle.data(), cmd.dword);
+                break;
             case Command::GetConsoleWindow:
                 cmd.hwnd = GetConsoleWindow();
+                break;
+            case Command::GetHandleInformation:
+                cmd.success = GetHandleInformation(cmd.handle, &cmd.dword);
                 break;
             case Command::GetNumberOfConsoleInputEvents:
                 cmd.success = GetNumberOfConsoleInputEvents(cmd.handle, &cmd.dword);
@@ -270,6 +277,13 @@ int main(int argc, char *argv[]) {
                 cmd.u.scanForConsoleHandles.count = ret.size();
                 std::copy(ret.begin(), ret.end(),
                           cmd.u.scanForConsoleHandles.table.begin());
+                break;
+            }
+            case Command::SetConsoleTitle: {
+                auto nul = std::find(cmd.u.consoleTitle.begin(),
+                                     cmd.u.consoleTitle.end(), L'\0');
+                ASSERT(nul != cmd.u.consoleTitle.end());
+                cmd.success = SetConsoleTitleW(cmd.u.consoleTitle.data());
                 break;
             }
             case Command::SetHandleInformation:

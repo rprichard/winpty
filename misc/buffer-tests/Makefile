@@ -32,12 +32,14 @@ COMMON_OBJECTS = \
 	build/Spawn.o \
 	build/UnicodeConversions.o \
 	build/Util.o \
-	build/WinptyAssert.o
+	build/WinptyAssert.o \
+	build/winpty_wcsnlen.o
 
 WORKER_OBJECTS = build/Worker.o
 TEST_OBJECTS = build/TestCommon.o
 
 all : \
+	build/Test_GetConsoleTitleW.exe \
 	build/Win7Bug_InheritHandles.exe \
 	build/Win7Bug_RaceCondition.exe \
 	build/TestHandleInheritance.exe \

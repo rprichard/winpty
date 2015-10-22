@@ -11,6 +11,7 @@
 #include "Spawn.h"
 #include "WorkerApi.h"
 #include <DebugClient.h>
+#include <UnicodeConversions.h>
 
 class Worker;
 
@@ -105,6 +106,9 @@ public:
     CONSOLE_SELECTION_INFO selectionInfo();
     void dumpConsoleHandles(BOOL writeToEach=FALSE);
     std::vector<Handle> scanForConsoleHandles();
+    void setTitle(const std::string &str)       { auto b = setTitleInternal(widenString(str)); ASSERT(b && "setTitle failed"); }
+    bool setTitleInternal(const std::wstring &str);
+    DWORD getTitleInternal(std::array<wchar_t, 1024> &buf, DWORD bufSize);
 
     Handle openConin(BOOL bInheritHandle=FALSE) {
         cmd().bInheritHandle = bInheritHandle;
