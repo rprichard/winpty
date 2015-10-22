@@ -4,6 +4,9 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
+
+#include <WinptyAssert.h>
 
 class RemoteWorker;
 
@@ -41,6 +44,17 @@ public:
     bool tryFlags(DWORD *flags=nullptr);
     void setFlags(DWORD mask, DWORD flags);
     bool trySetFlags(DWORD mask, DWORD flags);
+    bool inheritable() {
+        return flags() & HANDLE_FLAG_INHERIT;
+    }
+    void setInheritable(bool inheritable) {
+        auto success = trySetInheritable(inheritable);
+        ASSERT(success && "setInheritable failed");
+    }
+    bool trySetInheritable(bool inheritable) {
+        return trySetFlags(HANDLE_FLAG_INHERIT,
+                           inheritable ? HANDLE_FLAG_INHERIT : 0);
+    }
     wchar_t firstChar();
     RemoteHandle &setFirstChar(wchar_t ch);
     bool tryNumberOfConsoleInputEvents(DWORD *ret=nullptr);
@@ -52,3 +66,8 @@ private:
     HANDLE m_value;
     RemoteWorker *m_worker;
 };
+
+std::vector<RemoteHandle> inheritableHandles(
+    const std::vector<RemoteHandle> &vec);
+std::vector<uint64_t> handleInts(const std::vector<RemoteHandle> &vec);
+std::vector<HANDLE> handleValues(const std::vector<RemoteHandle> &vec);

@@ -19,6 +19,7 @@
 #include "OsVersion.h"
 #include "RemoteHandle.h"
 #include "RemoteWorker.h"
+#include "TestUtil.h"
 #include "UnicodeConversions.h"
 
 #include <DebugClient.h>

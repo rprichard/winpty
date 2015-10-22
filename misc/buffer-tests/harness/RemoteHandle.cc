@@ -1,6 +1,7 @@
 #include "RemoteHandle.h"
 
 #include <string>
+#include <vector>
 
 #include "RemoteWorker.h"
 
@@ -176,3 +177,29 @@ bool RemoteHandle::tryNumberOfConsoleInputEvents(DWORD *ret) {
     return worker().cmd().success;
 }
 
+std::vector<RemoteHandle> inheritableHandles(
+        const std::vector<RemoteHandle> &vec) {
+    std::vector<RemoteHandle> ret;
+    for (auto h : vec) {
+        if (h.inheritable()) {
+            ret.push_back(h);
+        }
+    }
+    return ret;
+}
+
+std::vector<uint64_t> handleInts(const std::vector<RemoteHandle> &vec) {
+    std::vector<uint64_t> ret;
+    for (auto h : vec) {
+        ret.push_back(reinterpret_cast<uint64_t>(h.value()));
+    }
+    return ret;
+}
+
+std::vector<HANDLE> handleValues(const std::vector<RemoteHandle> &vec) {
+    std::vector<HANDLE> ret;
+    for (auto h : vec) {
+        ret.push_back(h.value());
+    }
+    return ret;
+}

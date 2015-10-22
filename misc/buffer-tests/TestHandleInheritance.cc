@@ -6,50 +6,6 @@
 
 #include <TestCommon.h>
 
-#define CHECK(cond) \
-    do { \
-        if (!(cond)) { \
-            std::cout << __FILE__ << ":" << __LINE__ \
-                      << ": ERROR: check failed: " \
-                      << #cond << std::endl; \
-        } \
-    } while(0)
-
-static bool inheritable(Handle &h) {
-    return h.flags() & HANDLE_FLAG_INHERIT;
-}
-
-static bool trySetInheritable(Handle &h, bool inheritable) {
-    return h.trySetFlags(HANDLE_FLAG_INHERIT,
-                         inheritable ? HANDLE_FLAG_INHERIT : 0);
-}
-
-static std::vector<Handle> inheritableHandles(const std::vector<Handle> &vec) {
-    std::vector<Handle> ret;
-    for (auto h : vec) {
-        if (inheritable(h)) {
-            ret.push_back(h);
-        }
-    }
-    return ret;
-}
-
-static std::vector<uint64_t> handleInts(const std::vector<Handle> &vec) {
-    std::vector<uint64_t> ret;
-    for (auto h : vec) {
-        ret.push_back(reinterpret_cast<uint64_t>(h.value()));
-    }
-    return ret;
-}
-
-static std::vector<HANDLE> handleValues(const std::vector<Handle> &vec) {
-    std::vector<HANDLE> ret;
-    for (auto h : vec) {
-        ret.push_back(h.value());
-    }
-    return ret;
-}
-
 // Verify that the child's open console handle set is as expected from having
 // just attached to or spawned from a source worker.
 //  * The set of child handles should exactly match the set of inheritable
@@ -68,22 +24,6 @@ static void checkAttachHandleSet(Worker &child, Worker &source) {
     CHECK(false && "checkAttachHandleSet failed");
 }
 
-static std::tuple<Handle, Handle> newPipe(Worker &w, BOOL inheritable=FALSE) {
-    HANDLE readPipe, writePipe;
-    auto ret = CreatePipe(&readPipe, &writePipe, NULL, 0);
-    assert(ret && "CreatePipe failed");
-    auto p1 = Handle::dup(readPipe, w, inheritable);
-    auto p2 = Handle::dup(writePipe, w, inheritable);
-    return std::make_tuple(p1, p2);
-}
-
-static void printTestName(const char *testName) {
-    trace("----------------------------------------------------------");
-    trace("%s", testName);
-    printf("%s\n", testName);
-    fflush(stdout);
-}
-
 static void Test_IntrinsicInheritFlags() {
     // Console handles have an inherit flag, just as kernel handles do.
     //
@@ -100,27 +40,27 @@ static void Test_IntrinsicInheritFlags() {
     auto yy = y.dup(TRUE);
     p.dumpConsoleHandles();
 
-    CHECK(inheritable(n)  == false);
-    CHECK(inheritable(nn) == false);
-    CHECK(inheritable(yn) == isWin7());
-    CHECK(inheritable(y)  == true);
-    CHECK(inheritable(ny) == true);
-    CHECK(inheritable(yy) == true);
+    CHECK(n.inheritable()  == false);
+    CHECK(nn.inheritable() == false);
+    CHECK(yn.inheritable() == isWin7());
+    CHECK(y.inheritable()  == true);
+    CHECK(ny.inheritable() == true);
+    CHECK(yy.inheritable() == true);
 
     for (auto &h : (Handle[]){ n, y, nn, ny, yn, yy }) {
-        const bool v = inheritable(h);
+        const bool v = h.inheritable();
         if (isWin7()) {
             // In Windows 7, the console handle inherit flags could not be
             // changed.
-            CHECK(trySetInheritable(h, v) == false);
-            CHECK(trySetInheritable(h, !v) == false);
-            CHECK(inheritable(h) == v);
+            CHECK(h.trySetInheritable(v) == false);
+            CHECK(h.trySetInheritable(!v) == false);
+            CHECK(h.inheritable() == v);
         } else {
             // With older and newer operating systems, the inheritability can
             // be changed.  (In newer operating systems, i.e. Windows 8 and up,
             // the console handles are just normal kernel handles.)
-            CHECK(trySetInheritable(h, !v) == true);
-            CHECK(inheritable(h) == !v);
+            CHECK(h.trySetInheritable(!v) == true);
+            CHECK(h.inheritable() == !v);
         }
     }
     p.dumpConsoleHandles();
@@ -129,8 +69,8 @@ static void Test_IntrinsicInheritFlags() {
     // thing with an inheritable pipe handle, even on Windows 7.
     auto pipeY = std::get<0>(newPipe(p, TRUE));
     auto pipeN = pipeY.dup(FALSE);
-    CHECK(inheritable(pipeY) == true);
-    CHECK(inheritable(pipeN) == false);
+    CHECK(pipeY.inheritable() == true);
+    CHECK(pipeN.inheritable() == false);
 }
 
 //
@@ -249,7 +189,7 @@ static void Test_NewConsole_Resets_Everything() {
             proc.getStderr().value(),
         }));
         for (auto &h : handles) {
-            CHECK(inheritable(h));
+            CHECK(h.inheritable());
         }
     };
 
@@ -501,7 +441,7 @@ static void Test_Detach_Implicitly_Closes_Handles() {
     } else {
         // As of Windows 8, these handles aren't closed.
         for (auto h : orig2) {
-            CHECK(inheritable(h));
+            CHECK(h.inheritable());
         }
     }
 }

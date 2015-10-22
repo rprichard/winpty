@@ -8,19 +8,6 @@
 
 #include <TestCommon.h>
 
-#define CHECK_EQ(actual, expected) \
-    do {                                                        \
-        auto a = (actual);                                      \
-        auto e = (expected);                                    \
-        if (a != e) {                                           \
-            std::cout << __FILE__ << ":" << __LINE__            \
-                      << ": ERROR: check failed "               \
-                      << ("(" #actual " != " #expected "): ")   \
-                      << a << " != " << e                       \
-                      << std::endl;                             \
-        }                                                       \
-    } while(0)
-
 static void checkBuf(const std::array<wchar_t, 1024> &actual,
                      const std::array<wchar_t, 1024> &expected,
                      const char *filename,
