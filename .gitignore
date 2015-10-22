@@ -1,5 +1,6 @@
 *.o
 *.d
+*.h.gch
 *.exe
 *.dll
 *.sln
