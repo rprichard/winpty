@@ -6,10 +6,10 @@
 #include <algorithm>
 #include <vector>
 
+#include "Command.h"
 #include "Event.h"
 #include "ShmemParcel.h"
 #include "Spawn.h"
-#include "WorkerApi.h"
 #include <DebugClient.h>
 
 static const char *g_prefix = "";

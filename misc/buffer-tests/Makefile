@@ -50,7 +50,7 @@ COMMON_OBJECTS = \
 	build/WinptyAssert.o \
 	build/winpty_wcsnlen.o
 
-WORKER_OBJECTS = build/Worker.o
+WORKER_OBJECTS = build/WorkerProgram.o
 TEST_OBJECTS = build/TestCommon.o
 
 all : \
@@ -60,11 +60,11 @@ all : \
 	build/TestHandleInheritance.exe \
 	build/Worker.exe
 
-Worker.exe : $(WORKER_OBJECTS) $(COMMON_OBJECTS)
+build/Worker.exe : $(WORKER_OBJECTS) $(COMMON_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
 
-%.exe : %.o $(TEST_OBJECTS) $(COMMON_OBJECTS)
+build/%.exe : build/%.o $(TEST_OBJECTS) $(COMMON_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
 

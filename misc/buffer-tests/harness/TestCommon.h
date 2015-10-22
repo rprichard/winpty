@@ -6,12 +6,13 @@
 #include <string>
 #include <vector>
 
+#include "Command.h"
 #include "Event.h"
 #include "ShmemParcel.h"
 #include "Spawn.h"
-#include "WorkerApi.h"
+#include "UnicodeConversions.h"
+
 #include <DebugClient.h>
-#include <UnicodeConversions.h>
 
 class Worker;
 

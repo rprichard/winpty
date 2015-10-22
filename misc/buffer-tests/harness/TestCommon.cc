@@ -2,8 +2,9 @@
 
 #include <string>
 
+#include "UnicodeConversions.h"
+
 #include <DebugClient.h>
-#include <UnicodeConversions.h>
 #include <WinptyAssert.h>
 
 Handle Handle::dup(HANDLE h, Worker &target, BOOL bInheritHandle) {
