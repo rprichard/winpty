@@ -19,4 +19,6 @@ struct SpawnParams {
     }
 };
 
-HANDLE spawn(const std::string &workerName, const SpawnParams &params);
+HANDLE spawn(const std::string &workerName,
+             const SpawnParams &params,
+             DWORD *lastError);

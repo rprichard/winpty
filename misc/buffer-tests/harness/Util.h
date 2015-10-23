@@ -7,3 +7,4 @@
 
 std::string pathDirName(const std::string &path);
 std::string getModuleFileName(HMODULE module);
+std::string errorString(DWORD errCode);

@@ -20,7 +20,9 @@ static std::vector<wchar_t> wstrToWVector(const std::wstring &str) {
 
 } // anonymous namespace
 
-HANDLE spawn(const std::string &workerName, const SpawnParams &params) {
+HANDLE spawn(const std::string &workerName,
+             const SpawnParams &params,
+             DWORD *lastError) {
     auto workerPath = pathDirName(getModuleFileName(NULL)) + "\\Worker.exe";
     const std::wstring workerPathWStr = widenString(workerPath);
     const std::string cmdLine = "\"" + workerPath + "\" " + workerName;
@@ -80,7 +82,11 @@ HANDLE spawn(const std::string &workerName, const SpawnParams &params) {
                 inheritList.data(),
                 params.inheritCount * sizeof(HANDLE),
                 nullptr, nullptr);
-            ASSERT(success && "UpdateProcThreadAttribute failed");
+            if (!success) {
+                trace("Aborting: UpdateProcThreadAttribute failed: %s",
+                    errorString(GetLastError()).c_str());
+                abort();
+            }
         }
     }
 
@@ -95,7 +101,11 @@ HANDLE spawn(const std::string &workerName, const SpawnParams &params) {
                                   NULL, NULL,
                                   &suix.StartupInfo, &pi);
     if (!success) {
-        trace("CreateProcessW failed: GetLastError=0x%x", GetLastError());
+        if (lastError != nullptr) {
+            *lastError = GetLastError();
+        }
+        trace("CreateProcessW failed: %s",
+            errorString(GetLastError()).c_str());
     } else {
         ret = pi.hProcess;
         CloseHandle(pi.hThread);

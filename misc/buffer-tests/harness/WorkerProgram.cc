@@ -312,7 +312,8 @@ int main(int argc, char *argv[]) {
             case Command::SpawnChild:
                 trace("Spawning child...");
                 cmd.handle = spawn(cmd.u.spawn.spawnName.str(),
-                                   cmd.u.spawn.spawnParams);
+                                   cmd.u.spawn.spawnParams,
+                                   &cmd.dword);
                 if (cmd.handle != nullptr) {
                     trace("Spawning child... pid %u",
                         (unsigned int)GetProcessId(cmd.handle));

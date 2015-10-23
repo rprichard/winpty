@@ -39,7 +39,7 @@ RemoteWorker::RemoteWorker(const std::string &name) :
 
 RemoteWorker::RemoteWorker(SpawnParams params) :
         RemoteWorker(newWorkerName()) {
-    m_process = spawn(m_name, params);
+    m_process = spawn(m_name, params, nullptr);
     ASSERT(m_process != nullptr && "Could not create RemoteWorker");
     m_valid = true;
     // Perform an RPC just to ensure that the worker process is ready, and
@@ -53,12 +53,16 @@ RemoteWorker RemoteWorker::child(SpawnParams params) {
     return ret;
 }
 
-RemoteWorker RemoteWorker::tryChild(SpawnParams params) {
+RemoteWorker RemoteWorker::tryChild(SpawnParams params, DWORD *errCode) {
     RemoteWorker ret(newWorkerName());
     cmd().u.spawn.spawnName = ret.m_name;
     cmd().u.spawn.spawnParams = params;
     rpc(Command::SpawnChild);
-    if (cmd().handle != nullptr) {
+    if (cmd().handle == nullptr) {
+        if (errCode != nullptr) {
+            *errCode = cmd().dword;
+        }
+    } else {
         BOOL dupSuccess = DuplicateHandle(
             m_process,
             cmd().handle,

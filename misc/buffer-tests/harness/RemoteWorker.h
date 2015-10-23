@@ -21,7 +21,7 @@ public:
     RemoteWorker() : RemoteWorker(SpawnParams { false, CREATE_NEW_CONSOLE }) {}
     RemoteWorker(SpawnParams params);
     RemoteWorker child(SpawnParams params={});
-    RemoteWorker tryChild(SpawnParams params={});
+    RemoteWorker tryChild(SpawnParams params={}, DWORD *errCode=nullptr);
     ~RemoteWorker() { cleanup(); }
     bool valid() { return m_valid; }
     void exit();
