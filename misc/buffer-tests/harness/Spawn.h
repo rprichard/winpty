@@ -4,6 +4,8 @@
 
 #include <string>
 
+#include "RemoteHandle.h"
+
 struct SpawnParams {
     BOOL bInheritHandles = FALSE;
     DWORD dwCreationFlags = 0;
@@ -16,6 +18,18 @@ struct SpawnParams {
         bInheritHandles(bInheritHandles),
         dwCreationFlags(dwCreationFlags)
     {
+    }
+
+    SpawnParams(bool bInheritHandles, DWORD dwCreationFlags,
+                std::vector<RemoteHandle> stdHandles) :
+        bInheritHandles(bInheritHandles),
+        dwCreationFlags(dwCreationFlags)
+    {
+        ASSERT(stdHandles.size() == 3);
+        sui.dwFlags |= STARTF_USESTDHANDLES;
+        sui.hStdInput = stdHandles[0].value();
+        sui.hStdOutput = stdHandles[1].value();
+        sui.hStdError = stdHandles[2].value();
     }
 };
 

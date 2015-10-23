@@ -114,26 +114,18 @@ static void Test_CreateProcess_STARTUPINFOEX() {
         return p.tryChild(sp, &errCode);
     };
 
-    auto testSetupStdHandles = [&](SpawnParams sp, Handle in,
-                                   Handle out, Handle err) {
+    auto testSetupStdHandles = [&](SpawnParams sp) {
+        const auto in = sp.sui.hStdInput;
+        const auto out = sp.sui.hStdOutput;
+        const auto err = sp.sui.hStdError;
         sp.dwCreationFlags |= EXTENDED_STARTUPINFO_PRESENT;
         sp.sui.cb = sizeof(STARTUPINFOEXW);
-        sp.sui.dwFlags |= STARTF_USESTDHANDLES;
-        sp.sui.hStdInput = in.value();
-        sp.sui.hStdOutput = out.value();
-        sp.sui.hStdError = err.value();
         // This test case isn't interested in what
         // PROC_THREAD_ATTRIBUTE_HANDLE_LIST does when there are duplicate
         // handles in its list.
-        ASSERT(in.value() != out.value() &&
-               out.value() != err.value() &&
-               in.value() != err.value());
+        ASSERT(in != out && out != err && in != err);
         sp.inheritCount = 3;
-        sp.inheritList = {
-            sp.sui.hStdInput,
-            sp.sui.hStdOutput,
-            sp.sui.hStdError,
-        };
+        sp.inheritList = { in, out, err };
         return p.tryChild(sp, &errCode);
     };
 
@@ -187,7 +179,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     {
         // If bInheritHandles=FALSE and PROC_THREAD_ATTRIBUTE_HANDLE_LIST are
         // combined, the API call fails.
-        auto c = testSetupStdHandles({false}, ph1, ph2, ph4);
+        auto c = testSetupStdHandles({false, 0, {ph1, ph2, ph4}});
         CHECK(!c.valid());
         CHECK_EQ(errCode, (DWORD)ERROR_INVALID_PARAMETER);
     }
@@ -195,7 +187,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     if (!isAtLeastWin8()) {
         // Attempt to restrict inheritance to just one of the three open
         // traditional console handles.
-        auto c = testSetupStdHandles({true}, ph1, ph2, p.getStderr());
+        auto c = testSetupStdHandles({true, 0, {ph1, ph2, p.getStderr()}});
         if (isWin7()) {
             // On Windows 7, the CreateProcess call fails with a strange
             // error.
@@ -226,7 +218,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
         // PROC_THREAD_ATTRIBUTE_HANDLE_LIST and console handle interaction.
         // We'll set all the standard handles to pipes.  Nevertheless, all
         // console handles are inherited.
-        auto c = testSetupStdHandles({true}, ph1, ph2, ph4);
+        auto c = testSetupStdHandles({true, 0, {ph1, ph2, ph4}});
         CHECK(c.valid());
         CHECK(handleValues(c.scanForConsoleHandles()) ==
               handleValues(p.scanForConsoleHandles()));
@@ -286,12 +278,9 @@ static void Test_Detach_Does_Not_Change_Standard_Handles() {
     {
         Worker p3;
         auto pipe = newPipe(p3, true);
-        SpawnParams sp(true);
-        sp.sui.dwFlags |= STARTF_USESTDHANDLES;
-        sp.sui.hStdInput = std::get<0>(pipe).value();
-        sp.sui.hStdOutput = std::get<1>(pipe).value();
-        sp.sui.hStdError = std::get<1>(pipe).dup(true).value();
-        auto p3c = p3.child(sp);
+        auto rh = std::get<0>(pipe);
+        auto wh = std::get<1>(pipe);
+        auto p3c = p3.child({true, 0, {rh, wh, wh.dup(true)}});
         check(p3c);
     }
 }
