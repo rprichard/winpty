@@ -49,32 +49,194 @@ static void Test_IntrinsicInheritFlags() {
     CHECK(pipeN.inheritable() == false);
 }
 
-// XXX: Test that CREATE_NEW_CONSOLE + DETACHED_PROCESS ==> failure
-// XXX: Test that CREATE_NEW_CONSOLE + CREATE_NO_WINDOW ==> CREATE_NEW_CONSOLE
-// XXX: Test that DETACHED_PROCESS + CREATE_NO_WINDOW ==> DETACHED_PROCESS
+static void Test_CreateProcess_ModeCombos() {
+    // It is often unclear how (or whether) various combinations of
+    // CreateProcess parameters work when combined.  Try to test the ambiguous
+    // combinations.
+    printTestName(__FUNCTION__);
 
-static void Test_CreateNoWindow() {
+    DWORD errCode = 0;
+
+    {
+        // CREATE_NEW_CONSOLE | DETACHED_PROCESS ==> call fails
+        Worker p;
+        auto c = p.tryChild({ false, CREATE_NEW_CONSOLE | DETACHED_PROCESS }, &errCode);
+        CHECK(!c.valid());
+        CHECK_EQ(errCode, (DWORD)ERROR_INVALID_PARAMETER);
+    }
+    {
+        // CREATE_NO_WINDOW | CREATE_NEW_CONSOLE ==> CREATE_NEW_CONSOLE dominates
+        Worker p;
+        auto c = p.tryChild({ false, CREATE_NO_WINDOW | CREATE_NEW_CONSOLE }, &errCode);
+        CHECK(c.valid());
+        CHECK(c.consoleWindow() != nullptr);
+        CHECK(IsWindowVisible(c.consoleWindow()));
+    }
+    {
+        // CREATE_NO_WINDOW | DETACHED_PROCESS ==> DETACHED_PROCESS dominates
+        Worker p;
+        auto c = p.tryChild({ false, CREATE_NO_WINDOW | DETACHED_PROCESS }, &errCode);
+        CHECK(c.valid());
+        CHECK_EQ(c.newBuffer().value(), INVALID_HANDLE_VALUE);
+    }
+}
+
+static void Test_CreateProcess_STARTUPINFOEX() {
+    // STARTUPINFOEX tests.
     printTestName(__FUNCTION__);
 
     Worker p;
-    // Open some handles to demonstrate the "clean slate" outcome.
-    p.getStdin().dup(TRUE).setStdin();
-    p.newBuffer(TRUE).setStderr().dup(TRUE).setStdout().activate();
-    auto c = p.child({ true, CREATE_NO_WINDOW });
-    c.dumpConsoleHandles();
-    // Verify a blank slate.
-    auto handles = c.scanForConsoleHandles();
-    CHECK(handleValues(handles) == (std::vector<HANDLE> {
-        c.getStdin().value(),
-        c.getStdout().value(),
-        c.getStderr().value(),
-    }));
+    DWORD errCode = 0;
+    auto pipe1 = newPipe(p, true);
+    auto ph1 = std::get<0>(pipe1);
+    auto ph2 = std::get<1>(pipe1);
+
+    auto pipe2 = newPipe(p, true);
+    auto ph3 = std::get<0>(pipe2);
+    auto ph4 = std::get<1>(pipe2);
+
+    // Verify that ntHandlePointer is working...
+    CHECK(ntHandlePointer(ph1) != nullptr);
+    CHECK(ntHandlePointer(ph2) != nullptr);
+    CHECK(ntHandlePointer(ph1) != ntHandlePointer(ph2));
+    auto dupTest = ph1.dup();
+    CHECK(ntHandlePointer(ph1) == ntHandlePointer(dupTest));
+    dupTest.close();
+
+    auto testSetup = [&](size_t cb, DWORD dwCreationFlags, HANDLE inherit) {
+        SpawnParams sp(true, dwCreationFlags);
+        sp.sui.cb = cb;
+        sp.inheritCount = 1;
+        sp.inheritList = { inherit };
+        return p.tryChild(sp, &errCode);
+    };
+
+    {
+        // Use EXTENDED_STARTUPINFO_PRESENT correctly.
+        auto c = testSetup(sizeof(STARTUPINFOEXW),
+            EXTENDED_STARTUPINFO_PRESENT, ph1.value());
+        CHECK(c.valid());
+        auto ch1 = Handle::invent(ph1.value(), c);
+        auto ch2 = Handle::invent(ph2.value(), c);
+        // i.e. ph1 was inherited, because ch1 identifies the same thing.
+        // ph2 was not inherited, because it wasn't listed.
+        CHECK(ntHandlePointer(ph1) == ntHandlePointer(ch1));
+        CHECK(ntHandlePointer(ph2) != ntHandlePointer(ch2));
+
+        if (!isAtLeastWin8()) {
+            // The traditional console handles were all inherited, but they're
+            // also the standard handles, so maybe that's an exception.  We'll
+            // test more aggressively below.
+            CHECK(handleValues(c.scanForConsoleHandles()) ==
+                  handleValues(p.scanForConsoleHandles()));
+        }
+    }
+    {
+        // STARTUPINFOEX parameter is ignored if
+        // EXTENDED_STARTUPINFO_PRESENT isn't present.
+        auto c = testSetup(sizeof(STARTUPINFOEXW), 0, ph1.value());
+        CHECK(c.valid());
+        auto ch2 = Handle::invent(ph2.value(), c);
+        // i.e. ph2 was inherited, because ch2 identifies the same thing.
+        CHECK(ntHandlePointer(ph2) == ntHandlePointer(ch2));
+    }
+    {
+        // If EXTENDED_STARTUPINFO_PRESENT is specified, but the cb value
+        // is wrong, the API call fails.
+        auto c = testSetup(sizeof(STARTUPINFOW),
+            EXTENDED_STARTUPINFO_PRESENT, ph1.value());
+        CHECK(!c.valid());
+        CHECK_EQ(errCode, (DWORD)ERROR_INVALID_PARAMETER);
+    }
+    {
+        // Attempting to inherit the GetCurrentProcess pseudo-handle also
+        // fails.  (The MSDN docs point out that using GetCurrentProcess here
+        // will fail.)
+        auto c = testSetup(sizeof(STARTUPINFOEXW),
+            EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess());
+        CHECK(!c.valid());
+        CHECK_EQ(errCode, (DWORD)ERROR_INVALID_PARAMETER);
+    }
+
+    if (!isAtLeastWin8()) {
+        // Attempt to restrict inheritance to just one of the three open
+        // traditional console handles.
+        SpawnParams sp(true, EXTENDED_STARTUPINFO_PRESENT);
+        sp.sui.cb = sizeof(STARTUPINFOEXW);
+        sp.sui.dwFlags |= STARTF_USESTDHANDLES;
+        sp.sui.hStdInput = ph1.value();
+        sp.sui.hStdOutput = ph2.value();
+        sp.sui.hStdError = p.getStderr().value();
+        sp.inheritCount = 3;
+        sp.inheritList = {
+            sp.sui.hStdInput,
+            sp.sui.hStdOutput,
+            sp.sui.hStdError,
+        };
+        auto c = p.tryChild(sp, &errCode);
+        if (isWin7()) {
+            // On Windows 7, the CreateProcess call fails with a strange
+            // error.
+            CHECK(!c.valid());
+            CHECK_EQ(errCode, (DWORD)ERROR_NO_SYSTEM_RESOURCES);
+        } else {
+            // On Vista, the CreateProcess call succeeds, but handle
+            // inheritance is broken.  All of the console handles are
+            // inherited, not just the error screen buffer that was listed.
+            // None of the pipe handles were inherited, even though two were
+            // listed.
+            c.dumpConsoleHandles();
+            CHECK(handleValues(c.scanForConsoleHandles()) ==
+                  handleValues(p.scanForConsoleHandles()));
+            auto ch1 = Handle::invent(ph1.value(), c);
+            auto ch2 = Handle::invent(ph2.value(), c);
+            auto ch3 = Handle::invent(ph3.value(), c);
+            auto ch4 = Handle::invent(ph4.value(), c);
+            CHECK(ntHandlePointer(ph1) != ntHandlePointer(ch1));
+            CHECK(ntHandlePointer(ph2) != ntHandlePointer(ch2));
+            CHECK(ntHandlePointer(ph3) != ntHandlePointer(ch3));
+            CHECK(ntHandlePointer(ph4) != ntHandlePointer(ch4));
+        }
+    }
+
+    if (!isAtLeastWin8()) {
+        // Make a final valiant effort to test
+        // PROC_THREAD_ATTRIBUTE_HANDLE_LIST and console handle interaction.
+        // We'll set all the standard handles to pipes.  Nevertheless, all
+        // console handles are inherited.
+        SpawnParams sp(true, EXTENDED_STARTUPINFO_PRESENT);
+        sp.sui.cb = sizeof(STARTUPINFOEXW);
+        sp.sui.dwFlags |= STARTF_USESTDHANDLES;
+        sp.sui.hStdInput = ph1.value();
+        sp.sui.hStdOutput = ph2.value();
+        sp.sui.hStdError = ph2.dup(true).value();
+        sp.inheritCount = 3;
+        sp.inheritList = {
+            sp.sui.hStdInput,
+            sp.sui.hStdOutput,
+            sp.sui.hStdError,
+        };
+        p.openConout(true); // Add an extra handle.
+        auto c = p.tryChild(sp, &errCode);
+        CHECK(c.valid());
+        CHECK(handleValues(c.scanForConsoleHandles()) ==
+              handleValues(p.scanForConsoleHandles()));
+    }
+}
+
+static void Test_CreateNoWindow_HiddenVsNothing() {
+    printTestName(__FUNCTION__);
+
+    Worker p;
+    auto c = p.child({ false, CREATE_NO_WINDOW });
+
     if (isAtLeastWin7()) {
-        // As of Windows 7, there is no console window.
-        CHECK(c.consoleWindow() == NULL);
+        // As of Windows 7, GetConsoleWindow returns NULL.
+        CHECK(c.consoleWindow() == nullptr);
     } else {
-        // On earlier operating systems, there is a console window, but it's
-        // hidden.
+        // On earlier operating systems, GetConsoleWindow returns a handle
+        // to an invisible window.
+        CHECK(c.consoleWindow() != nullptr);
         CHECK(!IsWindowVisible(c.consoleWindow()));
     }
 }
@@ -122,7 +284,11 @@ static void Test_Activate_Does_Not_Change_Standard_Handles() {
 
 void runCommonTests() {
     Test_IntrinsicInheritFlags();
-    Test_CreateNoWindow();
+    Test_CreateProcess_ModeCombos();
+    if (isAtLeastVista()) {
+        Test_CreateProcess_STARTUPINFOEX();
+    }
+    Test_CreateNoWindow_HiddenVsNothing();
     Test_Input_Vs_Output();
     Test_Detach_Does_Not_Change_Standard_Handles();
     Test_Activate_Does_Not_Change_Standard_Handles();
