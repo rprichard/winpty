@@ -1,57 +1,168 @@
-Console Handles
-===============
+Console Handles and Standard Handles
+====================================
 
 This document will attempt to explain how console handles work and how they
 interact with process creation and console attachment and detachment.  It is
-based on experiments that I ran against various versions of Windows.
+based on experiments that I ran against various versions of Windows from
+Windows XP to Windows 10.
+
+
+
+
+Common semantics
+----------------
+
+There are three flags to `CreateProcess` that affect what console a new console
+process is attached to:
+
+ - `CREATE_NEW_CONSOLE`
+ - `CREATE_NO_WINDOW`
+ - `DETACHED_PROCESS`
+
+These flags are interpreted to produce what I will call the *CreationConsoleMode*.
+`CREATE_NO_WINDOW` is ignored if combined with either other flag, and the
+combination of `CREATE_NEW_CONSOLE` and `DETACHED_PROCESS` is an error:
+
+| Criteria                                    | Resulting *CreationConsoleMode*       |
+| ------------------------------------------- | ------------------------------------- |
+| None of the flags (parent has a console)    | *Inherit*                             |
+| None of the flags (parent has no console)   | *NewConsole*                          |
+| `CREATE_NEW_CONSOLE`                        | *NewConsole*                          |
+| `CREATE_NEW_CONSOLE | CREATE_NO_WINDOW`     | *NewConsole*                          |
+| `CREATE_NO_WINDOW`                          | *NewConsoleNoWindow*                  |
+| `DETACHED_PROCESS`                          | *Detach*                              |
+| `DETACHED_PROCESS | CREATE_NO_WINDOW`       | *Detach*                              |
+| `CREATE_NEW_CONSOLE | DETACHED_PROCESS`     | none - the `CreateProcess` call fails |
+| All three flags                             | none - the `CreateProcess` call fails |
+
+Windows' behavior depends on the *CreationConsoleMode*:
+
+ * *NewConsole* or *NewConsoleNoWindow*:  Windows attaches the new process to
+   a new console.  *NewConsoleNoWindow* is special--it creates an invisible
+   console.  (Prior to Windows 7, `GetConsoleWindow` returned a handle to an
+   invisible window.  Starting with Windows 7, `GetConsoleWindow` returns
+   `NULL`.)
+
+ * *Inherit*:  The child attaches to its parent's console.
+
+ * *Detach*:  The child has no attached console, even if its parent had one.
+
+I have not tested whether or how these flags affect non-console programs (i.e.
+programs whose PE header subsystem is `WINDOWS` rather than `CONSOLE`).
+
+There is one other `CreateProcess` flag that plays an important role in
+understanding console handles -- `STARTF_USESTDHANDLES`.  This flag influences
+whether the `AllocConsole` and `AttachConsole` APIs change the
+"standard handles" (`STDIN/STDOUT/STDERR`) during the lifetime of the
+new process, as well as the new process' initial standard handles, of course.
+The standard handles are accessed with `GetStdHandle`
+and `SetStdHandle`, which [are effectively wrappers around a global
+`HANDLE[3]` variable](http://blogs.msdn.com/b/oldnewthing/archive/2013/03/07/10399690.aspx)
+ -- these APIs do not use `DuplicateHandle` or `CloseHandle`
+internally, and [while NT kernels objects are reference counted, `HANDLE`s
+are not](http://blogs.msdn.com/b/oldnewthing/archive/2007/08/29/4620336.aspx).
+
+The `FreeConsole` API detaches a process from its console, but it never alters
+the standard handles.
+
+(Note that by "standard handles", I am strictly referring to `HANDLE` values
+and not `int` file descriptors or `FILE*` file streams provided by the C
+language.  C and C++ standard I/O is implemented on top of Windows `HANDLE`s.)
+
+
+
 
 Traditional semantics
 ---------------------
 
+### Console handles and handle sets
+
 In releases prior to Windows 8, console handles are not true NT handles.
-Rather, the values are always multiples of four minus one (i.e. 0x3, 0x7,
+Instead, the values are always multiples of four minus one (i.e. 0x3, 0x7,
 0xb, 0xf, ...), and the functions in `kernel32.dll` detect the special handles
-and perform RPCs to `csrss.exe` and/or `conhost.exe`.
+and perform LPCs to `csrss.exe` and/or `conhost.exe`.
 
-Whenever a new console is created, Windows replaces the attached process'
-set of open console handles (*ConsoleHandleSet*) with three inheritable handles
-(0x3, 0x7, 0xb) and sets `STDIN/STDOUT/STDERR` to these handles.  This
-behavior applies in these cases:
+A new console's initial console handles are always inheritable, but
+non-inheritable handles can also be created.  The inheritability can usually
+be changed, except on Windows 7 (see notes below).
 
- - at process startup if `CreateProcess` was called with `CREATE_NEW_CONSOLE` set
- - at process startup if `CreateProcess` was called with `CREATE_NO_WINDOW` set
- - when `AllocConsole` is called
+Traditional console handles cannot be duplicated to other processes.  If such
+a handle is used with `DuplicateHandle`, the source and target process handles
+must be the `GetCurrentProcess()` pseudo-handle, not a real handle to the
+current process.
 
+Whenever a process creates a new console (either during startup or when it
+calls `AllocConsole`), Windows replaces that process' set of open
+console handles (its *ConsoleHandleSet*) with three inheritable handles
+(0x3, 0x7, 0xb).  Whenever a process attaches to an existing console (either
+during startup or when it calls `AttachConsole`), Windows completely replaces
+that process' *ConsoleHandleSet* with the set of inheritable open handles
+from the originating process.  These "imported" handles are also inheritable.
 
-XXX: `AllocConsole` seemed to leave `STDIN/STDOUT/STDERR` alone on the BSOD Vista
-test case, when launched from Cygwin.  In that case, the standard handles were already
-pointing at the Cygwin pty pipes.  Do more testing here...  Also test AttachConsole
-with pipe stanard handles.
+### Standard handles, CreateProcess
 
+The manner in which Windows sets standard handles is influenced by two flags:
 
-Whenever a process inherits or attaches to an existing console, its
-*ConsoleHandleSet* is completely replaced by the set of inheritable open
-handles from the originating process.  Additionally, `AttachConsole` resets
-the `STDIN/STDOUT/STDERR` handles to (0x3, 0x7, 0xb), even if those handles
-are not open.  This behavior applies in these cases:
+ - Whether `STARTF_USESTDHANDLES` was set in `STARTUPINFO` when the process
+   started (*UseStdHandles*)
+ - Whether the `CreateProcess` parameter, `bInheritHandles`, was `TRUE`
+   (*InheritHandles*)
 
- - at process startup (all other cases)
- - when `AttachConsole` is called
+From Window XP up until Windows 8, `CreateProcess` sets standard handles as
+follows:
+
+ - Regardless of *ConsoleCreationMode*, if *UseStdHandles*, then handles are
+   set according to `STARTUPINFO`.  Windows makes no attempt to validate the
+   handle, nor will it treat a non-inheritable handle as inheritable because
+   it is listed in `STARTUPINFO`.
+
+   Otherwise, find the next applicable rule.
+
+ - If *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
+   Windows sets the handles to (0x3, 0x7, 0xb).
+
+ - If *ConsoleCreationMode* is *Inherit*:
+
+    - If *InheritHandles*, then the parent's standard
+      handles are copied as-is to the child, without exception.
+
+    - If !*InheritHandles*, then Windows duplicates each
+      of the parent's non-console standard handles into the child.  Any
+      standard handle that looks like a traditional console handle, up to
+      0x0FFFFFFF, is copied as-is, whether or not the handle is open.
+
+When Windows duplicates a parent handle into the child, if the handle
+cannot be duplicated for any reason (e.g. because it is `NULL`, closed,
+garbage, etc.), then the child's new handle is `NULL`.  If the parent's
+handle is the current process psuedo-handle, then the child's handle is
+a non-pseudo non-inheritable handle to the parent process.  The child
+handles have the same inheritability as the parent handles.  These
+handles are not closed by `FreeConsole`.
+
+The `bInheritHandles` parameter to `CreateProcess` does not affect whether
+console handles are inherited.  Console handles are inherited if and only if
+they are marked inheritable.  The `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`
+attribute added in Vista does not restrict console handle inheritance, and
+erratic behavior may result from specifying a traditional console handle in
+`PROC_THREAD_ATTRIBUTE_HANDLE_LIST`'s `HANDLE` list.  (See the
+`Test_CreateProcess_STARTUPINFOEX` test in `misc/buffer-tests`.)
+
+### AllocConsole, AttachConsole
+
+`AllocConsole` and `AttachConsole` set the standard handles as follows:
+
+ - If *UseStdHandles*, then Windows does not modify the standard handles.
+ - If !*UseStdHandles*, then Windows changes the standard handles to
+   (0x3, 0x7, 0xb), even if those handles are not open.
+
+### FreeConsole
 
 After calling `FreeConsole`, no console APIs work, and all previous console
 handles are apparently closed -- even `GetHandleInformation` fails on the
 handles.  `FreeConsole` has no effect on the `STDIN/STDOUT/STDERR` values.
 
-A new console's initial console handles are always inheritable, but
-non-inheritable handles can also be created.  The inheritability can usually
-be changed, except on Windows 7 (see notes below).  The `bInheritHandles`
-parameter to `CreateProcess` has no effect on console handles, which are
-always inherited if they are marked inheritable.  (As such, the
-`PROC_THREAD_ATTRIBUTE_HANDLE_LIST` attribute should be irrelevant to console
-handles; they would already be inherited.)  (XXX: However, verify that the
-attribute does not suppress inheritance.)
 
-Traditional console handles cannot be duplicated to other processes.
+
 
 Windows 8 semantics
 -------------------
@@ -88,31 +199,84 @@ refers to the currently attached console's input queue, and an *Unbound*
 process' console initialization.  These objects are usable as long as the
 calling process has any console attached.
 
-### Console initialization
+Unlike traditional console handles, modern console handles **can** be
+duplicated to other processes.
 
-When a process' console state is initialized, Windows may open new handles.
-This happens in these instances:
+### Standard handles, CreateProcess
 
- - at process startup if `CreateProcess` was called with `CREATE_NEW_CONSOLE` set
- - at process startup if `CreateProcess` was called with `CREATE_NO_WINDOW` set
- - at process startup if `CreateProcess` was called with `bInheritHandles=FALSE`
- - when `AttachConsole` is called
- - when `AllocConsole` is called
+Whenever a process is attached to a console (during startup, `AttachConsole`,
+or `AllocConsole`), Windows will sometimes create new *Unbound* console
+objects and assign them to one or more standard handles.  If it assigns
+to both `STDOUT` and `STDERR`, it reuses the same new *Unbound*
+*Output* object for both.
 
-When it opens handles, Windows sets `STDIN/STDOUT/STDERR` to three newly opened
-handles to two *Unbound* console objects.
+As with previous releases, standard handle determination is affected by the
+*UseStdHandles* and *InheritHandles* flags.
+
+(N.B.: The combination of !*InheritHandles* and *UseStdHandles* does not
+really make sense, so it's not surprising to see Windows 8 ignore
+*UseStdHandles* in this case, as it sometimes does.)
+
+Starting in Windows 8, `CreateProcess` sets standard handles as follows:
+
+ - Regardless of *ConsoleCreationMode*, if *InheritHandles* and
+   *UseStdHandles*, then handles are set according to `STARTUPINFO`,
+   except that each `NULL` handle is replaced with a new console
+   handle.  As with previous releases, Windows makes no effort to validate
+   the handle, nor will it propagate a non-inheritable `STARTUPINFO` handle.
+
+   Otherwise, find the next applicable rule.
+
+ - If *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
+   Windows sets all three handles to new console handles.
+
+ - If *ConsoleCreationMode* is *Inherit*:
+
+    - If *InheritHandles* and !*UseStdHandles*, then the parent's standard
+      handles are copied as-is to the child, without exception.
+
+    - If !*InheritHandles* and *UseStdHandles*, then all three handles become
+      `NULL`.
+
+    - If !*InheritHandles* and !*UseStdHandles*, then Windows duplicates each
+      parent standard handle into the child.
+
+      As with previous releases, `GetProcessHandle()` becomes a true process
+      handle.  `FreeConsole` in Windows 8 does not close the duplicated
+      handles, even if Windows had duplicated a console handle, which is
+      likely to occur.
+
+ - If *ConsoleCreationMode* is *Detach*:
+
+    - XXX: ...
+
+XXX: Also, I don't expect the `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` attribute
+to matter here, but it's needs to be tested.
+
+### AllocConsole, AttachConsole
+
+`AllocConsole` and `AttachConsole` set the standard handles as follows:
+
+ - If *UseStdHandles*, then Windows opens a console handle for each standard
+   handle that is currently `NULL`.
+
+ - If !*UseStdHandles*, then Windows opens three new console handles.
+
+### Implicit screen buffer refcount
 
 Regardless of whether new handles were opened, Windows increments a refcount
-on the active screen buffer, which decrements only when the process detaches
-from the console.
+on the console's currently active screen buffer, which decrements only when
+the process detaches from the console.
+
+### FreeConsole
 
 As in previous Windows releases, `FreeConsole` in Windows 8 does not change
-the `STDIN/STDOUT/STDERR` values.  If Windows opened new handles for
+the `STDIN/STDOUT/STDERR` values.  If Windows opened new console handles for
 `STDIN/STDOUT/STDERR` when it initialized the process' console state, then
 `FreeConsole` will close those handles.  Otherwise, `FreeConsole` will only
 close the two internal handles.
 
-### Interesting Consequences
+### Interesting properties
 
  * `FreeConsole` can close a non-console handle.  This happens if:
 
@@ -123,7 +287,7 @@ close the two internal handles.
 
    (Perhaps programs are not expected to close their standard handles.)
 
- * Console handles--*Bound* or *Unbound*--**can** be duplicated to other
+ * Console handles--*Bound* or *Unbound*--can be duplicated to other
    processes.  The duplicated handles are sometimes usable, especially
    if *Unbound*.  The same *Unbound* *Output* object can be open in two
    different processes and refer to different screen buffers in the same
@@ -140,8 +304,8 @@ close the two internal handles.
  * A program that repeatedly reinvoked itself with `CREATE_NEW_CONSOLE` and
    `bInheritHandles=TRUE` would accumulate console handles.  Each child
    would inherit all of the previous child's console handles, then allocate
-   three more for itself.  All of the handles would be usable if the
-   program kept track of them somehow.
+   three more for itself.  All of the handles would be usable (if the
+   program kept track of them somehow).
 
 Other notes
 -----------
