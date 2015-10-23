@@ -71,3 +71,6 @@ std::vector<RemoteHandle> inheritableHandles(
     const std::vector<RemoteHandle> &vec);
 std::vector<uint64_t> handleInts(const std::vector<RemoteHandle> &vec);
 std::vector<HANDLE> handleValues(const std::vector<RemoteHandle> &vec);
+std::vector<RemoteHandle> stdHandles(RemoteWorker &worker);
+void setStdHandles(std::vector<RemoteHandle> handles);
+bool allInheritable(const std::vector<RemoteHandle> &vec);

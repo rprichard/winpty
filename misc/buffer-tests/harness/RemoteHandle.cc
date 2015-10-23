@@ -203,3 +203,24 @@ std::vector<HANDLE> handleValues(const std::vector<RemoteHandle> &vec) {
     }
     return ret;
 }
+
+// It would make more sense to use a std::tuple here, but it's inconvenient.
+std::vector<RemoteHandle> stdHandles(RemoteWorker &worker) {
+    return {
+        worker.getStdin(),
+        worker.getStdout(),
+        worker.getStderr(),
+    };
+}
+
+// It would make more sense to use a std::tuple here, but it's inconvenient.
+void setStdHandles(std::vector<RemoteHandle> handles) {
+    ASSERT(handles.size() == 3);
+    handles[0].setStdin();
+    handles[1].setStdout();
+    handles[2].setStderr();
+}
+
+bool allInheritable(const std::vector<RemoteHandle> &vec) {
+    return handleValues(vec) == handleValues(inheritableHandles(vec));
+}

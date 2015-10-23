@@ -10,7 +10,7 @@ static void checkAttachHandleSet(Worker &child, Worker &source) {
     auto cvecInherit = inheritableHandles(cvec);
     auto svecInherit = inheritableHandles(source.scanForConsoleHandles());
     auto hv = &handleValues;
-    if (hv(cvecInherit) == hv(svecInherit) && hv(cvecInherit) == hv(cvec)) {
+    if (hv(cvecInherit) == hv(svecInherit) && allInheritable(cvec)) {
         return;
     }
     source.dumpConsoleHandles();
@@ -36,13 +36,11 @@ static void Test_NewConsole_Resets_Everything() {
         Handle::invent(h.value(), p).close();
     }
 
-    // XXX: On Win8+, I doubt we can expect particular console handle values...
-    // XXX: Actually, I'm not sure how much of this test is valid there at all...
     auto checkClean = [](Worker &proc) {
         proc.dumpConsoleHandles();
-        CHECK(proc.getStdin().uvalue() == 0x3);
-        CHECK(proc.getStdout().uvalue() == 0x7);
-        CHECK(proc.getStderr().uvalue() == 0xb);
+        CHECK_EQ(proc.getStdin().uvalue(), 0x3u);
+        CHECK_EQ(proc.getStdout().uvalue(), 0x7u);
+        CHECK_EQ(proc.getStderr().uvalue(), 0xbu);
         auto handles = proc.scanForConsoleHandles();
         CHECK(handleValues(handles) == (std::vector<HANDLE> {
             proc.getStdin().value(),
