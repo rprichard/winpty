@@ -176,7 +176,6 @@ static void Test_InheritNothing() {
     CHECK(c.getStdout().value() == p.getStdout().value());
     CHECK(c.getStderr().value() == p.getStderr().value());
     // Verify a console is attached.
-    CHECK(c.consoleWindow() != NULL);
     CHECK(c.openConin().value() != INVALID_HANDLE_VALUE);
     CHECK(c.openConout().value() != INVALID_HANDLE_VALUE);
     CHECK(c.newBuffer().value() != INVALID_HANDLE_VALUE);
