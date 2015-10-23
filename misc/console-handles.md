@@ -188,7 +188,6 @@ to the last screen buffer, then (2) creating a new screen buffer:
     int main() {
         FreeConsole();
         AllocConsole();
-        CloseHandle((HANDLE)0x3);
         CloseHandle((HANDLE)0x7);
         CloseHandle((HANDLE)0xb);
         CreateConsoleScreenBuffer(
