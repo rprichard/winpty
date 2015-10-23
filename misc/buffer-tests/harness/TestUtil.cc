@@ -18,6 +18,10 @@ std::tuple<RemoteHandle, RemoteHandle> newPipe(
     ASSERT(ret && "CreatePipe failed");
     auto p1 = RemoteHandle::dup(readPipe, w, inheritable);
     auto p2 = RemoteHandle::dup(writePipe, w, inheritable);
+    trace("Opened pipe in pid %u: rh=0x%I64x wh=0x%I64x",
+        w.pid(), p1.uvalue(), p2.uvalue());
+    CloseHandle(readPipe);
+    CloseHandle(writePipe);
     return std::make_tuple(p1, p2);
 }
 
