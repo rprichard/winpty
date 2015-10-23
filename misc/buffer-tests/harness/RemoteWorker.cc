@@ -40,45 +40,50 @@ RemoteWorker::RemoteWorker(const std::string &name) :
 RemoteWorker::RemoteWorker(SpawnParams params) :
         RemoteWorker(newWorkerName()) {
     m_process = spawn(m_name, params);
+    ASSERT(m_process != nullptr && "Could not create RemoteWorker");
+    m_valid = true;
     // Perform an RPC just to ensure that the worker process is ready, and
     // the console exists, before returning.
     rpc(Command::GetStdin);
 }
 
 RemoteWorker RemoteWorker::child(SpawnParams params) {
+    auto ret = tryChild(params);
+    ASSERT(ret.valid() && "Could not spawn child worker");
+    return ret;
+}
+
+RemoteWorker RemoteWorker::tryChild(SpawnParams params) {
     RemoteWorker ret(newWorkerName());
     cmd().u.spawn.spawnName = ret.m_name;
     cmd().u.spawn.spawnParams = params;
     rpc(Command::SpawnChild);
-    BOOL dupSuccess = DuplicateHandle(
-        m_process,
-        cmd().handle,
-        GetCurrentProcess(),
-        &ret.m_process,
-        0, FALSE, DUPLICATE_SAME_ACCESS);
-    ASSERT(dupSuccess && "RemoteWorker::child: DuplicateHandle failed");
-    rpc(Command::CloseQuietly);
-    ASSERT(cmd().success && "RemoteWorker::child: CloseHandle failed");
-    // Perform an RPC just to ensure that the worker process is ready, and
-    // the console exists, before returning.
-    ret.rpc(Command::GetStdin);
+    if (cmd().handle != nullptr) {
+        BOOL dupSuccess = DuplicateHandle(
+            m_process,
+            cmd().handle,
+            GetCurrentProcess(),
+            &ret.m_process,
+            0, FALSE, DUPLICATE_SAME_ACCESS);
+        ASSERT(dupSuccess && "RemoteWorker::child: DuplicateHandle failed");
+        rpc(Command::CloseQuietly);
+        ASSERT(cmd().success && "RemoteWorker::child: CloseHandle failed");
+        ret.m_valid = true;
+        // Perform an RPC just to ensure that the worker process is ready, and
+        // the console exists, before returning.
+        ret.rpc(Command::GetStdin);
+    }
     return ret;
 }
 
-RemoteWorker::~RemoteWorker() {
-    cleanup();
-}
-
-void RemoteWorker::cleanup() {
-    if (m_valid) {
-        cmd().dword = 0;
-        rpcAsync(Command::Exit);
-        DWORD result = WaitForSingleObject(m_process, INFINITE);
-        ASSERT(result == WAIT_OBJECT_0 &&
-            "WaitForSingleObject failed while killing worker");
-        CloseHandle(m_process);
-        m_valid = false;
-    }
+void RemoteWorker::exit() {
+    cmd().dword = 0;
+    rpcAsync(Command::Exit);
+    DWORD result = WaitForSingleObject(m_process, INFINITE);
+    ASSERT(result == WAIT_OBJECT_0 &&
+        "WaitForSingleObject failed while killing worker");
+    CloseHandle(m_process);
+    m_valid = false;
 }
 
 CONSOLE_SELECTION_INFO RemoteWorker::selectionInfo() {
@@ -147,6 +152,7 @@ void RemoteWorker::rpcAsync(Command::Kind kind) {
 }
 
 void RemoteWorker::rpcImpl(Command::Kind kind) {
+    ASSERT(m_valid && "Cannot perform an RPC on an invalid RemoteWorker");
     m_finishEvent.wait();
     m_finishEvent.reset();
     cmd().kind = kind;

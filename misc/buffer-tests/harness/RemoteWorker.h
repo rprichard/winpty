@@ -20,11 +20,13 @@ private:
 public:
     RemoteWorker() : RemoteWorker(SpawnParams { false, CREATE_NEW_CONSOLE }) {}
     RemoteWorker(SpawnParams params);
-    RemoteWorker child() { return child(SpawnParams {}); }
-    RemoteWorker child(SpawnParams params);
-    ~RemoteWorker();
+    RemoteWorker child(SpawnParams params={});
+    RemoteWorker tryChild(SpawnParams params={});
+    ~RemoteWorker() { cleanup(); }
+    bool valid() { return m_valid; }
+    void exit();
 private:
-    void cleanup();
+    void cleanup() { if (m_valid) { exit(); } }
 public:
 
     // basic worker info
@@ -33,6 +35,7 @@ public:
 
     // allow moving
     RemoteWorker(RemoteWorker &&other) :
+        m_valid(std::move(other.m_valid)),
         m_name(std::move(other.m_name)),
         m_parcel(std::move(other.m_parcel)),
         m_startEvent(std::move(other.m_startEvent)),
@@ -40,16 +43,18 @@ public:
         m_process(std::move(other.m_process))
     {
         other.m_valid = false;
+        other.m_process = nullptr;
     }
     RemoteWorker &operator=(RemoteWorker &&other) {
         cleanup();
+        m_valid = std::move(other.m_valid);
         m_name = std::move(other.m_name);
         m_parcel = std::move(other.m_parcel);
         m_startEvent = std::move(other.m_startEvent);
         m_finishEvent = std::move(other.m_finishEvent);
         m_process = std::move(other.m_process);
         other.m_valid = false;
-        m_valid = true;
+        other.m_process = nullptr;
         return *this;
     }
 
@@ -102,7 +107,7 @@ private:
     void rpcImpl(Command::Kind kind);
 
 private:
-    bool m_valid = true;
+    bool m_valid = false;
     std::string m_name;
     ShmemParcelTyped<Command> m_parcel;
     Event m_startEvent;

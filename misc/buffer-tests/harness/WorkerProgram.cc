@@ -313,8 +313,10 @@ int main(int argc, char *argv[]) {
                 trace("Spawning child...");
                 cmd.handle = spawn(cmd.u.spawn.spawnName.str(),
                                    cmd.u.spawn.spawnParams);
-                trace("Spawning child... pid %u",
-                    (unsigned int)GetProcessId(cmd.handle));
+                if (cmd.handle != nullptr) {
+                    trace("Spawning child... pid %u",
+                        (unsigned int)GetProcessId(cmd.handle));
+                }
                 break;
             case Command::System:
                 cmd.dword = system(cmd.u.systemText.c_str());

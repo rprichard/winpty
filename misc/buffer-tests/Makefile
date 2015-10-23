@@ -4,8 +4,15 @@ include ../../config-mingw.mk
 # %I64x.  I can't use %lld because it's broken on MinGW-on-WinXP, though it
 # works on later OSs.  %I64x works everywhere with MinGW, at runtime.  I
 # need to find a better way to do this int-to-string conversion.
-CFLAGS +=   -MMD -Wall  -Iharness -I../../shared
-CXXFLAGS += -MMD -Wall  -Iharness -I../../shared -std=c++11 -Wno-format
+CXXFLAGS += \
+	-MMD \
+	-Wall \
+	-Wno-format \
+	-Iharness -I../../shared \
+	-std=c++11 \
+	-DUNICODE \
+	-D_UNICODE \
+	-D_WIN32_WINNT=0x0600
 LDFLAGS += -static -static-libgcc -static-libstdc++
 
 # To disable PCH, just comment out these two lines.
