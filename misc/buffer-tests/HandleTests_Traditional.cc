@@ -187,7 +187,7 @@ static void Test_InheritNothing() {
 static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     printTestName(__FUNCTION__);
     Worker p;
-    Worker unrelated(SpawnParams { false, DETACHED_PROCESS });
+    Worker unrelated({ false, DETACHED_PROCESS });
 
     auto conin = p.getStdin().dup(TRUE);
     auto conout1 = p.getStdout().dup(TRUE);

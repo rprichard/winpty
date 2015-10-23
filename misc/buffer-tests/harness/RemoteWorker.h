@@ -15,11 +15,10 @@
 class RemoteWorker {
     friend class RemoteHandle;
 
-private:
-    RemoteWorker(const std::string &name);
 public:
-    RemoteWorker() : RemoteWorker(SpawnParams { false, CREATE_NEW_CONSOLE }) {}
-    RemoteWorker(SpawnParams params);
+    struct {} static constexpr DoNotSpawn = {};
+    explicit RemoteWorker(decltype(DoNotSpawn));
+    explicit RemoteWorker(SpawnParams params={false, CREATE_NEW_CONSOLE});
     RemoteWorker child(SpawnParams params={});
     RemoteWorker tryChild(SpawnParams params={}, DWORD *errCode=nullptr);
     ~RemoteWorker() { cleanup(); }

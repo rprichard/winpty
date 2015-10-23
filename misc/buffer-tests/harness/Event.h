@@ -7,7 +7,7 @@
 
 class Event {
 public:
-    Event(const std::string &name);
+    explicit Event(const std::string &name);
     ~Event();
     void set();
     void reset();

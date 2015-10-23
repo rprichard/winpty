@@ -362,7 +362,7 @@ static void Test_Activate_Does_Not_Change_Standard_Handles() {
 static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     printTestName("Test_AttachConsole_And_CreateProcess_Inheritance");
     Worker p;
-    Worker unrelated(SpawnParams { false, DETACHED_PROCESS });
+    Worker unrelated({ false, DETACHED_PROCESS });
 
     auto conin = p.getStdin().dup(TRUE);
     auto conout1 = p.getStdout().dup(TRUE);

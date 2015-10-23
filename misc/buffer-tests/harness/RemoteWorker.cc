@@ -28,17 +28,16 @@ static std::string newWorkerName() {
 
 } // anonymous namespace
 
-RemoteWorker::RemoteWorker(const std::string &name) :
-    m_name(name),
-    m_parcel(name + "-shmem", ShmemParcel::CreateNew),
-    m_startEvent(name + "-start"),
-    m_finishEvent(name + "-finish")
+RemoteWorker::RemoteWorker(decltype(DoNotSpawn)) :
+    m_name(newWorkerName()),
+    m_parcel(m_name + "-shmem", ShmemParcel::CreateNew),
+    m_startEvent(m_name + "-start"),
+    m_finishEvent(m_name + "-finish")
 {
     m_finishEvent.set();
 }
 
-RemoteWorker::RemoteWorker(SpawnParams params) :
-        RemoteWorker(newWorkerName()) {
+RemoteWorker::RemoteWorker(SpawnParams params) : RemoteWorker(DoNotSpawn) {
     m_process = spawn(m_name, params, nullptr);
     ASSERT(m_process != nullptr && "Could not create RemoteWorker");
     m_valid = true;
@@ -54,7 +53,7 @@ RemoteWorker RemoteWorker::child(SpawnParams params) {
 }
 
 RemoteWorker RemoteWorker::tryChild(SpawnParams params, DWORD *errCode) {
-    RemoteWorker ret(newWorkerName());
+    RemoteWorker ret(DoNotSpawn);
     cmd().u.spawn.spawnName = ret.m_name;
     cmd().u.spawn.spawnParams = params;
     rpc(Command::SpawnChild);
