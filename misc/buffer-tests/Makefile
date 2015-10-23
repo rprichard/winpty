@@ -14,8 +14,31 @@ PCHDEPS = build/pch.h.gch
 
 # Use gmake -n to see the command-lines gmake would run.
 
-.PHONY : default
-default : all
+COMMON_OBJECTS = \
+	build/DebugClient.o \
+	build/Event.o \
+	build/NtHandleQuery.o \
+	build/ShmemParcel.o \
+	build/Spawn.o \
+	build/UnicodeConversions.o \
+	build/Util.o \
+	build/WinptyAssert.o \
+	build/winpty_wcsnlen.o
+
+WORKER_OBJECTS = build/WorkerProgram.o
+TEST_OBJECTS = \
+	build/RemoteHandle.o \
+	build/RemoteWorker.o \
+	build/TestUtil.o
+
+include tests.mk
+
+.PHONY : all
+all : $(TESTS) build/Worker.exe
+
+.PHONY : clean
+clean:
+	rm -f build/*.exe build/*.o build/*.d build/*.gch
 
 build/pch.h.gch : harness/pch.h
 	@echo Compiling PCH $<
@@ -39,30 +62,6 @@ build/%.o : harness/%.cc $(PCHDEPS)
 
 .PRECIOUS : build/%.o
 
-COMMON_OBJECTS = \
-	build/DebugClient.o \
-	build/Event.o \
-	build/NtHandleQuery.o \
-	build/ShmemParcel.o \
-	build/Spawn.o \
-	build/UnicodeConversions.o \
-	build/Util.o \
-	build/WinptyAssert.o \
-	build/winpty_wcsnlen.o
-
-WORKER_OBJECTS = build/WorkerProgram.o
-TEST_OBJECTS = \
-	build/RemoteHandle.o \
-	build/RemoteWorker.o \
-	build/TestUtil.o
-
-all : \
-	build/Test_GetConsoleTitleW.exe \
-	build/Win7Bug_InheritHandles.exe \
-	build/Win7Bug_RaceCondition.exe \
-	build/TestHandleInheritance.exe \
-	build/Worker.exe
-
 build/Worker.exe : $(WORKER_OBJECTS) $(COMMON_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
@@ -70,9 +69,5 @@ build/Worker.exe : $(WORKER_OBJECTS) $(COMMON_OBJECTS)
 build/%.exe : build/%.o $(TEST_OBJECTS) $(COMMON_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
-
-.PHONY : clean
-clean:
-	rm -f build/*.exe build/*.o build/*.d build/*.gch
 
 -include build/*.d
