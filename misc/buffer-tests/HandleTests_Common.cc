@@ -96,7 +96,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     auto ph4 = std::get<1>(pipe2);
 
     // Add an extra console handle so we can verify that a child's console
-    // handles didn't reverted to the original default, but were inherited.
+    // handles didn't revert to the original default, but were inherited.
     p.openConout(true);
 
     // Verify that ntHandlePointer is working...
@@ -214,7 +214,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     }
 
     if (!isAtLeastWin8()) {
-        // Make a final valiant effort to test
+        // Make a final valiant effort to find a
         // PROC_THREAD_ATTRIBUTE_HANDLE_LIST and console handle interaction.
         // We'll set all the standard handles to pipes.  Nevertheless, all
         // console handles are inherited.
@@ -385,6 +385,23 @@ static void Test_GetStdHandle_SetStdHandle() {
         CHECK_EQ(p.openConout().firstChar(), 'b');
     }
 }
+
+
+
+// MSDN's CreateProcess page currently has this note in it:
+//
+//     Important  The caller is responsible for ensuring that the standard
+//     handle fields in STARTUPINFO contain valid handle values. These fields
+//     are copied unchanged to the child process without validation, even when
+//     the dwFlags member specifies STARTF_USESTDHANDLES. Incorrect values can
+//     cause the child process to misbehave or crash. Use the Application
+//     Verifier runtime verification tool to detect invalid handles.
+//
+// XXX: The word "even" here sticks out.  Verify that the standard handle
+// fields in STARTUPINFO are ignored when STARTF_USESTDHANDLES is not
+// specified.
+
+
 
 void runCommonTests() {
     Test_IntrinsicInheritFlags();

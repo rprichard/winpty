@@ -180,7 +180,7 @@ void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
 std::wstring Win32Console::title()
 {
     while (true) {
-        // Calling GetConsoleTitleW is tricky, because it's behavior changed
+        // Calling GetConsoleTitleW is tricky, because its behavior changed
         // from XP->Vista, then again from Win7->Win8.  The Vista+Win7 behavior
         // is especially broken.
         //
