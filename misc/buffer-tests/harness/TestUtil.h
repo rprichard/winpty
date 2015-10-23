@@ -36,3 +36,4 @@ std::tuple<RemoteHandle, RemoteHandle> newPipe(
         RemoteWorker &w, BOOL inheritable=FALSE);
 void printTestName(const char *testName);
 std::string windowText(HWND hwnd);
+void *ntHandlePointer(RemoteHandle &h);

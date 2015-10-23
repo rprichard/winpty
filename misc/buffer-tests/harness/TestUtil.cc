@@ -3,6 +3,7 @@
 #include <array>
 #include <string>
 
+#include "NtHandleQuery.h"
 #include "RemoteHandle.h"
 #include "RemoteWorker.h"
 #include "UnicodeConversions.h"
@@ -33,4 +34,17 @@ std::string windowText(HWND hwnd) {
     ASSERT(ret >= 0 && ret <= buf.size() - 1);
     buf[ret] = L'\0';
     return narrowString(std::wstring(buf.data()));
+}
+
+// Get the ObjectPointer (underlying NT object) for the NT handle.
+void *ntHandlePointer(RemoteHandle &h) {
+    HANDLE ret = INVALID_HANDLE_VALUE;
+    for (auto &entry : queryNtHandles()) {
+        if (entry.OwnerPid == h.worker().pid() &&
+                entry.HandleValue == h.uvalue()) {
+            ASSERT(ret == INVALID_HANDLE_VALUE);
+            ret = entry.ObjectPointer;
+        }
+    }
+    return ret;
 }
