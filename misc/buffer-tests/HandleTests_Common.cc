@@ -95,6 +95,10 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     auto ph3 = std::get<0>(pipe2);
     auto ph4 = std::get<1>(pipe2);
 
+    // Add an extra console handle so we can verify that a child's console
+    // handles didn't reverted to the original default, but were inherited.
+    p.openConout(true);
+
     // Verify that ntHandlePointer is working...
     CHECK(ntHandlePointer(ph1) != nullptr);
     CHECK(ntHandlePointer(ph2) != nullptr);
@@ -103,18 +107,40 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     CHECK(ntHandlePointer(ph1) == ntHandlePointer(dupTest));
     dupTest.close();
 
-    auto testSetup = [&](size_t cb, DWORD dwCreationFlags, HANDLE inherit) {
-        SpawnParams sp(true, dwCreationFlags);
+    auto testSetupOneHandle = [&](SpawnParams sp, size_t cb, HANDLE inherit) {
         sp.sui.cb = cb;
         sp.inheritCount = 1;
         sp.inheritList = { inherit };
         return p.tryChild(sp, &errCode);
     };
 
+    auto testSetupStdHandles = [&](SpawnParams sp, Handle in,
+                                   Handle out, Handle err) {
+        sp.dwCreationFlags |= EXTENDED_STARTUPINFO_PRESENT;
+        sp.sui.cb = sizeof(STARTUPINFOEXW);
+        sp.sui.dwFlags |= STARTF_USESTDHANDLES;
+        sp.sui.hStdInput = in.value();
+        sp.sui.hStdOutput = out.value();
+        sp.sui.hStdError = err.value();
+        // This test case isn't interested in what
+        // PROC_THREAD_ATTRIBUTE_HANDLE_LIST does when there are duplicate
+        // handles in its list.
+        ASSERT(in.value() != out.value() &&
+               out.value() != err.value() &&
+               in.value() != err.value());
+        sp.inheritCount = 3;
+        sp.inheritList = {
+            sp.sui.hStdInput,
+            sp.sui.hStdOutput,
+            sp.sui.hStdError,
+        };
+        return p.tryChild(sp, &errCode);
+    };
+
     {
-        // Use EXTENDED_STARTUPINFO_PRESENT correctly.
-        auto c = testSetup(sizeof(STARTUPINFOEXW),
-            EXTENDED_STARTUPINFO_PRESENT, ph1.value());
+        // Use PROC_THREAD_ATTRIBUTE_HANDLE_LIST correctly.
+        auto c = testSetupOneHandle({true, EXTENDED_STARTUPINFO_PRESENT},
+            sizeof(STARTUPINFOEXW), ph1.value());
         CHECK(c.valid());
         auto ch1 = Handle::invent(ph1.value(), c);
         auto ch2 = Handle::invent(ph2.value(), c);
@@ -132,9 +158,10 @@ static void Test_CreateProcess_STARTUPINFOEX() {
         }
     }
     {
-        // STARTUPINFOEX parameter is ignored if
+        // The STARTUPINFOEX parameter is ignored if
         // EXTENDED_STARTUPINFO_PRESENT isn't present.
-        auto c = testSetup(sizeof(STARTUPINFOEXW), 0, ph1.value());
+        auto c = testSetupOneHandle({true},
+            sizeof(STARTUPINFOEXW), ph1.value());
         CHECK(c.valid());
         auto ch2 = Handle::invent(ph2.value(), c);
         // i.e. ph2 was inherited, because ch2 identifies the same thing.
@@ -143,8 +170,8 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     {
         // If EXTENDED_STARTUPINFO_PRESENT is specified, but the cb value
         // is wrong, the API call fails.
-        auto c = testSetup(sizeof(STARTUPINFOW),
-            EXTENDED_STARTUPINFO_PRESENT, ph1.value());
+        auto c = testSetupOneHandle({true, EXTENDED_STARTUPINFO_PRESENT},
+            sizeof(STARTUPINFOW), ph1.value());
         CHECK(!c.valid());
         CHECK_EQ(errCode, (DWORD)ERROR_INVALID_PARAMETER);
     }
@@ -152,8 +179,15 @@ static void Test_CreateProcess_STARTUPINFOEX() {
         // Attempting to inherit the GetCurrentProcess pseudo-handle also
         // fails.  (The MSDN docs point out that using GetCurrentProcess here
         // will fail.)
-        auto c = testSetup(sizeof(STARTUPINFOEXW),
-            EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess());
+        auto c = testSetupOneHandle({true, EXTENDED_STARTUPINFO_PRESENT},
+            sizeof(STARTUPINFOEXW), GetCurrentProcess());
+        CHECK(!c.valid());
+        CHECK_EQ(errCode, (DWORD)ERROR_INVALID_PARAMETER);
+    }
+    {
+        // If bInheritHandles=FALSE and PROC_THREAD_ATTRIBUTE_HANDLE_LIST are
+        // combined, the API call fails.
+        auto c = testSetupStdHandles({false}, ph1, ph2, ph4);
         CHECK(!c.valid());
         CHECK_EQ(errCode, (DWORD)ERROR_INVALID_PARAMETER);
     }
@@ -161,19 +195,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     if (!isAtLeastWin8()) {
         // Attempt to restrict inheritance to just one of the three open
         // traditional console handles.
-        SpawnParams sp(true, EXTENDED_STARTUPINFO_PRESENT);
-        sp.sui.cb = sizeof(STARTUPINFOEXW);
-        sp.sui.dwFlags |= STARTF_USESTDHANDLES;
-        sp.sui.hStdInput = ph1.value();
-        sp.sui.hStdOutput = ph2.value();
-        sp.sui.hStdError = p.getStderr().value();
-        sp.inheritCount = 3;
-        sp.inheritList = {
-            sp.sui.hStdInput,
-            sp.sui.hStdOutput,
-            sp.sui.hStdError,
-        };
-        auto c = p.tryChild(sp, &errCode);
+        auto c = testSetupStdHandles({true}, ph1, ph2, p.getStderr());
         if (isWin7()) {
             // On Windows 7, the CreateProcess call fails with a strange
             // error.
@@ -204,20 +226,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
         // PROC_THREAD_ATTRIBUTE_HANDLE_LIST and console handle interaction.
         // We'll set all the standard handles to pipes.  Nevertheless, all
         // console handles are inherited.
-        SpawnParams sp(true, EXTENDED_STARTUPINFO_PRESENT);
-        sp.sui.cb = sizeof(STARTUPINFOEXW);
-        sp.sui.dwFlags |= STARTF_USESTDHANDLES;
-        sp.sui.hStdInput = ph1.value();
-        sp.sui.hStdOutput = ph2.value();
-        sp.sui.hStdError = ph2.dup(true).value();
-        sp.inheritCount = 3;
-        sp.inheritList = {
-            sp.sui.hStdInput,
-            sp.sui.hStdOutput,
-            sp.sui.hStdError,
-        };
-        p.openConout(true); // Add an extra handle.
-        auto c = p.tryChild(sp, &errCode);
+        auto c = testSetupStdHandles({true}, ph1, ph2, ph4);
         CHECK(c.valid());
         CHECK(handleValues(c.scanForConsoleHandles()) ==
               handleValues(p.scanForConsoleHandles()));
