@@ -5,14 +5,14 @@ include ../../config-mingw.mk
 # works on later OSs.  %I64x works everywhere with MinGW, at runtime.  I
 # need to find a better way to do this int-to-string conversion.
 CXXFLAGS += \
-	-MMD \
-	-Wall \
-	-Wno-format \
-	-Iharness -I../../shared \
-	-std=c++11 \
-	-DUNICODE \
-	-D_UNICODE \
-	-D_WIN32_WINNT=0x0600
+    -MMD \
+    -Wall \
+    -Wno-format \
+    -Iharness -I../../shared \
+    -std=c++11 \
+    -DUNICODE \
+    -D_UNICODE \
+    -D_WIN32_WINNT=0x0600
 LDFLAGS += -static -static-libgcc -static-libstdc++
 
 # To disable PCH, just comment out these two lines.
@@ -22,26 +22,30 @@ PCHDEPS = build/pch.h.gch
 # Use gmake -n to see the command-lines gmake would run.
 
 COMMON_OBJECTS = \
-	build/DebugClient.o \
-	build/Event.o \
-	build/NtHandleQuery.o \
-	build/ShmemParcel.o \
-	build/Spawn.o \
-	build/UnicodeConversions.o \
-	build/Util.o \
-	build/WinptyAssert.o \
-	build/winpty_wcsnlen.o
+    build/DebugClient.o \
+    build/Event.o \
+    build/NtHandleQuery.o \
+    build/ShmemParcel.o \
+    build/Spawn.o \
+    build/UnicodeConversions.o \
+    build/Util.o \
+    build/WinptyAssert.o \
+    build/winpty_wcsnlen.o
 
-WORKER_OBJECTS = build/WorkerProgram.o
+WORKER_OBJECTS = \
+    build/WorkerProgram.o \
+    $(COMMON_OBJECTS)
+
 TEST_OBJECTS = \
-	build/RemoteHandle.o \
-	build/RemoteWorker.o \
-	build/TestUtil.o
+    build/RemoteHandle.o \
+    build/RemoteWorker.o \
+    build/TestUtil.o \
+    $(COMMON_OBJECTS)
 
 include tests.mk
 
 .PHONY : all
-all : $(TESTS) build/Worker.exe
+all : $(TESTS) build/Worker.exe build/HandleTests.exe
 
 .PHONY : clean
 clean:
@@ -69,11 +73,19 @@ build/%.o : harness/%.cc $(PCHDEPS)
 
 .PRECIOUS : build/%.o
 
-build/Worker.exe : $(WORKER_OBJECTS) $(COMMON_OBJECTS)
+build/Worker.exe : $(WORKER_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
 
-build/%.exe : build/%.o $(TEST_OBJECTS) $(COMMON_OBJECTS)
+build/HandleTests.exe : $(TEST_OBJECTS) \
+            build/HandleTests.o \
+            build/HandleTests_Common.o \
+            build/HandleTests_Modern.o \
+            build/HandleTests_Traditional.o
+	@echo Linking $@
+	@$(CXX) -o $@ $^ $(LDFLAGS)
+
+build/%.exe : build/%.o $(TEST_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
 
