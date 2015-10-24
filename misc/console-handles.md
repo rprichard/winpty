@@ -208,7 +208,8 @@ Whenever a process is attached to a console (during startup, `AttachConsole`,
 or `AllocConsole`), Windows will sometimes create new *Unbound* console
 objects and assign them to one or more standard handles.  If it assigns
 to both `STDOUT` and `STDERR`, it reuses the same new *Unbound*
-*Output* object for both.
+*Output* object for both.  If `FreeConsole` is called, it will close these
+console handles.
 
 As with previous releases, standard handle determination is affected by the
 *UseStdHandles* and *InheritHandles* flags.
@@ -245,8 +246,10 @@ Starting in Windows 8, `CreateProcess` sets standard handles as follows:
       As with previous releases, the current process pseudo-handle becomes a
       true process handle to the parent.  However, starting with Windows 8.1,
       it instead translates to NULL.  (i.e. The bug was fixed.)  `FreeConsole`
-      in Windows 8 does not close the duplicated handles, even if Windows had
-      duplicated a console handle, which is likely to occur.
+      in Windows 8 does not close these duplicated handles, in general,
+      because they're not necessarily console handles.  Even if one does
+      happen to be a console handle, `FreeConsole` still does not close it.
+      (That said, these handles are likely to be console handles.)
 
  - If *ConsoleCreationMode* is *Detach*:
 
@@ -266,9 +269,11 @@ to matter here, but it's needs to be tested.
 
 ### Implicit screen buffer refcount
 
-Regardless of whether new handles were opened, Windows increments a refcount
-on the console's currently active screen buffer, which decrements only when
-the process detaches from the console.
+When a process' console state is initialized (at startup, `AllocConsole`
+or `AttachConsole`), Windows increments a refcount on the console's
+currently active screen buffer, which decrements only when the process
+detaches from the console.  All *Unbound* *Output* console objects reference
+this screen buffer.
 
 ### FreeConsole
 
