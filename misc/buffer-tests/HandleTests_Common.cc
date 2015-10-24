@@ -439,8 +439,9 @@ static void Test_CreateProcess_SpecialInherit() {
     }
 
     if (isAtLeastWin8()) {
-        // On Windows 8, FreeConsole doesn't even close the duplicated console
-        // handle that process startup created.
+        // On Windows 8 and up, if a standard handle we duplicate just happens
+        // to be a console handle, that isn't sufficient reason for FreeConsole
+        // to close it.
         Worker p;
         auto c = p.child({ false });
         auto ph = stdHandles(p);
