@@ -422,14 +422,20 @@ static void Test_CreateProcess_SpecialInherit() {
     }
 
     {
-        // The GetCurrentProcess() psuedo-handle is translated to a real
-        // process handle.
+        // The GetCurrentProcess() psuedo-handle (i.e. INVALID_HANDLE_VALUE)
+        // is translated to a real handle value for the child process.
+        // Naturally, this was unintended behavior, and as of Windows 8.1, it
+        // is instead translated to NULL.
         Worker p;
         Handle::invent(GetCurrentProcess(), p).setStdout();
         auto c = p.child({ false });
-        CHECK(c.getStdout().value() != GetCurrentProcess());
-        auto handleToPInP = Handle::dup(p.processHandle(), p);
-        CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(handleToPInP));
+        if (isAtLeastWin8_1()) {
+            CHECK(c.getStdout().value() == nullptr);
+        } else {
+            CHECK(c.getStdout().value() != GetCurrentProcess());
+            auto handleToPInP = Handle::dup(p.processHandle(), p);
+            CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(handleToPInP));
+        }
     }
 
     if (isAtLeastWin8()) {

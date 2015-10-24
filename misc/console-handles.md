@@ -242,10 +242,11 @@ Starting in Windows 8, `CreateProcess` sets standard handles as follows:
     - If !*InheritHandles* and !*UseStdHandles*, then Windows duplicates each
       parent standard handle into the child.
 
-      As with previous releases, `GetProcessHandle()` becomes a true process
-      handle.  `FreeConsole` in Windows 8 does not close the duplicated
-      handles, even if Windows had duplicated a console handle, which is
-      likely to occur.
+      As with previous releases, the current process pseudo-handle becomes a
+      true process handle to the parent.  However, starting with Windows 8.1,
+      it instead translates to NULL.  (i.e. The bug was fixed.)  `FreeConsole`
+      in Windows 8 does not close the duplicated handles, even if Windows had
+      duplicated a console handle, which is likely to occur.
 
  - If *ConsoleCreationMode* is *Detach*:
 

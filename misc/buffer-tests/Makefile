@@ -45,7 +45,7 @@ TEST_OBJECTS = \
 include tests.mk
 
 .PHONY : all
-all : $(TESTS) build/Worker.exe build/HandleTests.exe
+all : $(TESTS) build/Worker.exe build/HandleTests.exe build/HandleTests.exe.manifest
 
 .PHONY : clean
 clean:
@@ -84,6 +84,10 @@ build/HandleTests.exe : $(TEST_OBJECTS) \
             build/HandleTests_Traditional.o
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
+
+build/HandleTests.exe.manifest : manifest.xml
+	@Echo Copying $< to $@
+	@cp $< $@
 
 build/%.exe : build/%.o $(TEST_OBJECTS)
 	@echo Linking $@

@@ -27,3 +27,7 @@ inline bool isAtLeastWin7() {
 inline bool isAtLeastWin8() {
     return osversion() >= std::make_tuple(6, 2);
 }
+
+inline bool isAtLeastWin8_1() {
+    return osversion() >= std::make_tuple(6, 3);
+}
