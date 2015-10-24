@@ -510,6 +510,11 @@ static void Test_CreateProcess_SpecialInherit() {
         Handle::invent(nullptr, p).setStdin().setStdout().setStderr();
         auto c4 = p.child({ true, 0, { rh, rh, rh }});
         check(c4, rh, false);
+
+        // Also test the write end of the pipe.
+        auto wh = std::get<1>(pipe).setStdin().setStdout().setStderr();
+        auto c5 = p.child({ false });
+        check(c5, wh, false);
     }
 }
 
