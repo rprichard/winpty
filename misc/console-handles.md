@@ -113,8 +113,8 @@ follows:
 
  - Regardless of *ConsoleCreationMode*, if *UseStdHandles*, then handles are
    set according to `STARTUPINFO`.  Windows makes no attempt to validate the
-   handle, nor will it treat a non-inheritable handle as inheritable because
-   it is listed in `STARTUPINFO`.
+   handle, nor will it treat a non-inheritable handle as inheritable simply
+   because it is listed in `STARTUPINFO`.
 
    Otherwise, find the next applicable rule.
 
@@ -223,7 +223,8 @@ Starting in Windows 8, `CreateProcess` sets standard handles as follows:
    *UseStdHandles*, then handles are set according to `STARTUPINFO`,
    except that each `NULL` handle is replaced with a new console
    handle.  As with previous releases, Windows makes no effort to validate
-   the handle, nor will it propagate a non-inheritable `STARTUPINFO` handle.
+   the handle, nor will it treat a non-inheritable handle as inheritable
+   simply because it is listed in `STARTUPINFO`.
 
    Otherwise, find the next applicable rule.
 
