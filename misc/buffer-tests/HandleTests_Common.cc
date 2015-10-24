@@ -386,6 +386,87 @@ static void Test_GetStdHandle_SetStdHandle() {
     }
 }
 
+static void Test_CreateProcess_SpecialInherit() {
+    // If CreateProcess is called with bInheritHandles=FALSE and without
+    // STARTF_USESTDHANDLES, then CreateProcess will duplicate the parent's
+    // standard handles into the child.  There are slight variations between
+    // traditional and modern OS releases, but it's the same idea in both.
+    printTestName(__FUNCTION__);
+
+    {
+        // Base case: a non-inheritable pipe is still inherited.
+        Worker p;
+        auto pipe = newPipe(p, false);
+        auto rh = std::get<0>(pipe).setStdin();
+        auto wh = std::get<1>(pipe).setStdout().setStderr();
+        auto c = p.child({ false });
+        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(rh));
+        CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(wh));
+        CHECK(ntHandlePointer(c.getStderr()) == ntHandlePointer(wh));
+        // CreateProcess makes separate handles for stdout/stderr.
+        CHECK(c.getStdout().value() != c.getStderr().value());
+        // Calling FreeConsole in the child does not free the duplicated
+        // handles.
+        c.detach();
+        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(rh));
+        CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(wh));
+        CHECK(ntHandlePointer(c.getStderr()) == ntHandlePointer(wh));
+    }
+    {
+        // Bogus values are transformed into zero.
+        Worker p;
+        Handle::invent(0x10000ull, p).setStdin().setStdout();
+        Handle::invent(0x0ull, p).setStderr();
+        auto c = p.child({ false });
+        CHECK(handleInts(stdHandles(c)) == (std::vector<uint64_t> {0,0,0}));
+    }
+
+    {
+        // The GetCurrentProcess() psuedo-handle is translated to a real
+        // process handle.
+        Worker p;
+        Handle::invent(GetCurrentProcess(), p).setStdout();
+        auto c = p.child({ false });
+        CHECK(c.getStdout().value() != GetCurrentProcess());
+        auto handleToPInP = Handle::dup(p.processHandle(), p);
+        CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(handleToPInP));
+    }
+
+    if (isAtLeastWin8()) {
+        // On Windows 8, FreeConsole doesn't even close the duplicated console
+        // handle that process startup created.
+        Worker p;
+        auto c = p.child({ false });
+        auto ph = stdHandles(p);
+        auto ch = stdHandles(c);
+        auto check = [&]() {
+            for (int i = 0; i < 3; ++i) {
+                CHECK(ntHandlePointer(ph[i]) == ntHandlePointer(ch[i]));
+                CHECK_EQ(ph[i].inheritable(), ch[i].inheritable());
+            }
+        };
+        check();
+        c.detach();
+        check();
+    }
+
+    // Traditional console-like values are passed through as-is,
+    // up to 0x0FFFFFFFull.
+    Worker p;
+    Handle::invent(0x0FFFFFFFull, p).setStdin();
+    Handle::invent(0x10000003ull, p).setStdout();
+    Handle::invent(0x00000003ull, p).setStderr();
+    auto c = p.child({ false });
+    if (isAtLeastWin8()) {
+        // These values are invalid on Windows 8 and turned into NULL.
+        CHECK(handleInts(stdHandles(c)) ==
+            (std::vector<uint64_t> { 0, 0, 0 }));
+    } else {
+        CHECK(handleInts(stdHandles(c)) ==
+            (std::vector<uint64_t> { 0x0FFFFFFFull, 0, 3 }));
+    }
+}
+
 
 
 // MSDN's CreateProcess page currently has this note in it:
@@ -415,4 +496,5 @@ void runCommonTests() {
     Test_Activate_Does_Not_Change_Standard_Handles();
     Test_Active_ScreenBuffer_Order();
     Test_GetStdHandle_SetStdHandle();
+    Test_CreateProcess_SpecialInherit();
 }

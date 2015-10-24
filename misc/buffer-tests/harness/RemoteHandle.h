@@ -32,9 +32,14 @@ public:
     RemoteHandle &setStdin();
     RemoteHandle &setStdout();
     RemoteHandle &setStderr();
-    RemoteHandle dup(RemoteWorker &target, BOOL bInheritHandle=FALSE);
+private:
+    RemoteHandle dupImpl(RemoteWorker *target, BOOL bInheritHandle);
+public:
+    RemoteHandle dup(RemoteWorker &target, BOOL bInheritHandle=FALSE) {
+        return dupImpl(&target, bInheritHandle);
+    }
     RemoteHandle dup(BOOL bInheritHandle=FALSE) {
-        return dup(worker(), bInheritHandle);
+        return dupImpl(nullptr, bInheritHandle);
     }
     static RemoteHandle dup(HANDLE h, RemoteWorker &target,
                             BOOL bInheritHandle=FALSE);

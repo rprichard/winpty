@@ -56,17 +56,17 @@ RemoteHandle &RemoteHandle::setStderr() {
     return *this;
 }
 
-RemoteHandle RemoteHandle::dup(RemoteWorker &target, BOOL bInheritHandle) {
+RemoteHandle RemoteHandle::dupImpl(RemoteWorker *target, BOOL bInheritHandle) {
     HANDLE targetProcessFromSource;
 
-    if (&target == &worker()) {
+    if (target == nullptr) {
         targetProcessFromSource = GetCurrentProcess();
     } else {
         // Allow the source worker to see the target worker.
         targetProcessFromSource = INVALID_HANDLE_VALUE;
         BOOL success = DuplicateHandle(
             GetCurrentProcess(),
-            target.m_process,
+            target->m_process,
             worker().m_process,
             &targetProcessFromSource,
             0, FALSE, DUPLICATE_SAME_ACCESS);
@@ -80,7 +80,7 @@ RemoteHandle RemoteHandle::dup(RemoteWorker &target, BOOL bInheritHandle) {
     worker().rpc(Command::Duplicate);
     HANDLE retHandle = worker().cmd().handle;
 
-    if (&target != &worker()) {
+    if (target != nullptr) {
         // Cleanup targetProcessFromSource.
         worker().cmd().handle = targetProcessFromSource;
         worker().rpc(Command::CloseQuietly);
@@ -88,7 +88,7 @@ RemoteHandle RemoteHandle::dup(RemoteWorker &target, BOOL bInheritHandle) {
             "Error closing remote process handle");
     }
 
-    return RemoteHandle(retHandle, target);
+    return RemoteHandle(retHandle, target != nullptr ? *target : worker());
 }
 
 CONSOLE_SCREEN_BUFFER_INFO RemoteHandle::screenBufferInfo() {

@@ -18,22 +18,30 @@ static void checkAttachHandleSet(Worker &child, Worker &source) {
     CHECK(false && "checkAttachHandleSet failed");
 }
 
-static void Test_NewConsole_Resets_Everything() {
+static void Test_HandleDuplication() {
+    // A traditional console handle cannot be duplicated to another process,
+    // and it must be duplicated using the GetConsoleProcess() pseudo-value.
+    // (This tests targetProcess != psuedo-value, but it doesn't test
+    // sourceProcess != pseudo-value.  Not worth the trouble.)
+    printTestName(__FUNCTION__);
+    Worker p, other;
+    p.getStdout().setFirstChar('x');
+    CHECK_EQ(p.getStdout().dup().firstChar(), 'x');
+    CHECK_EQ(p.getStdout().dup(p).value(), INVALID_HANDLE_VALUE);
+    CHECK_EQ(p.getStdout().dup(other).value(), INVALID_HANDLE_VALUE);
+}
+
+static void Test_NewConsole_Resets_ConsoleHandleSet() {
     // Test that creating a new console properly resets everything.
-    //
-    // Tests:
-    //  * CreateProcess - CREATE_NEW_CONSOLE
-    //  * AllocConsole
-    //
     printTestName(__FUNCTION__);
     Worker p;
 
     // Open some handles to demonstrate the "clean slate" outcome.
-    auto orig = { p.getStdin(), p.getStdout(), p.getStderr() };
-    p.getStdin().dup(TRUE).setStdin();
-    p.newBuffer(TRUE).setStderr().dup(TRUE).setStdout().activate();
+    auto orig = stdHandles(p);
+    p.getStdin().dup(true).setStdin();
+    p.newBuffer(true).setStderr().dup(true).setStdout().activate();
     for (auto &h : orig) {
-        Handle::invent(h.value(), p).close();
+        h.close();
     }
 
     auto checkClean = [](Worker &proc) {
@@ -47,22 +55,34 @@ static void Test_NewConsole_Resets_Everything() {
             proc.getStdout().value(),
             proc.getStderr().value(),
         }));
-        for (auto &h : handles) {
-            CHECK(h.inheritable());
-        }
+        CHECK(allInheritable(handles));
     };
 
     // A child with a new console is reset to a blank slate.
-    auto c = p.child({ true, CREATE_NEW_CONSOLE });
-    checkClean(c);
+    for (int inherit = 0; inherit <= 1; ++inherit) {
+        auto c1 = p.child({ inherit != 0, CREATE_NEW_CONSOLE });
+        checkClean(c1);
+        auto c2 = p.child({ inherit != 0, CREATE_NO_WINDOW });
+        checkClean(c2);
 
-    // Similarly, detaching and allocating a new console resets everything.
+        // Starting a child from a DETACHED_PROCESS also produces a clean
+        // configuration.
+        Worker detachedParent({ false, DETACHED_PROCESS });
+        auto pipe = newPipe(detachedParent, true);
+        std::get<0>(pipe).setStdin();
+        std::get<1>(pipe).setStdout().dup(true).setStdout();
+        Worker c3 = detachedParent.child({ inherit != 0, 0 });
+        checkClean(c3);
+    }
+
+    // Similarly, detaching and allocating a new console resets the
+    // ConsoleHandleSet.
     p.detach();
     p.alloc();
     checkClean(p);
 }
 
-static void Test_DetachedProcess() {
+static void Test_CreateProcess_DetachedProcess() {
     // A child with DETACHED_PROCESS has no console, and its standard handles
     // are set to 0 by default.
     printTestName(__FUNCTION__);
@@ -98,23 +118,23 @@ static void Test_DetachedProcess() {
 static void Test_Creation_bInheritHandles_Flag() {
     // The bInheritHandles flags to CreateProcess has no effect on console
     // handles.
-    // XXX: I think it *does* on Windows 8 and up.
     printTestName(__FUNCTION__);
     Worker p;
     for (auto &h : (Handle[]){
         p.getStdin(),
         p.getStdout(),
         p.getStderr(),
-        p.newBuffer(FALSE),
-        p.newBuffer(TRUE),
+        p.newBuffer(false),
+        p.newBuffer(true),
     }) {
-        h.dup(FALSE);
-        h.dup(TRUE);
+        h.dup(false);
+        h.dup(true);
     }
     auto cY = p.child({ true });
     auto cN = p.child({ false });
-    CHECK(handleValues(cY.scanForConsoleHandles()) ==
-          handleValues(cN.scanForConsoleHandles()));
+    auto &hv = handleValues;
+    CHECK(hv(cY.scanForConsoleHandles()) == hv(inheritableHandles(p.scanForConsoleHandles())));
+    CHECK(hv(cN.scanForConsoleHandles()) == hv(inheritableHandles(p.scanForConsoleHandles())));
 }
 
 static void Test_HandleAllocationOrder() {
@@ -125,9 +145,9 @@ static void Test_HandleAllocationOrder() {
     auto h3 = p.getStdin();
     auto h7 = p.getStdout();
     auto hb = p.getStderr();
-    auto hf = h7.dup(TRUE);
-    auto h13 = h3.dup(TRUE);
-    auto h17 = hb.dup(TRUE);
+    auto hf = h7.dup(true);
+    auto h13 = h3.dup(true);
+    auto h17 = hb.dup(true);
 
     CHECK(h3.uvalue() == 0x3);
     CHECK(h7.uvalue() == 0x7);
@@ -140,10 +160,10 @@ static void Test_HandleAllocationOrder() {
     h13.close();
     h7.close();
 
-    h7 = h3.dup(TRUE);
-    hf = h3.dup(TRUE);
-    h13 = h3.dup(TRUE);
-    auto h1b = h3.dup(TRUE);
+    h7 = h3.dup(true);
+    hf = h3.dup(true);
+    h13 = h3.dup(true);
+    auto h1b = h3.dup(true);
 
     CHECK(h7.uvalue() == 0x7);
     CHECK(hf.uvalue() == 0xf);
@@ -181,19 +201,16 @@ static void Test_InheritNothing() {
     CHECK(c.newBuffer().value() != INVALID_HANDLE_VALUE);
 }
 
-// XXX: Does specifying a handle in STD_{...}_HANDLE or hStd{Input,...}
-// influence whether it is inherited, in any situation?
-
 static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     printTestName(__FUNCTION__);
     Worker p;
     Worker unrelated({ false, DETACHED_PROCESS });
 
-    auto conin = p.getStdin().dup(TRUE);
-    auto conout1 = p.getStdout().dup(TRUE);
-    auto conout2 = p.getStderr().dup(TRUE);
-    p.openConout(FALSE);    // an extra handle for checkAttachHandleSet testing
-    p.openConout(TRUE);     // an extra handle for checkAttachHandleSet testing
+    auto conin = p.getStdin().dup(true);
+    auto conout1 = p.getStdout().dup(true);
+    auto conout2 = p.getStderr().dup(true);
+    p.openConout(false);    // an extra handle for checkAttachHandleSet testing
+    p.openConout(true);     // an extra handle for checkAttachHandleSet testing
     p.getStdin().close();
     p.getStdout().close();
     p.getStderr().close();
@@ -214,41 +231,33 @@ static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     CHECK(c.getStdout().value() == p.getStdout().value());
     CHECK(c.getStderr().value() == p.getStderr().value());
 
-    // AttachConsole always sets the handles to (0x3, 0x7, 0xb) regardless of
-    // handle validity.  In this case, c2 initially had non-default handles,
-    // and it attached to a process that has and also initially had
-    // non-default handles.  Nevertheless, the new standard handles are the
-    // defaults.
+    // AttachConsole sets the handles to (0x3, 0x7, 0xb) regardless of handle
+    // validity.  In this case, c2 initially had non-default handles, and it
+    // attached to a process that has and also initially had non-default
+    // handles.  Nevertheless, the new standard handles are the defaults.
     for (auto proc : {&c2, &unrelated}) {
         CHECK(proc->getStdin().uvalue() == 0x3);
         CHECK(proc->getStdout().uvalue() == 0x7);
         CHECK(proc->getStderr().uvalue() == 0xb);
     }
 
-    // The set of inheritable console handles in the two children exactly match
+    // The set of inheritable console handles in these processes exactly match
     // that of the parent.
     checkAttachHandleSet(c, p);
     checkAttachHandleSet(c2, p);
     checkAttachHandleSet(unrelated, p);
 }
 
-// XXX: This isn't quite ideal.  FreeConsole's behavior is different:
-//  - traditional: wipe out ConsoleHandleSet, leave std handles alone
-//  - modern: close handles opened on attachment if any, leave std handles alone
-
 static void Test_Detach_Implicitly_Closes_Handles() {
     // After detaching, calling GetHandleInformation fails on previous console
-    // handles.  Prior to Windows 8, this property applied to all console
-    // handles; in Windows 8, it only applies to some handles, apparently.
+    // handles.
 
     printTestName(__FUNCTION__);
     Worker p;
-    Handle orig1[] = {
+    Handle orig[] = {
         p.getStdin(),
         p.getStdout(),
         p.getStderr(),
-    };
-    Handle orig2[] = {
         p.getStdin().dup(TRUE),
         p.getStdout().dup(TRUE),
         p.getStderr().dup(TRUE),
@@ -257,27 +266,15 @@ static void Test_Detach_Implicitly_Closes_Handles() {
     };
 
     p.detach();
-
-    // After detaching the console, these handles are closed.
-    for (auto h : orig1) {
+    for (auto h : orig) {
         CHECK(!h.tryFlags());
-    }
-    if (!isAtLeastWin8()) {
-        // Previously, these handles were also closed.
-        for (auto h : orig2) {
-            CHECK(!h.tryFlags());
-        }
-    } else {
-        // As of Windows 8, these handles aren't closed.
-        for (auto h : orig2) {
-            CHECK(h.inheritable());
-        }
     }
 }
 
 void runTraditionalTests() {
-    Test_NewConsole_Resets_Everything();
-    Test_DetachedProcess();
+    Test_HandleDuplication();
+    Test_NewConsole_Resets_ConsoleHandleSet();
+    Test_CreateProcess_DetachedProcess();
     Test_Creation_bInheritHandles_Flag();
     Test_HandleAllocationOrder();
     Test_InheritNothing();

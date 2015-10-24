@@ -41,7 +41,7 @@ std::string windowText(HWND hwnd) {
 }
 
 // Get the ObjectPointer (underlying NT object) for the NT handle.
-void *ntHandlePointer(RemoteHandle &h) {
+void *ntHandlePointer(RemoteHandle h) {
     HANDLE ret = nullptr;
     for (auto &entry : queryNtHandles()) {
         if (entry.OwnerPid == h.worker().pid() &&
