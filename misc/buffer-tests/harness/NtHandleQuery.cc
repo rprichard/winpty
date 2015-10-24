@@ -34,7 +34,7 @@ std::vector<SYSTEM_HANDLE_ENTRY> queryNtHandles() {
     auto funcPtr = ntdll.proc("NtQuerySystemInformation");
     ASSERT(funcPtr != NULL && "NtQuerySystemInformation API is missing");
     auto func = reinterpret_cast<NtQuerySystemInformation_Type*>(funcPtr);
-    std::vector<char> buf(1024);
+    static std::vector<char> buf(1024);
     while (true) {
         ULONG returnLength = 0;
         auto ret = func(

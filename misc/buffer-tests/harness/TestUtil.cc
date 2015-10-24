@@ -9,6 +9,7 @@
 #include "UnicodeConversions.h"
 
 #include <DebugClient.h>
+#include <OsModule.h>
 #include <WinptyAssert.h>
 
 std::tuple<RemoteHandle, RemoteHandle> newPipe(
@@ -51,4 +52,39 @@ void *ntHandlePointer(RemoteHandle h) {
         }
     }
     return ret;
+}
+
+bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
+    static auto kernelbaseCheck = LoadLibraryW(L"KernelBase.dll");
+    if (kernelbaseCheck != nullptr) {
+        static OsModule kernelbase(L"KernelBase.dll");
+        static auto comp =
+            reinterpret_cast<BOOL(WINAPI*)(HANDLE,HANDLE)>(
+                kernelbase.proc("CompareObjectHandles"));
+        if (comp != nullptr) {
+            HANDLE h1local = nullptr;
+            HANDLE h2local = nullptr;
+            bool dup1 = DuplicateHandle(
+                h1.worker().processHandle(),
+                h1.value(),
+                GetCurrentProcess(),
+                &h1local,
+                0, false, DUPLICATE_SAME_ACCESS);
+            bool dup2 = DuplicateHandle(
+                h2.worker().processHandle(),
+                h2.value(),
+                GetCurrentProcess(),
+                &h2local,
+                0, false, DUPLICATE_SAME_ACCESS);
+            bool ret = dup1 && dup2 && comp(h1local, h2local);
+            if (dup1) {
+                CloseHandle(h1local);
+            }
+            if (dup2) {
+                CloseHandle(h2local);
+            }
+            return ret;
+        }
+    }
+    return ntHandlePointer(h1) == ntHandlePointer(h2);
 }

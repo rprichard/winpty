@@ -99,13 +99,15 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     // handles didn't revert to the original default, but were inherited.
     p.openConout(true);
 
-    // Verify that ntHandlePointer is working...
-    CHECK(ntHandlePointer(ph1) != nullptr);
-    CHECK(ntHandlePointer(ph2) != nullptr);
-    CHECK(ntHandlePointer(ph1) != ntHandlePointer(ph2));
-    auto dupTest = ph1.dup();
-    CHECK(ntHandlePointer(ph1) == ntHandlePointer(dupTest));
-    dupTest.close();
+    // Verify that compareObjectHandles is working...
+    {
+        CHECK(!compareObjectHandles(ph1, ph2));
+        auto dupTest = ph1.dup();
+        CHECK(compareObjectHandles(ph1, dupTest));
+        dupTest.close();
+        Worker other;
+        CHECK(compareObjectHandles(ph1, ph1.dup(other)));
+    }
 
     auto testSetupOneHandle = [&](SpawnParams sp, size_t cb, HANDLE inherit) {
         sp.sui.cb = cb;
@@ -138,8 +140,8 @@ static void Test_CreateProcess_STARTUPINFOEX() {
         auto ch2 = Handle::invent(ph2.value(), c);
         // i.e. ph1 was inherited, because ch1 identifies the same thing.
         // ph2 was not inherited, because it wasn't listed.
-        CHECK(ntHandlePointer(ph1) == ntHandlePointer(ch1));
-        CHECK(ntHandlePointer(ph2) != ntHandlePointer(ch2));
+        CHECK(compareObjectHandles(ph1, ch1));
+        CHECK(!compareObjectHandles(ph2, ch2));
 
         if (!isAtLeastWin8()) {
             // The traditional console handles were all inherited, but they're
@@ -157,7 +159,7 @@ static void Test_CreateProcess_STARTUPINFOEX() {
         CHECK(c.valid());
         auto ch2 = Handle::invent(ph2.value(), c);
         // i.e. ph2 was inherited, because ch2 identifies the same thing.
-        CHECK(ntHandlePointer(ph2) == ntHandlePointer(ch2));
+        CHECK(compareObjectHandles(ph2, ch2));
     }
     {
         // If EXTENDED_STARTUPINFO_PRESENT is specified, but the cb value
@@ -206,10 +208,10 @@ static void Test_CreateProcess_STARTUPINFOEX() {
             auto ch2 = Handle::invent(ph2.value(), c);
             auto ch3 = Handle::invent(ph3.value(), c);
             auto ch4 = Handle::invent(ph4.value(), c);
-            CHECK(ntHandlePointer(ph1) != ntHandlePointer(ch1));
-            CHECK(ntHandlePointer(ph2) != ntHandlePointer(ch2));
-            CHECK(ntHandlePointer(ph3) != ntHandlePointer(ch3));
-            CHECK(ntHandlePointer(ph4) != ntHandlePointer(ch4));
+            CHECK(!compareObjectHandles(ph1, ch1));
+            CHECK(!compareObjectHandles(ph2, ch2));
+            CHECK(!compareObjectHandles(ph3, ch3));
+            CHECK(!compareObjectHandles(ph4, ch4));
         }
     }
 
@@ -399,9 +401,9 @@ static void Test_CreateProcess_SpecialInherit() {
         auto pipe = newPipe(p, false);
         auto wh = std::get<1>(pipe).setStdin().setStdout().setStderr();
         auto c = p.child({ false });
-        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(wh));
-        CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(wh));
-        CHECK(ntHandlePointer(c.getStderr()) == ntHandlePointer(wh));
+        CHECK(compareObjectHandles(c.getStdin(), wh));
+        CHECK(compareObjectHandles(c.getStdout(), wh));
+        CHECK(compareObjectHandles(c.getStderr(), wh));
         // CreateProcess makes separate handles for stdin/stdout/stderr.
         CHECK(c.getStdin().value() != c.getStdout().value());
         CHECK(c.getStdout().value() != c.getStderr().value());
@@ -409,9 +411,9 @@ static void Test_CreateProcess_SpecialInherit() {
         // Calling FreeConsole in the child does not free the duplicated
         // handles.
         c.detach();
-        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(wh));
-        CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(wh));
-        CHECK(ntHandlePointer(c.getStderr()) == ntHandlePointer(wh));
+        CHECK(compareObjectHandles(c.getStdin(), wh));
+        CHECK(compareObjectHandles(c.getStdout(), wh));
+        CHECK(compareObjectHandles(c.getStderr(), wh));
     }
     {
         // Bogus values are transformed into zero.
@@ -435,7 +437,7 @@ static void Test_CreateProcess_SpecialInherit() {
         } else {
             CHECK(c.getStdout().value() != GetCurrentProcess());
             auto handleToPInP = Handle::dup(p.processHandle(), p);
-            CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(handleToPInP));
+            CHECK(compareObjectHandles(c.getStdout(), handleToPInP));
         }
     }
 
@@ -449,7 +451,7 @@ static void Test_CreateProcess_SpecialInherit() {
         auto ch = stdHandles(c);
         auto check = [&]() {
             for (int i = 0; i < 3; ++i) {
-                CHECK(ntHandlePointer(ph[i]) == ntHandlePointer(ch[i]));
+                CHECK(compareObjectHandles(ph[i], ch[i]));
                 CHECK_EQ(ph[i].inheritable(), ch[i].inheritable());
             }
         };
@@ -482,9 +484,9 @@ static void Test_CreateProcess_SpecialInherit() {
             CHECK((proc.getStdout().value() == nullptr) == expectBroken);
             CHECK((proc.getStderr().value() == nullptr) == expectBroken);
             if (!expectBroken) {
-                CHECK(ntHandlePointer(proc.getStdin()) == ntHandlePointer(correct));
-                CHECK(ntHandlePointer(proc.getStdout()) == ntHandlePointer(correct));
-                CHECK(ntHandlePointer(proc.getStderr()) == ntHandlePointer(correct));
+                CHECK(compareObjectHandles(proc.getStdin(), correct));
+                CHECK(compareObjectHandles(proc.getStdout(), correct));
+                CHECK(compareObjectHandles(proc.getStderr(), correct));
             }
         };
 

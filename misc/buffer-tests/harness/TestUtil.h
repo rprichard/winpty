@@ -40,3 +40,4 @@ std::tuple<RemoteHandle, RemoteHandle> newPipe(
 void printTestName(const char *testName);
 std::string windowText(HWND hwnd);
 void *ntHandlePointer(RemoteHandle h);
+bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2);
