@@ -397,18 +397,19 @@ static void Test_CreateProcess_SpecialInherit() {
         // Base case: a non-inheritable pipe is still inherited.
         Worker p;
         auto pipe = newPipe(p, false);
-        auto rh = std::get<0>(pipe).setStdin();
-        auto wh = std::get<1>(pipe).setStdout().setStderr();
+        auto wh = std::get<1>(pipe).setStdin().setStdout().setStderr();
         auto c = p.child({ false });
-        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(rh));
+        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(wh));
         CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(wh));
         CHECK(ntHandlePointer(c.getStderr()) == ntHandlePointer(wh));
-        // CreateProcess makes separate handles for stdout/stderr.
+        // CreateProcess makes separate handles for stdin/stdout/stderr.
+        CHECK(c.getStdin().value() != c.getStdout().value());
         CHECK(c.getStdout().value() != c.getStderr().value());
+        CHECK(c.getStdin().value() != c.getStderr().value());
         // Calling FreeConsole in the child does not free the duplicated
         // handles.
         c.detach();
-        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(rh));
+        CHECK(ntHandlePointer(c.getStdin()) == ntHandlePointer(wh));
         CHECK(ntHandlePointer(c.getStdout()) == ntHandlePointer(wh));
         CHECK(ntHandlePointer(c.getStderr()) == ntHandlePointer(wh));
     }
@@ -471,6 +472,42 @@ static void Test_CreateProcess_SpecialInherit() {
     } else {
         CHECK(handleInts(stdHandles(c)) ==
             (std::vector<uint64_t> { 0x0FFFFFFFull, 0, 3 }));
+    }
+
+    {
+        // Windows XP bug: special inheritance doesn't work with the read end
+        // of a pipe, even if it's inheritable.  It works with the write end.
+        auto check = [](Worker &proc, Handle correct, bool expectBroken) {
+            CHECK((proc.getStdin().value() == nullptr) == expectBroken);
+            CHECK((proc.getStdout().value() == nullptr) == expectBroken);
+            CHECK((proc.getStderr().value() == nullptr) == expectBroken);
+            if (!expectBroken) {
+                CHECK(ntHandlePointer(proc.getStdin()) == ntHandlePointer(correct));
+                CHECK(ntHandlePointer(proc.getStdout()) == ntHandlePointer(correct));
+                CHECK(ntHandlePointer(proc.getStderr()) == ntHandlePointer(correct));
+            }
+        };
+
+        Worker p;
+
+        auto pipe = newPipe(p, false);
+        auto rh = std::get<0>(pipe).setStdin().setStdout().setStderr();
+        auto c1 = p.child({ false });
+        check(c1, rh, !isAtLeastVista());
+
+        // Marking the handle itself inheritable makes no difference.
+        rh.setInheritable(true);
+        auto c2 = p.child({ false });
+        check(c2, rh, !isAtLeastVista());
+
+        // If we enter bInheritHandles=TRUE mode, it works.
+        auto c3 = p.child({ true });
+        check(c3, rh, false);
+
+        // Using STARTF_USESTDHANDLES works too.
+        Handle::invent(nullptr, p).setStdin().setStdout().setStderr();
+        auto c4 = p.child({ true, 0, { rh, rh, rh }});
+        check(c4, rh, false);
     }
 }
 

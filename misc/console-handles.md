@@ -345,6 +345,21 @@ Here's what's evident from examining the OS behavior:
    `GetConsoleWindow` and `IsWindowVisible` calls.  `GetConsoleWindow` returns
    `NULL` starting with Windows 7.
 
+### Windows XP pipe read handle inheritance anomaly
+
+On Windows XP, `CreateProcess` fails to propagate a handle in this situation:
+
+ - `bInheritHandles` is `FALSE`.
+ - `STARTF_USESTDHANDLES` is not specified in `STARTUPINFO.dwFlags`.
+ - One of the `STDIN/STDOUT/STDERR` handles is set to the read end of an
+   anonymous pipe.
+
+In this situation, Windows XP will set the child process's standard handle to
+`NULL`.  The write end of the pipe works fine.  Passing a `bInheritHandles`
+of `TRUE` (and an inheritable pipe handle) works fine.  Using
+`STARTF_USESTDHANDLES` also works.  See `Test_CreateProcess_SpecialInherit`
+in `misc/buffer-tests` for a test case.
+
 ### Windows Vista BSOD
 
 It is easy to cause a BSOD on Vista and Server 2008 by (1) closing all handles
