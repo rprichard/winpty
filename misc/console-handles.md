@@ -84,7 +84,7 @@ and perform LPCs to `csrss.exe` and/or `conhost.exe`.
 
 A new console's initial console handles are always inheritable, but
 non-inheritable handles can also be created.  The inheritability can usually
-be changed, except on Windows 7 (see notes below).
+be changed, except on Windows 7 (see [[win7inh]](#win7inh)).
 
 Traditional console handles cannot be duplicated to other processes.  If such
 a handle is used with `DuplicateHandle`, the source and target process handles
@@ -111,33 +111,30 @@ The manner in which Windows sets standard handles is influenced by two flags:
 From Window XP up until Windows 8, `CreateProcess` sets standard handles as
 follows:
 
- - Regardless of *ConsoleCreationMode*, if *UseStdHandles*, then handles are
-   set according to `STARTUPINFO`.  Windows makes no attempt to validate the
-   handle, nor will it treat a non-inheritable handle as inheritable simply
-   because it is listed in `STARTUPINFO`.
+ 1. If *UseStdHandles*, then the child uses the `STARTUPINFO` fields.  Windows
+    makes no attempt to validate the handles, nor will it treat a
+    non-inheritable handle as inheritable simply because it is listed in
+    `STARTUPINFO`.
 
-   Otherwise, find the next applicable rule.
+ 2. If *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
+    Windows sets the handles to (0x3, 0x7, 0xb).
 
- - If *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
-   Windows sets the handles to (0x3, 0x7, 0xb).
+ 3. If *InheritHandles*, then the parent's standard handles are copied as-is
+    to the child, without exception.
 
- - If *ConsoleCreationMode* is *Inherit*:
+ 4. Windows duplicates each
+    of the parent's non-console standard handles into the child.  Any
+    standard handle that looks like a traditional console handle, up to
+    0x0FFFFFFF, is copied as-is, whether or not the handle is open.
+    <sup>[[1]](#foot_inv_con)</sup>
 
-    - If *InheritHandles*, then the parent's standard
-      handles are copied as-is to the child, without exception.
+    If Windows fails to duplicate a handle for any reason (e.g. because
+    it is `NULL` or not open), then the child's new handle is `NULL`.
+    The child handles have the same inheritability as the parent handles.
+    These handles are not closed by `FreeConsole`.
+    (Bugs: [[dupproc]](#dupproc) [[xppipe]](#xppipe))
 
-    - If !*InheritHandles*, then Windows duplicates each
-      of the parent's non-console standard handles into the child.  Any
-      standard handle that looks like a traditional console handle, up to
-      0x0FFFFFFF, is copied as-is, whether or not the handle is open.
-      <sup>[[1]](#foot_inv_con)</sup>
-
-      If Windows fails to duplicate a handle for any reason (e.g. because
-      it is `NULL` or not open), then the child's new handle is `NULL`.
-      If the parent's handle is the current process psuedo-handle, then
-      the child's handle is a non-pseudo non-inheritable handle to the
-      parent process.  The child handles have the same inheritability as
-      the parent handles.  These handles are not closed by `FreeConsole`.
+XXX: What about `DETACHED_PROCESS`?
 
 The `bInheritHandles` parameter to `CreateProcess` does not affect whether
 console handles are inherited.  Console handles are inherited if and only if
@@ -208,57 +205,41 @@ Whenever a process is attached to a console (during startup, `AttachConsole`,
 or `AllocConsole`), Windows will sometimes create new *Unbound* console
 objects and assign them to one or more standard handles.  If it assigns
 to both `STDOUT` and `STDERR`, it reuses the same new *Unbound*
-*Output* object for both.  If `FreeConsole` is called, it will close these
-console handles.
+*Output* object for both.
 
 As with previous releases, standard handle determination is affected by the
 *UseStdHandles* and *InheritHandles* flags.
 
-(N.B.: The combination of !*InheritHandles* and *UseStdHandles* does not
-really make sense, so it's not surprising to see Windows 8 ignore
-*UseStdHandles* in this case, as it sometimes does.)
+Each of the child's standard handles is set using the first match:
 
-Starting in Windows 8, `CreateProcess` sets standard handles as follows:
+ 1. If *InheritHandles*, *UseStdHandles*, and the relevant `STARTUPINFO`
+    field is non-`NULL`, then Windows uses the `STARTUPINFO` field.  As with
+    previous releases, Windows makes no effort to validate the handle, nor
+    will it treat a non-inheritable handle as inheritable simply because it
+    is listed in `STARTUPINFO`.
 
- - Regardless of *ConsoleCreationMode*, if *InheritHandles* and
-   *UseStdHandles*, then handles are set according to `STARTUPINFO`,
-   As with previous releases, Windows makes no effort to validate the
-   handle, nor will it treat a non-inheritable handle as inheritable
-   simply because it is listed in `STARTUPINFO`.
+ 2. If *CreationConsoleMode* is *NewConsole* or *NewConsoleNoWindow*, then
+    Windows opens a handle to a new *Unbound* console object.  This handle will
+    be closed if `FreeConsole` is later called.  (N.B.: Windows reuses the
+    same *Unbound* output object if it creates handles for both `STDOUT` and
+    `STDERR`.  The handles themselves are still different, though.)
 
-   If the *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
-   Windows replaces any `NULL` standard handle with a new console handle.
+ 3. If *UseStdHandles*, the child's standard handle becomes `NULL`.
 
-   Otherwise, find the next applicable rule.
+ 4. If *InheritHandles*, the parent's standard handle is copied as-is, without
+    exception.
 
- - If *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
-   Windows sets all three handles to new console handles.
+ 5. The parent's standard handle is duplicated.  As with previous releases, if
+    the handle cannot be duplicated, then the child's handle becomes `NULL`.
+    The child handle has the same inheritability as the parent handle.
+    `FreeConsole` does *not* close this handle, even if it happens to be a
+    console handle (which is not unlikely).
+    (Bugs: [[dupproc]](#dupproc))
 
- - If *ConsoleCreationMode* is *Inherit*:
-
-    - If *InheritHandles* and !*UseStdHandles*, then the parent's standard
-      handles are copied as-is to the child, without exception.
-
-    - If !*InheritHandles* and *UseStdHandles*, then all three handles become
-      `NULL`.
-
-    - If !*InheritHandles* and !*UseStdHandles*, then Windows duplicates each
-      parent standard handle into the child.
-
-      As with previous releases, the current process pseudo-handle becomes a
-      true process handle to the parent.  However, starting with Windows 8.1,
-      it instead translates to NULL.  (i.e. The bug was fixed.)  `FreeConsole`
-      in Windows 8 does not close these duplicated handles, in general,
-      because they're not necessarily console handles.  Even if one does
-      happen to be a console handle, `FreeConsole` still does not close it.
-      (That said, these handles are likely to be console handles.)
-
- - If *ConsoleCreationMode* is *Detach*:
-
-    - XXX: ...
+XXX: What about `DETACHED_PROCESS`?
 
 XXX: Also, I don't expect the `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` attribute
-to matter here, but it's needs to be tested.
+to matter here, but it needs to be tested.
 
 ### AllocConsole, AttachConsole
 
@@ -352,7 +333,7 @@ Here's what's evident from examining the OS behavior:
    `GetConsoleWindow` and `IsWindowVisible` calls.  `GetConsoleWindow` returns
    `NULL` starting with Windows 7.
 
-### Windows XP pipe read handle inheritance anomaly
+### <a name="xppipe">Windows XP pipe read handle inheritance anomaly [xppipe]</a>
 
 On Windows XP, `CreateProcess` fails to propagate a handle in this situation:
 
@@ -366,6 +347,13 @@ In this situation, Windows XP will set the child process's standard handle to
 of `TRUE` (and an inheritable pipe handle) works fine.  Using
 `STARTF_USESTDHANDLES` also works.  See `Test_CreateProcess_DefaultInherit`
 in `misc/buffer-tests` for a test case.
+
+### <a name="dupproc">`CreateProcess` duplicates `INVALID_HANDLE_VALUE` until Windows 8.1 [dupproc]</a>
+
+From Windows XP to Windows 8, when `CreateProcess` duplicates parent standard
+handles into the child, it duplicates `INVALID_HANDLE_VALUE` (aka the
+`GetCurrentProcess()` pseudo-handle) to a true handle to the parent process.
+This bug was fixed in Windows 8.1.
 
 ### Windows Vista BSOD
 
@@ -387,7 +375,7 @@ to the last screen buffer, then (2) creating a new screen buffer:
         return 0;
     }
 
-### Windows 7 inheritability
+### <a name="win7inh">Windows 7 inheritability [win7inh]</a>
 
  * Calling `DuplicateHandle(h, FALSE)` on an inheritable console handle
    produces an inheritable handle.  According to documentation and previous
@@ -413,4 +401,5 @@ standard handle will be invalid:
  - The child has the same *ConsoleHandleSet* as the parent, excluding
    non-inheritable handles.
 
-It's an interesting edge case, though, so I test for it specifically.
+It's an interesting edge case, though, so I test for it specifically.  As of
+Windows 8, the non-inheritable console handle would be successfully duplicated.
