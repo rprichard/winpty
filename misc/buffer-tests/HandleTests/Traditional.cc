@@ -271,7 +271,8 @@ static void Test_Detach_Implicitly_Closes_Handles() {
     }
 }
 
-void runTraditionalTests() {
+REGISTER(run_Traditional, isTraditionalConio);
+void run_Traditional() {
     Test_HandleDuplication();
     Test_NewConsole_Resets_ConsoleHandleSet();
     Test_CreateProcess_DetachedProcess();

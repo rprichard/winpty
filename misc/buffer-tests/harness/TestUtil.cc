@@ -2,6 +2,7 @@
 
 #include <array>
 #include <string>
+#include <vector>
 
 #include "NtHandleQuery.h"
 #include "RemoteHandle.h"
@@ -11,6 +12,8 @@
 #include <DebugClient.h>
 #include <OsModule.h>
 #include <WinptyAssert.h>
+
+static RegistrationTable *g_testFunctions;
 
 std::tuple<RemoteHandle, RemoteHandle> newPipe(
         RemoteWorker &w, BOOL inheritable) {
@@ -26,10 +29,10 @@ std::tuple<RemoteHandle, RemoteHandle> newPipe(
     return std::make_tuple(p1, p2);
 }
 
-void printTestName(const char *testName) {
+void printTestName(const std::string &name) {
     trace("----------------------------------------------------------");
-    trace("%s", testName);
-    printf("%s\n", testName);
+    trace("%s", name.c_str());
+    printf("%s\n", name.c_str());
     fflush(stdout);
 }
 
@@ -87,4 +90,15 @@ bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
         }
     }
     return ntHandlePointer(h1) == ntHandlePointer(h2);
+}
+
+void registerTest(const std::string &name, bool (&cond)(), void (&func)()) {
+    if (g_testFunctions == nullptr) {
+        g_testFunctions = new RegistrationTable {};
+    }
+    g_testFunctions->push_back(std::make_tuple(name, &cond, &func));
+}
+
+RegistrationTable registeredTests() {
+    return *g_testFunctions;
 }

@@ -380,7 +380,8 @@ static void Test_CreateProcess_DefaultInherit() {
 
 
 
-void runCommonTests_CreateProcess() {
+REGISTER(run_CreateProcess, always);
+void run_CreateProcess() {
     Test_CreateProcess_ModeCombos();
     if (isAtLeastVista()) {
         Test_CreateProcess_STARTUPINFOEX();

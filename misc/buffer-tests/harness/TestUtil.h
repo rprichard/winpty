@@ -35,9 +35,22 @@ class RemoteWorker;
         }                                                                     \
     } while(0)
 
-std::tuple<RemoteHandle, RemoteHandle> newPipe(
-        RemoteWorker &w, BOOL inheritable=FALSE);
-void printTestName(const char *testName);
-std::string windowText(HWND hwnd);
+#define REGISTER(name, cond) \
+    static void name(); \
+    int g_register_ ## name = (registerTest(#name, cond, name), 0);
+
+// Test registration
+void registerTest(const std::string &name, bool(&cond)(), void(&func)());
+using RegistrationTable = std::vector<std::tuple<std::string, bool(*)(), void(*)()>>;
+RegistrationTable registeredTests();
+inline bool always() { return true; }
+void printTestName(const std::string &name);
+
+// NT kernel handle query
 void *ntHandlePointer(RemoteHandle h);
 bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2);
+
+// Misc
+std::tuple<RemoteHandle, RemoteHandle> newPipe(
+        RemoteWorker &w, BOOL inheritable=FALSE);
+std::string windowText(HWND hwnd);

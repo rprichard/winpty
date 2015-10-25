@@ -16,31 +16,36 @@ CXXFLAGS += \
 LDFLAGS += -static -static-libgcc -static-libstdc++
 
 # To disable PCH, just comment out these two lines.
-PCHFLAGS = -include build/pch.h
-PCHDEPS = build/pch.h.gch
+PCHFLAGS = -include build/obj/pch.h
+PCHDEPS = build/obj/pch.h.gch
 
 # Use gmake -n to see the command-lines gmake would run.
 
 COMMON_OBJECTS = \
-    build/DebugClient.o \
-    build/Event.o \
-    build/NtHandleQuery.o \
-    build/ShmemParcel.o \
-    build/Spawn.o \
-    build/UnicodeConversions.o \
-    build/Util.o \
-    build/WinptyAssert.o \
-    build/winpty_wcsnlen.o
+    build/obj/harness/Event.o \
+    build/obj/harness/NtHandleQuery.o \
+    build/obj/harness/ShmemParcel.o \
+    build/obj/harness/Spawn.o \
+    build/obj/harness/UnicodeConversions.o \
+    build/obj/harness/Util.o \
+    build/obj/shared/DebugClient.o \
+    build/obj/shared/WinptyAssert.o \
+    build/obj/shared/winpty_wcsnlen.o
 
 WORKER_OBJECTS = \
-    build/WorkerProgram.o \
-    $(COMMON_OBJECTS)
+    build/obj/harness/WorkerProgram.o
 
 TEST_OBJECTS = \
-    build/RemoteHandle.o \
-    build/RemoteWorker.o \
-    build/TestUtil.o \
-    $(COMMON_OBJECTS)
+    build/obj/harness/RemoteHandle.o \
+    build/obj/harness/RemoteWorker.o \
+    build/obj/harness/TestUtil.o \
+
+HANDLETESTS_OBJECTS = \
+    build/obj/HandleTests/CreateProcess.o \
+    build/obj/HandleTests/MiscTests.o \
+    build/obj/HandleTests/Modern.o \
+    build/obj/HandleTests/Traditional.o \
+    build/obj/HandleTests/main.o
 
 include tests.mk
 
@@ -53,49 +58,45 @@ all : \
 
 .PHONY : clean
 clean:
-	rm -f build/*.exe build/*.o build/*.d build/*.gch
+	rm -fr build
 
-build/pch.h.gch : harness/pch.h
+build/obj/pch.h.gch : harness/pch.h
 	@echo Compiling PCH $<
+	@mkdir -p $$(dirname $@)
 	@$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-build/%.o : %.c
+build/obj/%.o : %.cc $(PCHDEPS)
 	@echo Compiling $<
-	@$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
-
-build/%.o : %.cc $(PCHDEPS)
-	@echo Compiling $<
+	@mkdir -p $$(dirname $@)
 	@$(CXX) $(PCHFLAGS) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-build/%.o : ../../shared/%.cc $(PCHDEPS)
+build/obj/shared/%.o : ../../shared/%.cc $(PCHDEPS)
 	@echo Compiling $<
+	@mkdir -p $$(dirname $@)
 	@$(CXX) $(PCHFLAGS) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
-build/%.o : harness/%.cc $(PCHDEPS)
-	@echo Compiling $<
-	@$(CXX) $(PCHFLAGS) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+.PRECIOUS : build/obj/%.o
+.PRECIOUS : build/obj/shared/%.o
 
-.PRECIOUS : build/%.o
-
-build/Worker.exe : $(WORKER_OBJECTS)
+build/Worker.exe : $(WORKER_OBJECTS) $(COMMON_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
 
-build/HandleTests.exe : $(TEST_OBJECTS) \
-            build/HandleTests.o \
-            build/HandleTests_Common.o \
-            build/HandleTests_Common_CreateProcess.o \
-            build/HandleTests_Modern.o \
-            build/HandleTests_Traditional.o
+build/HandleTests.exe : $(HANDLETESTS_OBJECTS) $(TEST_OBJECTS) $(COMMON_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
 
 build/HandleTests.exe.manifest : manifest.xml
 	@Echo Copying $< to $@
+	@mkdir -p $$(dirname $@)
 	@cp $< $@
 
-build/%.exe : build/%.o $(TEST_OBJECTS)
+build/%.exe : build/obj/%.o $(TEST_OBJECTS) $(COMMON_OBJECTS)
 	@echo Linking $@
 	@$(CXX) -o $@ $^ $(LDFLAGS)
 
--include build/*.d
+-include $(COMMON_OBJECTS:.o=.d)
+-include $(WORKER_OBJECTS:.o=.d)
+-include $(TEST_OBJECTS:.o=.d)
+-include $(HANDLETESTS_OBJECTS:.o=.d)
+-include build/obj/*.d

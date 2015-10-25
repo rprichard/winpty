@@ -193,7 +193,8 @@ static void Test_GetStdHandle_SetStdHandle() {
     }
 }
 
-void runCommonTests() {
+REGISTER(run_MiscTests, always);
+void run_MiscTests() {
     Test_IntrinsicInheritFlags();
     Test_Input_Vs_Output();
     Test_Detach_Does_Not_Change_Standard_Handles();

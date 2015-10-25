@@ -31,3 +31,11 @@ inline bool isAtLeastWin8() {
 inline bool isAtLeastWin8_1() {
     return osversion() >= std::make_tuple(6, 3);
 }
+
+inline bool isTraditionalConio() {
+    return !isAtLeastWin8();
+}
+
+inline bool isModernConio() {
+    return isAtLeastWin8();
+}
