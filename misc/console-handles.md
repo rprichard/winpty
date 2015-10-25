@@ -222,10 +222,12 @@ Starting in Windows 8, `CreateProcess` sets standard handles as follows:
 
  - Regardless of *ConsoleCreationMode*, if *InheritHandles* and
    *UseStdHandles*, then handles are set according to `STARTUPINFO`,
-   except that each `NULL` handle is replaced with a new console
-   handle.  As with previous releases, Windows makes no effort to validate
-   the handle, nor will it treat a non-inheritable handle as inheritable
+   As with previous releases, Windows makes no effort to validate the
+   handle, nor will it treat a non-inheritable handle as inheritable
    simply because it is listed in `STARTUPINFO`.
+
+   If the *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
+   Windows replaces any `NULL` standard handle with a new console handle.
 
    Otherwise, find the next applicable rule.
 
