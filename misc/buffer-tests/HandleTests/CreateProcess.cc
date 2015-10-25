@@ -1,10 +1,10 @@
 #include <TestCommon.h>
 
+REGISTER(Test_CreateProcess_ModeCombos, always);
 static void Test_CreateProcess_ModeCombos() {
     // It is often unclear how (or whether) various combinations of
     // CreateProcess parameters work when combined.  Try to test the ambiguous
     // combinations.
-    printTestName(__FUNCTION__);
 
     DWORD errCode = 0;
 
@@ -32,9 +32,9 @@ static void Test_CreateProcess_ModeCombos() {
     }
 }
 
+REGISTER(Test_CreateProcess_STARTUPINFOEX, isAtLeastVista);
 static void Test_CreateProcess_STARTUPINFOEX() {
     // STARTUPINFOEX tests.
-    printTestName(__FUNCTION__);
 
     Worker p;
     DWORD errCode = 0;
@@ -178,8 +178,8 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     }
 }
 
+REGISTER(Test_CreateNoWindow_HiddenVsNothing, always);
 static void Test_CreateNoWindow_HiddenVsNothing() {
-    printTestName(__FUNCTION__);
 
     Worker p;
     auto c = p.child({ false, CREATE_NO_WINDOW });
@@ -195,6 +195,7 @@ static void Test_CreateNoWindow_HiddenVsNothing() {
     }
 }
 
+REGISTER(Test_CreateProcess_DefaultInherit, always);
 static void Test_CreateProcess_DefaultInherit() {
     // If CreateProcess is called with these parameters:
     //  - bInheritHandles=FALSE
@@ -204,8 +205,6 @@ static void Test_CreateProcess_DefaultInherit() {
     //
     // There are variations between OS releases, especially with regards to
     // how console handles work.
-
-    printTestName(__FUNCTION__);
 
     {
         // Base case: a non-inheritable pipe is still inherited.
@@ -377,15 +376,3 @@ static void Test_CreateProcess_DefaultInherit() {
 // XXX: The word "even" here sticks out.  Verify that the standard handle
 // fields in STARTUPINFO are ignored when STARTF_USESTDHANDLES is not
 // specified.
-
-
-
-REGISTER(run_CreateProcess, always);
-void run_CreateProcess() {
-    Test_CreateProcess_ModeCombos();
-    if (isAtLeastVista()) {
-        Test_CreateProcess_STARTUPINFOEX();
-    }
-    Test_CreateNoWindow_HiddenVsNothing();
-    Test_CreateProcess_DefaultInherit();
-}

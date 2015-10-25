@@ -1,11 +1,11 @@
 #include <TestCommon.h>
 
+REGISTER(Test_IntrinsicInheritFlags, always);
 static void Test_IntrinsicInheritFlags() {
     // Console handles have an inherit flag, just as kernel handles do.
     //
     // In Windows 7, there is a bug where DuplicateHandle(h, FALSE) makes the
     // new handle inheritable if the old handle was inheritable.
-    printTestName(__FUNCTION__);
 
     Worker p;
     auto n =  p.newBuffer(FALSE);
@@ -49,17 +49,17 @@ static void Test_IntrinsicInheritFlags() {
     CHECK(pipeN.inheritable() == false);
 }
 
+REGISTER(Test_Input_Vs_Output, always);
 static void Test_Input_Vs_Output() {
     // Ensure that APIs meant for the other kind of handle fail.
-    printTestName(__FUNCTION__);
     Worker p;
     CHECK(!p.getStdin().tryScreenBufferInfo());
     CHECK(!p.getStdout().tryNumberOfConsoleInputEvents());
 }
 
+REGISTER(Test_Detach_Does_Not_Change_Standard_Handles, always);
 static void Test_Detach_Does_Not_Change_Standard_Handles() {
     // Detaching the current console does not affect the standard handles.
-    printTestName(__FUNCTION__);
     auto check = [](Worker &p) {
         auto handles1 = handleValues(stdHandles(p));
         p.detach();
@@ -92,6 +92,7 @@ static void Test_Detach_Does_Not_Change_Standard_Handles() {
     }
 }
 
+REGISTER(Test_Activate_Does_Not_Change_Standard_Handles, always);
 static void Test_Activate_Does_Not_Change_Standard_Handles() {
     // SetConsoleActiveScreenBuffer does not change the standard handles.
     // MSDN documents this fact on "Console Handles"[1]
@@ -101,7 +102,6 @@ static void Test_Activate_Does_Not_Change_Standard_Handles() {
     //     change the STDOUT handle does not affect the active screen buffer."
     //
     // [1] https://msdn.microsoft.com/en-us/library/windows/desktop/ms682075.aspx
-    printTestName(__FUNCTION__);
     Worker p;
     auto handles1 = handleValues(stdHandles(p));
     p.newBuffer(TRUE).activate();
@@ -109,6 +109,7 @@ static void Test_Activate_Does_Not_Change_Standard_Handles() {
     CHECK(handles1 == handles2);
 }
 
+REGISTER(Test_Active_ScreenBuffer_Order, always);
 static void Test_Active_ScreenBuffer_Order() {
     // SetActiveConsoleScreenBuffer does not increase a refcount on the
     // screen buffer.  Instead, when the active screen buffer's refcount hits
@@ -121,7 +122,6 @@ static void Test_Active_ScreenBuffer_Order() {
         return ret;
     };
 
-    printTestName(__FUNCTION__);
     {
         // Simplest test
         Worker p;
@@ -155,6 +155,7 @@ static void Test_Active_ScreenBuffer_Order() {
     }
 }
 
+REGISTER(Test_GetStdHandle_SetStdHandle, always);
 static void Test_GetStdHandle_SetStdHandle() {
     // A commenter on the Old New Thing blog suggested that
     // GetStdHandle/SetStdHandle could have internally used CloseHandle and/or
@@ -164,7 +165,6 @@ static void Test_GetStdHandle_SetStdHandle() {
     // fact.
     //
     // http://blogs.msdn.com/b/oldnewthing/archive/2013/03/07/10399690.aspx#10400489
-    printTestName(__FUNCTION__);
     auto &hv = handleValues;
     {
         // Set values and read them back.  We get the same handles.
@@ -191,14 +191,4 @@ static void Test_GetStdHandle_SetStdHandle() {
         // active.
         CHECK_EQ(p.openConout().firstChar(), 'b');
     }
-}
-
-REGISTER(run_MiscTests, always);
-void run_MiscTests() {
-    Test_IntrinsicInheritFlags();
-    Test_Input_Vs_Output();
-    Test_Detach_Does_Not_Change_Standard_Handles();
-    Test_Activate_Does_Not_Change_Standard_Handles();
-    Test_Active_ScreenBuffer_Order();
-    Test_GetStdHandle_SetStdHandle();
 }

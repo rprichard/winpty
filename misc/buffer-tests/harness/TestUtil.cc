@@ -1,6 +1,7 @@
 #include "TestUtil.h"
 
 #include <array>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -95,6 +96,10 @@ bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
 void registerTest(const std::string &name, bool (&cond)(), void (&func)()) {
     if (g_testFunctions == nullptr) {
         g_testFunctions = new RegistrationTable {};
+    }
+    for (auto &entry : *g_testFunctions) {
+        // I think the compiler catches duplicates already, but just in case.
+        ASSERT(&cond != std::get<1>(entry) || &func != std::get<2>(entry));
     }
     g_testFunctions->push_back(std::make_tuple(name, &cond, &func));
 }

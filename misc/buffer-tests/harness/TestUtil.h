@@ -37,7 +37,7 @@ class RemoteWorker;
 
 #define REGISTER(name, cond) \
     static void name(); \
-    int g_register_ ## name = (registerTest(#name, cond, name), 0);
+    int g_register_ ## cond ## _ ## name = (registerTest(#name, cond, name), 0)
 
 // Test registration
 void registerTest(const std::string &name, bool(&cond)(), void(&func)());

@@ -18,12 +18,12 @@ static void checkAttachHandleSet(Worker &child, Worker &source) {
     CHECK(false && "checkAttachHandleSet failed");
 }
 
+REGISTER(Test_HandleDuplication, isTraditionalConio);
 static void Test_HandleDuplication() {
     // A traditional console handle cannot be duplicated to another process,
     // and it must be duplicated using the GetConsoleProcess() pseudo-value.
     // (This tests targetProcess != psuedo-value, but it doesn't test
     // sourceProcess != pseudo-value.  Not worth the trouble.)
-    printTestName(__FUNCTION__);
     Worker p, other;
     p.getStdout().setFirstChar('x');
     CHECK_EQ(p.getStdout().dup().firstChar(), 'x');
@@ -31,9 +31,9 @@ static void Test_HandleDuplication() {
     CHECK_EQ(p.getStdout().dup(other).value(), INVALID_HANDLE_VALUE);
 }
 
+REGISTER(Test_NewConsole_Resets_ConsoleHandleSet, isTraditionalConio);
 static void Test_NewConsole_Resets_ConsoleHandleSet() {
     // Test that creating a new console properly resets everything.
-    printTestName(__FUNCTION__);
     Worker p;
 
     // Open some handles to demonstrate the "clean slate" outcome.
@@ -82,10 +82,10 @@ static void Test_NewConsole_Resets_ConsoleHandleSet() {
     checkClean(p);
 }
 
+REGISTER(Test_CreateProcess_DetachedProcess, isTraditionalConio);
 static void Test_CreateProcess_DetachedProcess() {
     // A child with DETACHED_PROCESS has no console, and its standard handles
     // are set to 0 by default.
-    printTestName(__FUNCTION__);
     Worker p;
 
     p.getStdin().dup(TRUE).setStdin();
@@ -115,10 +115,10 @@ static void Test_CreateProcess_DetachedProcess() {
     }));
 }
 
+REGISTER(Test_Creation_bInheritHandles_Flag, isTraditionalConio);
 static void Test_Creation_bInheritHandles_Flag() {
     // The bInheritHandles flags to CreateProcess has no effect on console
     // handles.
-    printTestName(__FUNCTION__);
     Worker p;
     for (auto &h : (Handle[]){
         p.getStdin(),
@@ -137,9 +137,9 @@ static void Test_Creation_bInheritHandles_Flag() {
     CHECK(hv(cN.scanForConsoleHandles()) == hv(inheritableHandles(p.scanForConsoleHandles())));
 }
 
+REGISTER(Test_HandleAllocationOrder, isTraditionalConio);
 static void Test_HandleAllocationOrder() {
     // When a new handle is created, it always assumes the lowest unused value.
-    printTestName(__FUNCTION__);
     Worker p;
 
     auto h3 = p.getStdin();
@@ -171,12 +171,12 @@ static void Test_HandleAllocationOrder() {
     CHECK(h1b.uvalue() == 0x1b);
 }
 
+REGISTER(Test_InheritNothing, isTraditionalConio);
 static void Test_InheritNothing() {
     // It's possible for the standard handles to be non-inheritable.
     //
     // Avoid calling DuplicateHandle(h, FALSE), because it produces inheritable
     // console handles on Windows 7.
-    printTestName(__FUNCTION__);
     Worker p;
     auto conin = p.openConin();
     auto conout = p.openConout();
@@ -201,8 +201,8 @@ static void Test_InheritNothing() {
     CHECK(c.newBuffer().value() != INVALID_HANDLE_VALUE);
 }
 
+REGISTER(Test_AttachConsole_And_CreateProcess_Inheritance, isTraditionalConio);
 static void Test_AttachConsole_And_CreateProcess_Inheritance() {
-    printTestName(__FUNCTION__);
     Worker p;
     Worker unrelated({ false, DETACHED_PROCESS });
 
@@ -248,11 +248,11 @@ static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     checkAttachHandleSet(unrelated, p);
 }
 
+REGISTER(Test_Detach_Implicitly_Closes_Handles, isTraditionalConio);
 static void Test_Detach_Implicitly_Closes_Handles() {
     // After detaching, calling GetHandleInformation fails on previous console
     // handles.
 
-    printTestName(__FUNCTION__);
     Worker p;
     Handle orig[] = {
         p.getStdin(),
@@ -269,16 +269,4 @@ static void Test_Detach_Implicitly_Closes_Handles() {
     for (auto h : orig) {
         CHECK(!h.tryFlags());
     }
-}
-
-REGISTER(run_Traditional, isTraditionalConio);
-void run_Traditional() {
-    Test_HandleDuplication();
-    Test_NewConsole_Resets_ConsoleHandleSet();
-    Test_CreateProcess_DetachedProcess();
-    Test_Creation_bInheritHandles_Flag();
-    Test_HandleAllocationOrder();
-    Test_InheritNothing();
-    Test_AttachConsole_And_CreateProcess_Inheritance();
-    Test_Detach_Implicitly_Closes_Handles();
 }
