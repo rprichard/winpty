@@ -54,7 +54,9 @@ static void Test_CreateProcess_DefaultInherit() {
             ObjectSnap snap;
             for (int i = 0; i < 3; ++i) {
                 CHECK(snap.eq(ph[i], ch[i]));
-                CHECK_EQ(ph[i].inheritable(), ch[i].inheritable());
+                CHECK(ph[i].tryFlags() && ch[i].tryFlags());
+                CHECK_EQ(ph[i].tryFlags() && ph[i].inheritable(),
+                         ch[i].tryFlags() && ch[i].inheritable());
             }
         };
         check();
