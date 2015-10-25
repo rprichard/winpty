@@ -1,5 +1,34 @@
 #include <TestCommon.h>
 
+REGISTER(Test_CompareObjectHandles, always);
+static void Test_CompareObjectHandles() {
+    // Verify that compareObjectHandles and ObjectSnap are working.
+
+    Worker p;
+    Worker other;
+    auto pipe1 = newPipe(p, true);
+    auto ph1 = std::get<0>(pipe1);
+    auto ph2 = std::get<1>(pipe1);
+    auto ph1dup = ph1.dup();
+    auto ph1other = ph1.dup(other);
+
+    ObjectSnap snap;
+
+    CHECK(!compareObjectHandles(ph1, ph2));
+    CHECK(compareObjectHandles(ph1, ph1dup));
+    CHECK(compareObjectHandles(ph1, ph1other));
+
+    CHECK(!snap.eq(ph1, ph2));
+    CHECK(snap.eq(ph1, ph1dup));
+    CHECK(snap.eq(ph1, ph1other));
+    CHECK(snap.eq({ ph1, ph1other, ph1dup }));
+
+    CHECK(!snap.eq({ ph2, ph1, ph1other, ph1dup }));
+    CHECK(!snap.eq({ ph1, ph2, ph1other, ph1dup }));
+    CHECK(!snap.eq({ ph1, ph1other, ph2, ph1dup }));
+    CHECK(!snap.eq({ ph1, ph1other, ph1dup, ph2 }));
+}
+
 REGISTER(Test_IntrinsicInheritFlags, always);
 static void Test_IntrinsicInheritFlags() {
     // Console handles have an inherit flag, just as kernel handles do.

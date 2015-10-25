@@ -50,16 +50,6 @@ static void Test_CreateProcess_STARTUPINFOEX() {
     // handles didn't revert to the original default, but were inherited.
     p.openConout(true);
 
-    // Verify that compareObjectHandles is working...
-    {
-        CHECK(!compareObjectHandles(ph1, ph2));
-        auto dupTest = ph1.dup();
-        CHECK(compareObjectHandles(ph1, dupTest));
-        dupTest.close();
-        Worker other;
-        CHECK(compareObjectHandles(ph1, ph1.dup(other)));
-    }
-
     auto testSetupOneHandle = [&](SpawnParams sp, size_t cb, HANDLE inherit) {
         sp.sui.cb = cb;
         sp.inheritCount = 1;
@@ -159,10 +149,13 @@ static void Test_CreateProcess_STARTUPINFOEX() {
             auto ch2 = Handle::invent(ph2.value(), c);
             auto ch3 = Handle::invent(ph3.value(), c);
             auto ch4 = Handle::invent(ph4.value(), c);
-            CHECK(!compareObjectHandles(ph1, ch1));
-            CHECK(!compareObjectHandles(ph2, ch2));
-            CHECK(!compareObjectHandles(ph3, ch3));
-            CHECK(!compareObjectHandles(ph4, ch4));
+            {
+                ObjectSnap snap;
+                CHECK(!snap.eq(ph1, ch1));
+                CHECK(!snap.eq(ph2, ch2));
+                CHECK(!snap.eq(ph3, ch3));
+                CHECK(!snap.eq(ph4, ch4));
+            }
         }
     }
 

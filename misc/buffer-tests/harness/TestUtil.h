@@ -50,7 +50,18 @@ void printTestName(const std::string &name);
 // NT kernel handle query
 void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
                       RemoteHandle h);
+bool hasBuiltinCompareObjectHandles();
 bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2);
+
+// NT kernel handle->object snapshot
+class ObjectSnap {
+public:
+    ObjectSnap();
+    bool eq(std::initializer_list<RemoteHandle> handles);
+    bool eq(RemoteHandle h1, RemoteHandle h2) { return eq({h1, h2}); }
+private:
+    std::vector<SYSTEM_HANDLE_ENTRY> m_table;
+};
 
 // Misc
 std::tuple<RemoteHandle, RemoteHandle> newPipe(

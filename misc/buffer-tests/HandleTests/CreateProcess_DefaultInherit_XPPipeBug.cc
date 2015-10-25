@@ -10,9 +10,10 @@ static void Test_CreateProcess_DefaultInherit_XPPipeBug() {
         CHECK((proc.getStdout().value() == nullptr) == expectBroken);
         CHECK((proc.getStderr().value() == nullptr) == expectBroken);
         if (!expectBroken) {
-            CHECK(compareObjectHandles(proc.getStdin(), correct));
-            CHECK(compareObjectHandles(proc.getStdout(), correct));
-            CHECK(compareObjectHandles(proc.getStderr(), correct));
+            ObjectSnap snap;
+            CHECK(snap.eq({
+                proc.getStdin(), proc.getStdout(), proc.getStderr(), correct
+            }));
         }
     };
 

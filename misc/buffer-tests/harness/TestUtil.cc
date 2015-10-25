@@ -59,40 +59,77 @@ void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
     return ret;
 }
 
+bool hasBuiltinCompareObjectHandles() {
+    static auto kernelbase = LoadLibraryW(L"KernelBase.dll");
+    if (kernelbase != nullptr) {
+        static auto proc = GetProcAddress(kernelbase, "CompareObjectHandles");
+        if (proc != nullptr) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
-    static auto kernelbaseCheck = LoadLibraryW(L"KernelBase.dll");
-    if (kernelbaseCheck != nullptr) {
+    if (hasBuiltinCompareObjectHandles()) {
         static OsModule kernelbase(L"KernelBase.dll");
         static auto comp =
             reinterpret_cast<BOOL(WINAPI*)(HANDLE,HANDLE)>(
                 kernelbase.proc("CompareObjectHandles"));
-        if (comp != nullptr) {
-            HANDLE h1local = nullptr;
-            HANDLE h2local = nullptr;
-            bool dup1 = DuplicateHandle(
-                h1.worker().processHandle(),
-                h1.value(),
-                GetCurrentProcess(),
-                &h1local,
-                0, false, DUPLICATE_SAME_ACCESS);
-            bool dup2 = DuplicateHandle(
-                h2.worker().processHandle(),
-                h2.value(),
-                GetCurrentProcess(),
-                &h2local,
-                0, false, DUPLICATE_SAME_ACCESS);
-            bool ret = dup1 && dup2 && comp(h1local, h2local);
-            if (dup1) {
-                CloseHandle(h1local);
+        ASSERT(comp != nullptr);
+        HANDLE h1local = nullptr;
+        HANDLE h2local = nullptr;
+        bool dup1 = DuplicateHandle(
+            h1.worker().processHandle(),
+            h1.value(),
+            GetCurrentProcess(),
+            &h1local,
+            0, false, DUPLICATE_SAME_ACCESS);
+        bool dup2 = DuplicateHandle(
+            h2.worker().processHandle(),
+            h2.value(),
+            GetCurrentProcess(),
+            &h2local,
+            0, false, DUPLICATE_SAME_ACCESS);
+        bool ret = dup1 && dup2 && comp(h1local, h2local);
+        if (dup1) {
+            CloseHandle(h1local);
+        }
+        if (dup2) {
+            CloseHandle(h2local);
+        }
+        return ret;
+    } else {
+        auto table = queryNtHandles();
+        return ntHandlePointer(table, h1) == ntHandlePointer(table, h2);
+    }
+}
+
+ObjectSnap::ObjectSnap() {
+    if (!hasBuiltinCompareObjectHandles()) {
+        m_table = queryNtHandles();
+    }
+}
+
+bool ObjectSnap::eq(std::initializer_list<RemoteHandle> handles) {
+    if (handles.size() < 2) {
+        return true;
+    }
+    if (hasBuiltinCompareObjectHandles()) {
+        for (auto i = handles.begin() + 1; i < handles.end(); ++i) {
+            if (!compareObjectHandles(*handles.begin(), *i)) {
+                return false;
             }
-            if (dup2) {
-                CloseHandle(h2local);
+        }
+    } else {
+        HANDLE first = ntHandlePointer(m_table, *handles.begin());
+        for (auto i = handles.begin() + 1; i < handles.end(); ++i) {
+            if (first != ntHandlePointer(m_table, *i)) {
+                return false;
             }
-            return ret;
         }
     }
-    auto table = queryNtHandles();
-    return ntHandlePointer(table, h1) == ntHandlePointer(table, h2);
+    return true;
 }
 
 void registerTest(const std::string &name, bool (&cond)(), void (&func)()) {

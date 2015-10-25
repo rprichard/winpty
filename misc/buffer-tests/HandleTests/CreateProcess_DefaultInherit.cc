@@ -17,9 +17,10 @@ static void Test_CreateProcess_DefaultInherit() {
         auto pipe = newPipe(p, false);
         auto wh = std::get<1>(pipe).setStdin().setStdout().setStderr();
         auto c = p.child({ false });
-        CHECK(compareObjectHandles(c.getStdin(), wh));
-        CHECK(compareObjectHandles(c.getStdout(), wh));
-        CHECK(compareObjectHandles(c.getStderr(), wh));
+        {
+            ObjectSnap snap;
+            CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
+        }
         // CreateProcess makes separate handles for stdin/stdout/stderr.
         CHECK(c.getStdin().value() != c.getStdout().value());
         CHECK(c.getStdout().value() != c.getStderr().value());
@@ -27,9 +28,10 @@ static void Test_CreateProcess_DefaultInherit() {
         // Calling FreeConsole in the child does not free the duplicated
         // handles.
         c.detach();
-        CHECK(compareObjectHandles(c.getStdin(), wh));
-        CHECK(compareObjectHandles(c.getStdout(), wh));
-        CHECK(compareObjectHandles(c.getStderr(), wh));
+        {
+            ObjectSnap snap;
+            CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
+        }
     }
     {
         // Bogus values are transformed into zero.
@@ -49,8 +51,9 @@ static void Test_CreateProcess_DefaultInherit() {
         auto ph = stdHandles(p);
         auto ch = stdHandles(c);
         auto check = [&]() {
+            ObjectSnap snap;
             for (int i = 0; i < 3; ++i) {
-                CHECK(compareObjectHandles(ph[i], ch[i]));
+                CHECK(snap.eq(ph[i], ch[i]));
                 CHECK_EQ(ph[i].inheritable(), ch[i].inheritable());
             }
         };
@@ -100,9 +103,9 @@ static void Test_CreateProcess_DefaultInherit() {
         } else {
             // In Win8, a console handle works like all other handles.
             CHECK_EQ(c.getStdout().firstChar(), 'B');
-            CHECK(compareObjectHandles(p.getStdout(), p.getStderr()));
-            CHECK(compareObjectHandles(c.getStdout(), c.getStderr()));
-            CHECK(compareObjectHandles(p.getStdout(), c.getStdout()));
+            ObjectSnap snap;
+            CHECK(snap.eq({ p.getStdout(), p.getStderr(),
+                            c.getStdout(), c.getStderr() }));
             CHECK(!c.getStdout().inheritable());
             CHECK(!c.getStderr().inheritable());
         }
