@@ -223,3 +223,36 @@ bool isUnboundConsoleObject(RemoteHandle h) {
     dup.close();
     return ret;
 }
+
+void checkModernConsoleHandleInit(RemoteWorker &proc,
+                                  bool in, bool out, bool err,
+                                  std::vector<RemoteHandle> nonReuseCheck) {
+    ObjectSnap snap;
+    auto checkNonReuse = [&](RemoteHandle h) {
+        // The new Unbound console objects should not be inherited from
+        // anywhere else -- they should be brand new objects.
+        for (auto other : nonReuseCheck) {
+            CHECK(!snap.eq(h, other));
+        }
+    };
+    if (in) {
+        CHECK(isUsableConsoleInputHandle(proc.getStdin()));
+        CHECK(isUnboundConsoleObject(proc.getStdin()));
+        checkNonReuse(proc.getStdin());
+    }
+    if (out) {
+        CHECK(isUsableConsoleOutputHandle(proc.getStdout()));
+        CHECK(isUnboundConsoleObject(proc.getStdout()));
+        checkNonReuse(proc.getStdout());
+    }
+    if (err) {
+        CHECK(isUsableConsoleOutputHandle(proc.getStderr()));
+        CHECK(isUnboundConsoleObject(proc.getStderr()));
+        checkNonReuse(proc.getStderr());
+    }
+    if (out && err) {
+        ObjectSnap snap;
+        CHECK(proc.getStdout().value() != proc.getStderr().value());
+        CHECK(snap.eq(proc.getStdout(), proc.getStderr()));
+    }
+}

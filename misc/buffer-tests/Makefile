@@ -45,7 +45,7 @@ HANDLETESTS_OBJECTS = \
     build/obj/HandleTests/CreateProcess_DefaultInherit.o \
     build/obj/HandleTests/CreateProcess_DefaultInherit_PseudoHandleBug.o \
     build/obj/HandleTests/CreateProcess_DefaultInherit_XPPipeBug.o \
-    build/obj/HandleTests/CreateProcess_UseStdHandles_NoInherit.o \
+    build/obj/HandleTests/CreateProcess_UseStdHandles.o \
     build/obj/HandleTests/MiscTests.o \
     build/obj/HandleTests/Modern.o \
     build/obj/HandleTests/Traditional.o \
