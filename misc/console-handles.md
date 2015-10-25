@@ -130,14 +130,14 @@ follows:
       of the parent's non-console standard handles into the child.  Any
       standard handle that looks like a traditional console handle, up to
       0x0FFFFFFF, is copied as-is, whether or not the handle is open.
+      <sup>[[1]](#foot_inv_con)</sup>
 
-When Windows duplicates a parent handle into the child, if the handle
-cannot be duplicated for any reason (e.g. because it is `NULL`, closed,
-garbage, etc.), then the child's new handle is `NULL`.  If the parent's
-handle is the current process psuedo-handle, then the child's handle is
-a non-pseudo non-inheritable handle to the parent process.  The child
-handles have the same inheritability as the parent handles.  These
-handles are not closed by `FreeConsole`.
+      If Windows fails to duplicate a handle for any reason (e.g. because
+      it is `NULL` or not open), then the child's new handle is `NULL`.
+      If the parent's handle is the current process psuedo-handle, then
+      the child's handle is a non-pseudo non-inheritable handle to the
+      parent process.  The child handles have the same inheritability as
+      the parent handles.  These handles are not closed by `FreeConsole`.
 
 The `bInheritHandles` parameter to `CreateProcess` does not affect whether
 console handles are inherited.  Console handles are inherited if and only if
@@ -362,7 +362,7 @@ On Windows XP, `CreateProcess` fails to propagate a handle in this situation:
 In this situation, Windows XP will set the child process's standard handle to
 `NULL`.  The write end of the pipe works fine.  Passing a `bInheritHandles`
 of `TRUE` (and an inheritable pipe handle) works fine.  Using
-`STARTF_USESTDHANDLES` also works.  See `Test_CreateProcess_SpecialInherit`
+`STARTF_USESTDHANDLES` also works.  See `Test_CreateProcess_DefaultInherit`
 in `misc/buffer-tests` for a test case.
 
 ### Windows Vista BSOD
@@ -396,3 +396,19 @@ to the last screen buffer, then (2) creating a new screen buffer:
 ### Windows 7 `conhost.exe` crash with `CONOUT$`
 
 XXX: Document this.  It's a problem...
+
+
+
+
+Footnotes
+---------
+
+<a name="foot_inv_con">1</a>: From the previous discussion, it follows that
+if a standard handle is a non-inheritable console handle, then the child's
+standard handle will be invalid:
+
+ - Traditional console standard handles are copied as-is to the child.
+ - The child has the same *ConsoleHandleSet* as the parent, excluding
+   non-inheritable handles.
+
+It's an interesting edge case, though, so I test for it specifically.

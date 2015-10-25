@@ -195,11 +195,16 @@ static void Test_CreateNoWindow_HiddenVsNothing() {
     }
 }
 
-static void Test_CreateProcess_SpecialInherit() {
-    // If CreateProcess is called with bInheritHandles=FALSE and without
-    // STARTF_USESTDHANDLES, then CreateProcess will duplicate the parent's
-    // standard handles into the child.  There are slight variations between
-    // traditional and modern OS releases, but it's the same idea in both.
+static void Test_CreateProcess_DefaultInherit() {
+    // If CreateProcess is called with these parameters:
+    //  - bInheritHandles=FALSE
+    //  - STARTF_USESTDHANDLES is not specified
+    //  - the "CreationConsoleMode" is Inherit (see console-handles.md)
+    // then Windows duplicates each of STDIN/STDOUT/STDERR to the child.
+    //
+    // There are variations between OS releases, especially with regards to
+    // how console handles work.
+
     printTestName(__FUNCTION__);
 
     {
@@ -267,24 +272,57 @@ static void Test_CreateProcess_SpecialInherit() {
         check();
     }
 
-    // Traditional console-like values are passed through as-is,
-    // up to 0x0FFFFFFFull.
-    Worker p;
-    Handle::invent(0x0FFFFFFFull, p).setStdin();
-    Handle::invent(0x10000003ull, p).setStdout();
-    Handle::invent(0x00000003ull, p).setStderr();
-    auto c = p.child({ false });
-    if (isAtLeastWin8()) {
-        // These values are invalid on Windows 8 and turned into NULL.
-        CHECK(handleInts(stdHandles(c)) ==
-            (std::vector<uint64_t> { 0, 0, 0 }));
-    } else {
-        CHECK(handleInts(stdHandles(c)) ==
-            (std::vector<uint64_t> { 0x0FFFFFFFull, 0, 3 }));
+    {
+        // Traditional console-like values are passed through as-is,
+        // up to 0x0FFFFFFFull.
+        Worker p;
+        Handle::invent(0x0FFFFFFFull, p).setStdin();
+        Handle::invent(0x10000003ull, p).setStdout();
+        Handle::invent(0x00000003ull, p).setStderr();
+        auto c = p.child({ false });
+        if (isAtLeastWin8()) {
+            // These values are invalid on Windows 8 and turned into NULL.
+            CHECK(handleInts(stdHandles(c)) ==
+                (std::vector<uint64_t> { 0, 0, 0 }));
+        } else {
+            CHECK(handleInts(stdHandles(c)) ==
+                (std::vector<uint64_t> { 0x0FFFFFFFull, 0, 3 }));
+        }
     }
 
     {
-        // Windows XP bug: special inheritance doesn't work with the read end
+        // Test setting STDIN/STDOUT/STDERR to non-inheritable console handles.
+        //
+        // On old releases, default inheritance's handle duplication does not
+        // apply to console handles, and a console handle is inherited if and
+        // only if it is inheritable.
+        //
+        // On new releases, this will Just Work.
+        //
+        Worker p;
+        p.getStdout().setFirstChar('A');
+        p.openConin(false).setStdin();
+        p.newBuffer(false, 'B').setStdout().setStderr();
+        auto c = p.child({ false });
+
+        if (!isAtLeastWin8()) {
+            CHECK(handleValues(stdHandles(p)) == handleValues(stdHandles(c)));
+            CHECK(!c.getStdin().tryFlags());
+            CHECK(!c.getStdout().tryFlags());
+            CHECK(!c.getStderr().tryFlags());
+        } else {
+            // In Win8, a console handle works like all other handles.
+            CHECK_EQ(c.getStdout().firstChar(), 'B');
+            CHECK(compareObjectHandles(p.getStdout(), p.getStderr()));
+            CHECK(compareObjectHandles(c.getStdout(), c.getStderr()));
+            CHECK(compareObjectHandles(p.getStdout(), c.getStdout()));
+            CHECK(!c.getStdout().inheritable());
+            CHECK(!c.getStderr().inheritable());
+        }
+    }
+
+    {
+        // Windows XP bug: default inheritance doesn't work with the read end
         // of a pipe, even if it's inheritable.  It works with the write end.
         auto check = [](Worker &proc, Handle correct, bool expectBroken) {
             CHECK((proc.getStdin().value() == nullptr) == expectBroken);
@@ -348,5 +386,5 @@ void runCommonTests_CreateProcess() {
         Test_CreateProcess_STARTUPINFOEX();
     }
     Test_CreateNoWindow_HiddenVsNothing();
-    Test_CreateProcess_SpecialInherit();
+    Test_CreateProcess_DefaultInherit();
 }
