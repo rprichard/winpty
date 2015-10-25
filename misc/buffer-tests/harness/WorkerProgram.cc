@@ -8,6 +8,7 @@
 
 #include "Command.h"
 #include "Event.h"
+#include "OsVersion.h"
 #include "ShmemParcel.h"
 #include "Spawn.h"
 #include <DebugClient.h>
@@ -81,24 +82,21 @@ static void dumpStandardHandles() {
 
 static std::vector<HANDLE> scanForConsoleHandles() {
     std::vector<HANDLE> ret;
-    OSVERSIONINFO verinfo = {0};
-    verinfo.dwOSVersionInfoSize = sizeof(verinfo);
-    BOOL success = GetVersionEx(&verinfo);
-    ASSERT(success && "GetVersionEx failed");
-    uint64_t version =
-        ((uint64_t)verinfo.dwMajorVersion << 32) | verinfo.dwMinorVersion;
-    DWORD mode;
-    if (version >= 0x600000002) {
+    if (isModernConio()) {
         // As of Windows 8, console handles are real kernel handles.
-        for (unsigned int h = 0x4; h <= 0x1000; h += 4) {
-            if (GetConsoleMode((HANDLE)h, &mode)) {
-                ret.push_back((HANDLE)h);
+        for (unsigned int i = 0x4; i <= 0x1000; i += 4) {
+            HANDLE h = reinterpret_cast<HANDLE>(i);
+            DWORD mode;
+            if (GetConsoleMode(h, &mode)) {
+                ret.push_back(h);
             }
         }
     } else {
-        for (unsigned int h = 0x3; h < 0x3 + 100 * 4; h += 4) {
-            if (GetConsoleMode((HANDLE)h, &mode)) {
-                ret.push_back((HANDLE)h);
+        for (unsigned int i = 0x3; i < 0x3 + 100 * 4; i += 4) {
+            HANDLE h = reinterpret_cast<HANDLE>(i);
+            DWORD mode;
+            if (GetConsoleMode(h, &mode)) {
+                ret.push_back(h);
             }
         }
     }
