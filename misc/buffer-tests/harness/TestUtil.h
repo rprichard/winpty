@@ -41,11 +41,11 @@ class RemoteWorker;
     int g_register_ ## cond ## _ ## name = (registerTest(#name, cond, name), 0)
 
 // Test registration
+void printTestName(const std::string &name);
 void registerTest(const std::string &name, bool(&cond)(), void(&func)());
 using RegistrationTable = std::vector<std::tuple<std::string, bool(*)(), void(*)()>>;
 RegistrationTable registeredTests();
 inline bool always() { return true; }
-void printTestName(const std::string &name);
 
 // NT kernel handle query
 void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
@@ -57,9 +57,11 @@ bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2);
 class ObjectSnap {
 public:
     ObjectSnap();
+    void *object(RemoteHandle h);
     bool eq(std::initializer_list<RemoteHandle> handles);
     bool eq(RemoteHandle h1, RemoteHandle h2) { return eq({h1, h2}); }
 private:
+    bool m_hasTable = false;
     std::vector<SYSTEM_HANDLE_ENTRY> m_table;
 };
 
@@ -67,3 +69,11 @@ private:
 std::tuple<RemoteHandle, RemoteHandle> newPipe(
         RemoteWorker &w, BOOL inheritable=FALSE);
 std::string windowText(HWND hwnd);
+
+// "domain-specific" routines: perhaps these belong outside the harness?
+void checkInitConsoleHandleSet(RemoteWorker &child);
+void checkInitConsoleHandleSet(RemoteWorker &child, RemoteWorker &source);
+bool isUsableConsoleHandle(RemoteHandle h);
+bool isUsableConsoleInputHandle(RemoteHandle h);
+bool isUsableConsoleOutputHandle(RemoteHandle h);
+bool isUnboundConsoleObject(RemoteHandle h);

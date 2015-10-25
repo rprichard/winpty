@@ -1,23 +1,5 @@
 #include <TestCommon.h>
 
-// Verify that the child's open console handle set is as expected from having
-// just attached to or spawned from a source worker.
-//  * The set of child handles should exactly match the set of inheritable
-//    source handles.
-//  * Every open child handle should be inheritable.
-static void checkAttachHandleSet(Worker &child, Worker &source) {
-    auto cvec = child.scanForConsoleHandles();
-    auto cvecInherit = inheritableHandles(cvec);
-    auto svecInherit = inheritableHandles(source.scanForConsoleHandles());
-    auto hv = &handleValues;
-    if (hv(cvecInherit) == hv(svecInherit) && allInheritable(cvec)) {
-        return;
-    }
-    source.dumpConsoleHandles();
-    child.dumpConsoleHandles();
-    CHECK(false && "checkAttachHandleSet failed");
-}
-
 REGISTER(Test_HandleDuplication, isTraditionalConio);
 static void Test_HandleDuplication() {
     // A traditional console handle cannot be duplicated to another process,
@@ -209,8 +191,8 @@ static void Test_AttachConsole_And_CreateProcess_Inheritance() {
     auto conin = p.getStdin().dup(true);
     auto conout1 = p.getStdout().dup(true);
     auto conout2 = p.getStderr().dup(true);
-    p.openConout(false);    // an extra handle for checkAttachHandleSet testing
-    p.openConout(true);     // an extra handle for checkAttachHandleSet testing
+    p.openConout(false); // an extra handle for checkInitConsoleHandleSet testing
+    p.openConout(true);  // an extra handle for checkInitConsoleHandleSet testing
     p.getStdin().close();
     p.getStdout().close();
     p.getStderr().close();
@@ -243,9 +225,9 @@ static void Test_AttachConsole_And_CreateProcess_Inheritance() {
 
     // The set of inheritable console handles in these processes exactly match
     // that of the parent.
-    checkAttachHandleSet(c, p);
-    checkAttachHandleSet(c2, p);
-    checkAttachHandleSet(unrelated, p);
+    checkInitConsoleHandleSet(c, p);
+    checkInitConsoleHandleSet(c2, p);
+    checkInitConsoleHandleSet(unrelated, p);
 }
 
 REGISTER(Test_Detach_Implicitly_Closes_Handles, isTraditionalConio);
