@@ -46,9 +46,10 @@ std::string windowText(HWND hwnd) {
 }
 
 // Get the ObjectPointer (underlying NT object) for the NT handle.
-void *ntHandlePointer(RemoteHandle h) {
+void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
+                      RemoteHandle h) {
     HANDLE ret = nullptr;
-    for (auto &entry : queryNtHandles()) {
+    for (auto &entry : table) {
         if (entry.OwnerPid == h.worker().pid() &&
                 entry.HandleValue == h.uvalue()) {
             ASSERT(ret == nullptr);
@@ -90,7 +91,8 @@ bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
             return ret;
         }
     }
-    return ntHandlePointer(h1) == ntHandlePointer(h2);
+    auto table = queryNtHandles();
+    return ntHandlePointer(table, h1) == ntHandlePointer(table, h2);
 }
 
 void registerTest(const std::string &name, bool (&cond)(), void (&func)()) {

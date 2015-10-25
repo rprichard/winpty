@@ -6,6 +6,7 @@
 #include <string>
 #include <tuple>
 
+#include "NtHandleQuery.h"
 #include "RemoteHandle.h"
 
 class RemoteWorker;
@@ -47,7 +48,8 @@ inline bool always() { return true; }
 void printTestName(const std::string &name);
 
 // NT kernel handle query
-void *ntHandlePointer(RemoteHandle h);
+void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
+                      RemoteHandle h);
 bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2);
 
 // Misc
