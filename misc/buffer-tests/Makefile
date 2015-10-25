@@ -45,7 +45,11 @@ TEST_OBJECTS = \
 include tests.mk
 
 .PHONY : all
-all : $(TESTS) build/Worker.exe build/HandleTests.exe build/HandleTests.exe.manifest
+all : \
+    $(TESTS) \
+    build/Worker.exe \
+    build/HandleTests.exe \
+    build/HandleTests.exe.manifest
 
 .PHONY : clean
 clean:
@@ -80,6 +84,7 @@ build/Worker.exe : $(WORKER_OBJECTS)
 build/HandleTests.exe : $(TEST_OBJECTS) \
             build/HandleTests.o \
             build/HandleTests_Common.o \
+            build/HandleTests_Common_CreateProcess.o \
             build/HandleTests_Modern.o \
             build/HandleTests_Traditional.o
 	@echo Linking $@
