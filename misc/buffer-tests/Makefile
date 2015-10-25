@@ -43,6 +43,7 @@ TEST_OBJECTS = \
 HANDLETESTS_OBJECTS = \
     build/obj/HandleTests/CreateProcess.o \
     build/obj/HandleTests/CreateProcess_DefaultInherit.o \
+    build/obj/HandleTests/CreateProcess_DefaultInherit_PseudoHandleBug.o \
     build/obj/HandleTests/CreateProcess_DefaultInherit_XPPipeBug.o \
     build/obj/HandleTests/MiscTests.o \
     build/obj/HandleTests/Modern.o \

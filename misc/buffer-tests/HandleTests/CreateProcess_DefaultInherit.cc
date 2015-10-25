@@ -40,23 +40,6 @@ static void Test_CreateProcess_DefaultInherit() {
         CHECK(handleInts(stdHandles(c)) == (std::vector<uint64_t> {0,0,0}));
     }
 
-    {
-        // The GetCurrentProcess() psuedo-handle (i.e. INVALID_HANDLE_VALUE)
-        // is translated to a real handle value for the child process.
-        // Naturally, this was unintended behavior, and as of Windows 8.1, it
-        // is instead translated to NULL.
-        Worker p;
-        Handle::invent(GetCurrentProcess(), p).setStdout();
-        auto c = p.child({ false });
-        if (isAtLeastWin8_1()) {
-            CHECK(c.getStdout().value() == nullptr);
-        } else {
-            CHECK(c.getStdout().value() != GetCurrentProcess());
-            auto handleToPInP = Handle::dup(p.processHandle(), p);
-            CHECK(compareObjectHandles(c.getStdout(), handleToPInP));
-        }
-    }
-
     if (isAtLeastWin8()) {
         // On Windows 8 and up, if a standard handle we duplicate just happens
         // to be a console handle, that isn't sufficient reason for FreeConsole
