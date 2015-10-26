@@ -119,10 +119,13 @@ the first matching rule:
  2. If *ConsoleCreationMode* is *NewConsole* or *NewConsoleNoWindow*, then
     Windows sets the handles to (0x3, 0x7, 0xb).
 
- 3. If *InheritHandles*, then the parent's standard handles are copied as-is
+ 3. If *ConsoleCreationMode* is *Detach*, then Windows sets the handles to
+    (`NULL`, `NULL`, `NULL`).
+
+ 4. If *InheritHandles*, then the parent's standard handles are copied as-is
     to the child, without exception.
 
- 4. Windows duplicates each
+ 5. Windows duplicates each
     of the parent's non-console standard handles into the child.  Any
     standard handle that looks like a traditional console handle, up to
     0x0FFFFFFF, is copied as-is, whether or not the handle is open.
@@ -133,8 +136,6 @@ the first matching rule:
     The child handles have the same inheritability as the parent handles.
     These handles are not closed by `FreeConsole`.
     (Bugs: [[dupproc]](#dupproc) [[xppipe]](#xppipe))
-
-XXX: What about `DETACHED_PROCESS`?
 
 The `bInheritHandles` parameter to `CreateProcess` does not affect whether
 console handles are inherited.  Console handles are inherited if and only if
@@ -224,19 +225,20 @@ Each of the child's standard handles is set using the first match:
     same *Unbound* output object if it creates handles for both `STDOUT` and
     `STDERR`.  The handles themselves are still different, though.)
 
- 3. If *UseStdHandles*, the child's standard handle becomes `NULL`.
+ 3. If *ConsoleCreationMode* is *Detach*, then Windows sets the handles to
+    (`NULL`, `NULL`, `NULL`).
 
- 4. If *InheritHandles*, the parent's standard handle is copied as-is, without
+ 4. If *UseStdHandles*, the child's standard handle becomes `NULL`.
+
+ 5. If *InheritHandles*, the parent's standard handle is copied as-is, without
     exception.
 
- 5. The parent's standard handle is duplicated.  As with previous releases, if
+ 6. The parent's standard handle is duplicated.  As with previous releases, if
     the handle cannot be duplicated, then the child's handle becomes `NULL`.
     The child handle has the same inheritability as the parent handle.
     `FreeConsole` does *not* close this handle, even if it happens to be a
     console handle (which is not unlikely).
     (Bugs: [[dupproc]](#dupproc))
-
-XXX: What about `DETACHED_PROCESS`?
 
 XXX: Also, I don't expect the `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` attribute
 to matter here, but it needs to be tested.
