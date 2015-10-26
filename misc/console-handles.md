@@ -108,8 +108,8 @@ The manner in which Windows sets standard handles is influenced by two flags:
  - Whether the `CreateProcess` parameter, `bInheritHandles`, was `TRUE`
    (*InheritHandles*)
 
-From Window XP up until Windows 8, `CreateProcess` sets standard handles as
-follows:
+From Window XP up until Windows 8, `CreateProcess` sets standard handles using
+the first matching rule:
 
  1. If *UseStdHandles*, then the child uses the `STARTUPINFO` fields.  Windows
     makes no attempt to validate the handles, nor will it treat a
@@ -247,7 +247,6 @@ to matter here, but it needs to be tested.
 
  - If *UseStdHandles*, then Windows opens a console handle for each standard
    handle that is currently `NULL`.
-
  - If !*UseStdHandles*, then Windows opens three new console handles.
 
 ### Implicit screen buffer refcount
