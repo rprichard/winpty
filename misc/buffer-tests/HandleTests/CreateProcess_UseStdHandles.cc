@@ -182,7 +182,8 @@ static void Test_CreateProcess_UseStdHandles() {
             const bool inherit = inheritInt != 0;
             auto c1 = p.child({inherit, 0, newHandles});
             check(c1, inherit, false);
-            auto c2 = p.child({inherit, CREATE_NEW_CONSOLE, newHandles});
+            auto c2 = p.child(
+                {inherit, Worker::defaultCreationFlags(), newHandles});
             check(c2, inherit, true);
         }
     });

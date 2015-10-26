@@ -154,7 +154,8 @@ static void Test_CreateProcess_InheritList_ModernDuplication() {
             CHECK(c.getStdout().uvalue() == 0ull);
         } else {
             CHECK(c.getStdin().uvalue() == 0ull);
-            CHECK(c.getStdout().uvalue() == 0xdeadbeefull);
+            CHECK(c.getStdout().value() ==
+                Handle::invent(0xdeadbeefull, c).value());
         }
     }
 }

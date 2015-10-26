@@ -10,7 +10,7 @@
 REGISTER(Test_CreateProcess_NewConsole, always);
 static void Test_CreateProcess_NewConsole() {
     auto check = [](Worker &p, bool inheritHandles) {
-        auto c = p.child({ inheritHandles, CREATE_NEW_CONSOLE });
+        auto c = p.child({ inheritHandles, Worker::defaultCreationFlags() });
         if (isTraditionalConio()) {
             checkInitConsoleHandleSet(c);
             CHECK(handleInts(stdHandles(c)) ==

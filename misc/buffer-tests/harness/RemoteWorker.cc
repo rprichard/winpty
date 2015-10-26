@@ -28,6 +28,8 @@ static std::string newWorkerName() {
 
 } // anonymous namespace
 
+DWORD RemoteWorker::dwDefaultCreationFlags = CREATE_NEW_CONSOLE;
+
 RemoteWorker::RemoteWorker(decltype(DoNotSpawn)) :
     m_name(newWorkerName()),
     m_parcel(m_name + "-shmem", ShmemParcel::CreateNew),

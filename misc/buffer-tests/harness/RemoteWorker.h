@@ -14,11 +14,21 @@
 
 class RemoteWorker {
     friend class RemoteHandle;
+    static DWORD dwDefaultCreationFlags;
+
+public:
+    static void setDefaultCreationFlags(DWORD flags) {
+        dwDefaultCreationFlags = flags;
+    }
+    static DWORD defaultCreationFlags() {
+        return dwDefaultCreationFlags;
+    }
 
 public:
     struct {} static constexpr DoNotSpawn = {};
     explicit RemoteWorker(decltype(DoNotSpawn));
-    explicit RemoteWorker(SpawnParams params={false, CREATE_NEW_CONSOLE});
+    explicit RemoteWorker() : RemoteWorker({false, dwDefaultCreationFlags}) {}
+    explicit RemoteWorker(SpawnParams params);
     RemoteWorker child(SpawnParams params={});
     RemoteWorker tryChild(SpawnParams params={}, DWORD *errCode=nullptr);
     ~RemoteWorker() { cleanup(); }
