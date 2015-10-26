@@ -129,6 +129,11 @@ static void Test_CreateProcess_Duplicate() {
         //  - bInheritHandles=TRUE
         //  - STARTF_USESTDHANDLES not specified
         //  - an inherit list (PROC_THREAD_ATTRIBUTE_HANDLE_LIST) is specified
-        Test_CreateProcess_Duplicate_Impl(childWithDummyInheritList);
+        Test_CreateProcess_Duplicate_Impl([](Worker &p, SpawnParams sp) {
+            return childWithDummyInheritList(p, sp, false);
+        });
+        Test_CreateProcess_Duplicate_Impl([](Worker &p, SpawnParams sp) {
+            return childWithDummyInheritList(p, sp, true);
+        });
     }
 }

@@ -40,7 +40,8 @@ RemoteWorker::RemoteWorker(decltype(DoNotSpawn)) :
 }
 
 RemoteWorker::RemoteWorker(SpawnParams params) : RemoteWorker(DoNotSpawn) {
-    m_process = spawn(m_name, params, nullptr);
+    SpawnFailure dummy;
+    m_process = spawn(m_name, params, dummy);
     ASSERT(m_process != nullptr && "Could not create RemoteWorker");
     m_valid = true;
     // Perform an RPC just to ensure that the worker process is ready, and
@@ -54,14 +55,14 @@ RemoteWorker RemoteWorker::child(SpawnParams params) {
     return ret;
 }
 
-RemoteWorker RemoteWorker::tryChild(SpawnParams params, DWORD *errCode) {
+RemoteWorker RemoteWorker::tryChild(SpawnParams params, SpawnFailure *failure) {
     RemoteWorker ret(DoNotSpawn);
     cmd().u.spawn.spawnName = ret.m_name;
     cmd().u.spawn.spawnParams = params;
     rpc(Command::SpawnChild);
     if (cmd().handle == nullptr) {
-        if (errCode != nullptr) {
-            *errCode = cmd().dword;
+        if (failure != nullptr) {
+            *failure = cmd().u.spawn.spawnFailure;
         }
     } else {
         BOOL dupSuccess = DuplicateHandle(

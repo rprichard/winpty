@@ -331,6 +331,23 @@ Here's what's evident from examining the OS behavior:
    `GetConsoleWindow` and `IsWindowVisible` calls.  `GetConsoleWindow` returns
    `NULL` starting with Windows 7.
 
+### `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`
+
+The `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` list cannot be empty; the
+`UpdateProcThreadAttribute` call fails if `cbSize` is `0`.  However, a list
+containing a `NULL` is apparently OK and equivalent to an empty list.
+Curiously, if the inherit list has both a non-`NULL` handle and a `NULL`
+handle, the list is still treated as empty (i.e. the non-`NULL` handle is
+not inherited).
+
+Starting with Windows 8, `CreateProcess` duplicates the parent's handles into
+the child when `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` and these other parameters
+are specified:
+
+ - *InheritHandles* is true
+ - *UseStdHandles* is false
+ - *CreationConsoleMode* is *Inherit*
+
 ### <a name="xppipe">Windows XP pipe read handle inheritance anomaly [xppipe]</a>
 
 On Windows XP, `CreateProcess` fails to propagate a handle in this situation:

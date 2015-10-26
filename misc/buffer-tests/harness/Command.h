@@ -57,6 +57,7 @@ struct Command {
         struct {
             FixedSizeString<128> spawnName;
             SpawnParams spawnParams;
+            SpawnFailure spawnFailure;
         } spawn;
         FixedSizeString<1024> writeText;
         FixedSizeString<1024> systemText;

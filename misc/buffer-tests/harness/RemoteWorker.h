@@ -30,7 +30,7 @@ public:
     explicit RemoteWorker() : RemoteWorker({false, dwDefaultCreationFlags}) {}
     explicit RemoteWorker(SpawnParams params);
     RemoteWorker child(SpawnParams params={});
-    RemoteWorker tryChild(SpawnParams params={}, DWORD *errCode=nullptr);
+    RemoteWorker tryChild(SpawnParams params={}, SpawnFailure *failure=nullptr);
     ~RemoteWorker() { cleanup(); }
     bool valid() { return m_valid; }
     void exit();

@@ -311,7 +311,7 @@ int main(int argc, char *argv[]) {
                 trace("Spawning child...");
                 cmd.handle = spawn(cmd.u.spawn.spawnName.str(),
                                    cmd.u.spawn.spawnParams,
-                                   &cmd.dword);
+                                   cmd.u.spawn.spawnFailure);
                 if (cmd.handle != nullptr) {
                     trace("Spawning child... pid %u",
                         (unsigned int)GetProcessId(cmd.handle));

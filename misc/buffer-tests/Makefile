@@ -47,6 +47,7 @@ HANDLETESTS_OBJECTS = \
     build/obj/HandleTests/CreateProcess_Duplicate_PseudoHandleBug.o \
     build/obj/HandleTests/CreateProcess_Duplicate_XPPipeBug.o \
     build/obj/HandleTests/CreateProcess_InheritAllHandles.o \
+    build/obj/HandleTests/CreateProcess_InheritList.o \
     build/obj/HandleTests/CreateProcess_NewConsole.o \
     build/obj/HandleTests/CreateProcess_UseStdHandles.o \
     build/obj/HandleTests/MiscTests.o \

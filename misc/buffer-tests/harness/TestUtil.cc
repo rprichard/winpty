@@ -270,24 +270,33 @@ void checkModernConsoleHandleInit(RemoteWorker &proc,
 }
 
 // Wrapper around RemoteWorker::child that does the bare minimum to use an
-// inherit list.  It creates an inheritable pipe, closes one end, and specifies
-// the other end in an inherit list.  It closes the final pipe end in the
-// parent and child before returning.
+// inherit list.
+//
+// If `dummyPipeInInheritList` is true, it also creates an inheritable pipe,
+// closes one end, and specifies the other end in an inherit list.  It closes
+// the final pipe end in the parent and child before returning.
 //
 // This function is useful for testing the modern bInheritHandles=TRUE handle
 // duplication functionality.
 //
-RemoteWorker childWithDummyInheritList(RemoteWorker &p, SpawnParams sp) {
-    auto pipe = newPipe(p, true);
-    std::get<0>(pipe).close();
-    auto dummy = std::get<1>(pipe);
+RemoteWorker childWithDummyInheritList(RemoteWorker &p, SpawnParams sp,
+                                       bool dummyPipeInInheritList) {
     sp.bInheritHandles = true;
     sp.dwCreationFlags |= EXTENDED_STARTUPINFO_PRESENT;
     sp.sui.cb = sizeof(STARTUPINFOEXW);
     sp.inheritCount = 1;
-    sp.inheritList = { dummy.value() };
-    auto c = p.child(sp);
-    RemoteHandle::invent(dummy.value(), c).close();
-    dummy.close();
-    return c;
+
+    if (dummyPipeInInheritList) {
+        auto pipe = newPipe(p, true);
+        std::get<0>(pipe).close();
+        auto dummy = std::get<1>(pipe);
+        sp.inheritList = { dummy.value() };
+        auto c = p.child(sp);
+        RemoteHandle::invent(dummy.value(), c).close();
+        dummy.close();
+        return c;
+    } else {
+        sp.inheritList = { NULL };
+        return p.child(sp);
+    }
 }

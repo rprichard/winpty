@@ -85,4 +85,5 @@ bool isUsableConsoleOutputHandle(RemoteHandle h);
 bool isUnboundConsoleObject(RemoteHandle h);
 void checkModernConsoleHandleInit(RemoteWorker &proc,
                                   bool in, bool out, bool err);
-RemoteWorker childWithDummyInheritList(RemoteWorker &p, SpawnParams sp);
+RemoteWorker childWithDummyInheritList(RemoteWorker &p, SpawnParams sp,
+                                       bool dummyPipeInInheritList);

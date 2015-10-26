@@ -33,6 +33,12 @@ struct SpawnParams {
     }
 };
 
+struct SpawnFailure {
+    enum Kind { Success, CreateProcess, UpdateProcThreadAttribute };
+    Kind kind = Success;
+    DWORD errCode = 0;
+};
+
 HANDLE spawn(const std::string &workerName,
              const SpawnParams &params,
-             DWORD *lastError);
+             SpawnFailure &error);

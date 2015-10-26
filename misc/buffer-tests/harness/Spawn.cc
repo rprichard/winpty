@@ -22,7 +22,7 @@ static std::vector<wchar_t> wstrToWVector(const std::wstring &str) {
 
 HANDLE spawn(const std::string &workerName,
              const SpawnParams &params,
-             DWORD *lastError) {
+             SpawnFailure &error) {
     auto workerPath = pathDirName(getModuleFileName(NULL)) + "\\Worker.exe";
     const std::wstring workerPathWStr = widenString(workerPath);
     const std::string cmdLine = "\"" + workerPath + "\" " + workerName;
@@ -33,7 +33,6 @@ HANDLE spawn(const std::string &workerName,
            suix.StartupInfo.cb == sizeof(STARTUPINFOEXW));
     std::unique_ptr<char[]> attrListBuffer;
     auto inheritList = params.inheritList;
-    LPPROC_THREAD_ATTRIBUTE_LIST attrList = nullptr;
 
     OsModule kernel32(L"kernel32.dll");
 #define DECL_API_FUNC(name) decltype(name) *p##name = nullptr;
@@ -41,6 +40,17 @@ HANDLE spawn(const std::string &workerName,
     DECL_API_FUNC(UpdateProcThreadAttribute);
     DECL_API_FUNC(DeleteProcThreadAttributeList);
 #undef DECL_API_FUNC
+
+    struct AttrList {
+        decltype(DeleteProcThreadAttributeList) *cleanup = nullptr;
+        LPPROC_THREAD_ATTRIBUTE_LIST v = nullptr;
+        ~AttrList() {
+            if (v != nullptr) {
+                ASSERT(cleanup != nullptr);
+                cleanup(v);
+            }
+        }
+    } attrList;
 
     if (params.inheritCount != SpawnParams::NoInheritList) {
         // Add PROC_THREAD_ATTRIBUTE_HANDLE_LIST to the STARTUPINFOEX.  Use
@@ -69,7 +79,8 @@ HANDLE spawn(const std::string &workerName,
             ASSERT(success &&
                 "First InitializeProcThreadAttributeList call failed");
             attrListBuffer = std::unique_ptr<char[]>(new char[bufferSize]);
-            suix.lpAttributeList = attrList =
+            attrList.cleanup = pDeleteProcThreadAttributeList;
+            suix.lpAttributeList = attrList.v =
                 reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(
                     attrListBuffer.get());
             success = pInitializeProcThreadAttributeList(
@@ -83,9 +94,11 @@ HANDLE spawn(const std::string &workerName,
                 params.inheritCount * sizeof(HANDLE),
                 nullptr, nullptr);
             if (!success) {
-                trace("Aborting: UpdateProcThreadAttribute failed: %s",
-                    errorString(GetLastError()).c_str());
-                abort();
+                error.kind = SpawnFailure::UpdateProcThreadAttribute;
+                error.errCode = GetLastError();
+                trace("UpdateProcThreadAttribute failed: %s",
+                    errorString(error.errCode).c_str());
+                return nullptr;
             }
         }
     }
@@ -93,7 +106,6 @@ HANDLE spawn(const std::string &workerName,
     PROCESS_INFORMATION pi;
     memset(&pi, 0, sizeof(pi));
 
-    HANDLE ret = nullptr;
     auto success = CreateProcessW(workerPathWStr.c_str(), cmdLineWVec.data(),
                                   NULL, NULL,
                                   /*bInheritHandles=*/params.bInheritHandles,
@@ -101,19 +113,15 @@ HANDLE spawn(const std::string &workerName,
                                   NULL, NULL,
                                   &suix.StartupInfo, &pi);
     if (!success) {
-        if (lastError != nullptr) {
-            *lastError = GetLastError();
-        }
+        error.kind = SpawnFailure::CreateProcess;
+        error.errCode = GetLastError();
         trace("CreateProcessW failed: %s",
-            errorString(GetLastError()).c_str());
-    } else {
-        ret = pi.hProcess;
-        CloseHandle(pi.hThread);
+            errorString(error.errCode).c_str());
+        return nullptr;
     }
 
-    if (attrList != nullptr) {
-        pDeleteProcThreadAttributeList(attrList);
-    }
-
-    return ret;
+    error.kind = SpawnFailure::Success;
+    error.errCode = 0;
+    CloseHandle(pi.hThread);
+    return pi.hProcess;
 }
