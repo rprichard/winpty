@@ -57,7 +57,7 @@ static void Test_CreateProcess_InheritAllHandles() {
     }
 }
 
-REGISTER(Test_CreateProcess_InheritList_StdHandles, always);
+REGISTER(Test_CreateProcess_InheritList_StdHandles, isAtLeastVista);
 static void Test_CreateProcess_InheritList_StdHandles() {
     // List one of the standard handles in the inherit list, and see what
     // happens to the standard list.
@@ -113,7 +113,7 @@ static void Test_CreateProcess_InheritList_StdHandles() {
     }
 }
 
-REGISTER(Test_CreateProcess_InheritList_ModernDuplication, always);
+REGISTER(Test_CreateProcess_InheritList_ModernDuplication, isAtLeastVista);
 static void Test_CreateProcess_InheritList_ModernDuplication() {
     auto &hv = handleValues;
 
