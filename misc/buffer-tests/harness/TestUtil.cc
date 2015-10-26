@@ -224,6 +224,8 @@ bool isUnboundConsoleObject(RemoteHandle h) {
     return ret;
 }
 
+// Verify that an optional subset of the STDIN/STDOUT/STDERR standard
+// handles are new handles referring to new Unbound console objects.
 void checkModernConsoleHandleInit(RemoteWorker &proc,
                                   bool in, bool out, bool err) {
     // List all the usable console handles that weren't just opened.
@@ -265,4 +267,27 @@ void checkModernConsoleHandleInit(RemoteWorker &proc,
         CHECK(proc.getStdout().value() != proc.getStderr().value());
         CHECK(snap.eq(proc.getStdout(), proc.getStderr()));
     }
+}
+
+// Wrapper around RemoteWorker::child that does the bare minimum to use an
+// inherit list.  It creates an inheritable pipe, closes one end, and specifies
+// the other end in an inherit list.  It closes the final pipe end in the
+// parent and child before returning.
+//
+// This function is useful for testing the modern bInheritHandles=TRUE handle
+// duplication functionality.
+//
+RemoteWorker childWithDummyInheritList(RemoteWorker &p, SpawnParams sp) {
+    auto pipe = newPipe(p, true);
+    std::get<0>(pipe).close();
+    auto dummy = std::get<1>(pipe);
+    sp.bInheritHandles = true;
+    sp.dwCreationFlags |= EXTENDED_STARTUPINFO_PRESENT;
+    sp.sui.cb = sizeof(STARTUPINFOEXW);
+    sp.inheritCount = 1;
+    sp.inheritList = { dummy.value() };
+    auto c = p.child(sp);
+    RemoteHandle::invent(dummy.value(), c).close();
+    dummy.close();
+    return c;
 }

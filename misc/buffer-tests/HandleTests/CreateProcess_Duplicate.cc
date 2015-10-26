@@ -9,14 +9,17 @@
 // There are variations between OS releases, especially with regards to
 // how console handles work.
 
-REGISTER(Test_CreateProcess_Duplicate, always);
-static void Test_CreateProcess_Duplicate() {
+namespace {
+
+template <typename T>
+void Test_CreateProcess_Duplicate_Impl(T makeChild) {
+    printTestName(__FUNCTION__);
     {
         // Base case: a non-inheritable pipe is still inherited.
         Worker p;
         auto pipe = newPipe(p, false);
         auto wh = std::get<1>(pipe).setStdin().setStdout().setStderr();
-        auto c = p.child({ false });
+        auto c = makeChild(p, { false });
         {
             ObjectSnap snap;
             CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
@@ -38,7 +41,7 @@ static void Test_CreateProcess_Duplicate() {
         Worker p;
         Handle::invent(0x10000ull, p).setStdin().setStdout();
         Handle::invent(0x0ull, p).setStderr();
-        auto c = p.child({ false });
+        auto c = makeChild(p, { false });
         CHECK(handleInts(stdHandles(c)) == (std::vector<uint64_t> {0,0,0}));
     }
 
@@ -47,7 +50,7 @@ static void Test_CreateProcess_Duplicate() {
         // to be a console handle, that isn't sufficient reason for FreeConsole
         // to close it.
         Worker p;
-        auto c = p.child({ false });
+        auto c = makeChild(p, { false });
         auto ph = stdHandles(p);
         auto ch = stdHandles(c);
         auto check = [&]() {
@@ -71,7 +74,7 @@ static void Test_CreateProcess_Duplicate() {
         Handle::invent(0x0FFFFFFFull, p).setStdin();
         Handle::invent(0x10000003ull, p).setStdout();
         Handle::invent(0x00000003ull, p).setStderr();
-        auto c = p.child({ false });
+        auto c = makeChild(p, { false });
         if (isAtLeastWin8()) {
             // These values are invalid on Windows 8 and turned into NULL.
             CHECK(handleInts(stdHandles(c)) ==
@@ -94,7 +97,7 @@ static void Test_CreateProcess_Duplicate() {
         p.getStdout().setFirstChar('A');
         p.openConin(false).setStdin();
         p.newBuffer(false, 'B').setStdout().setStderr();
-        auto c = p.child({ false });
+        auto c = makeChild(p, { false });
 
         if (!isAtLeastWin8()) {
             CHECK(handleValues(stdHandles(p)) == handleValues(stdHandles(c)));
@@ -110,5 +113,22 @@ static void Test_CreateProcess_Duplicate() {
             CHECK(!c.getStdout().inheritable());
             CHECK(!c.getStderr().inheritable());
         }
+    }
+}
+
+} // anonymous namespace
+
+REGISTER(Test_CreateProcess_Duplicate, always);
+static void Test_CreateProcess_Duplicate() {
+    Test_CreateProcess_Duplicate_Impl([](Worker &p, SpawnParams sp) {
+        return p.child(sp);
+    });
+    if (isModernConio()) {
+        // With modern console I/O, calling CreateProcess with these
+        // parameters also duplicates standard handles:
+        //  - bInheritHandles=TRUE
+        //  - STARTF_USESTDHANDLES not specified
+        //  - an inherit list (PROC_THREAD_ATTRIBUTE_HANDLE_LIST) is specified
+        Test_CreateProcess_Duplicate_Impl(childWithDummyInheritList);
     }
 }

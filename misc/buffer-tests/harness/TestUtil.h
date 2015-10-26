@@ -8,6 +8,7 @@
 
 #include "NtHandleQuery.h"
 #include "RemoteHandle.h"
+#include "Spawn.h"
 
 class RemoteWorker;
 
@@ -39,6 +40,11 @@ class RemoteWorker;
 #define REGISTER(name, cond) \
     static void name(); \
     int g_register_ ## cond ## _ ## name = (registerTest(#name, cond, name), 0)
+
+template <typename T>
+static void extendVector(std::vector<T> &base, const std::vector<T> &to_add) {
+    base.insert(base.end(), to_add.begin(), to_add.end());
+}
 
 // Test registration
 void printTestName(const std::string &name);
@@ -79,3 +85,4 @@ bool isUsableConsoleOutputHandle(RemoteHandle h);
 bool isUnboundConsoleObject(RemoteHandle h);
 void checkModernConsoleHandleInit(RemoteWorker &proc,
                                   bool in, bool out, bool err);
+RemoteWorker childWithDummyInheritList(RemoteWorker &p, SpawnParams sp);

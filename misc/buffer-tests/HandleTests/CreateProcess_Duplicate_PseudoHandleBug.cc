@@ -19,3 +19,21 @@ static void Test_CreateProcess_Duplicate_PseudoHandleBug() {
         CHECK(compareObjectHandles(c.getStdout(), handleToPInP));
     }
 }
+
+REGISTER(Test_CreateProcess_Duplicate_PseudoHandleBug_IL, always);
+static void Test_CreateProcess_Duplicate_PseudoHandleBug_IL() {
+    // As above, but use an inherit list.  With an inherit list, standard
+    // handles are duplicated, but only with Windows 8 and up.
+    Worker p;
+    Handle::invent(INVALID_HANDLE_VALUE, p).setStdout();
+    auto c = childWithDummyInheritList(p, {});
+    if (isAtLeastWin8_1()) {
+        CHECK(c.getStdout().value() == nullptr);
+    } else if (isAtLeastWin8()) {
+        CHECK(c.getStdout().value() != GetCurrentProcess());
+        auto handleToPInP = Handle::dup(p.processHandle(), p);
+        CHECK(compareObjectHandles(c.getStdout(), handleToPInP));
+    } else {
+        CHECK(c.getStdout().value() == INVALID_HANDLE_VALUE);
+    }
+}

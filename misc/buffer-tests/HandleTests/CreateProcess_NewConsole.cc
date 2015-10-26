@@ -7,17 +7,14 @@
 //  - CreationConsoleMode=NewConsole
 //
 
-template <typename T>
-static void extend(std::vector<T> &base, const std::vector<T> &to_add) {
-    base.insert(base.end(), to_add.begin(), to_add.end());
-}
-
 REGISTER(Test_CreateProcess_NewConsole, always);
 static void Test_CreateProcess_NewConsole() {
     auto check = [](Worker &p, bool inheritHandles) {
         auto c = p.child({ inheritHandles, CREATE_NEW_CONSOLE });
         if (isTraditionalConio()) {
             checkInitConsoleHandleSet(c);
+            CHECK(handleInts(stdHandles(c)) ==
+                (std::vector<uint64_t> {0x3, 0x7, 0xb}));
         } else {
             checkModernConsoleHandleInit(c, true, true, true);
         }
@@ -44,8 +41,8 @@ static void Test_CreateProcess_NewConsole() {
         auto c = check(p, true);
 
         std::vector<uint64_t> expected;
-        extend(expected, handleInts(stdHandles(p)));
-        extend(expected, handleInts(stdHandles(c)));
+        extendVector(expected, handleInts(stdHandles(p)));
+        extendVector(expected, handleInts(stdHandles(c)));
         std::sort(expected.begin(), expected.end());
 
         auto correct = handleInts(c.scanForConsoleHandles());

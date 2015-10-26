@@ -230,8 +230,8 @@ Each of the child's standard handles is set using the first match:
 
  4. If *UseStdHandles*, the child's standard handle becomes `NULL`.
 
- 5. If *InheritHandles*, the parent's standard handle is copied as-is, without
-    exception.
+ 5. If *InheritHandles*, and there is no `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`
+    specified, then the parent's standard handle is copied as-is.
 
  6. The parent's standard handle is duplicated.  As with previous releases, if
     the handle cannot be duplicated, then the child's handle becomes `NULL`.
@@ -239,9 +239,6 @@ Each of the child's standard handles is set using the first match:
     `FreeConsole` does *not* close this handle, even if it happens to be a
     console handle (which is not unlikely).
     (Bugs: [[dupproc]](#dupproc))
-
-XXX: Also, I don't expect the `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` attribute
-to matter here, but it needs to be tested.
 
 ### AllocConsole, AttachConsole (modern)
 
