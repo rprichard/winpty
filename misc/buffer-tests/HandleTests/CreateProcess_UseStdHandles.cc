@@ -150,18 +150,13 @@ static void Test_CreateProcess_UseStdHandles() {
                 auto nonReuseCheck = stdHandles(p);
                 nonReuseCheck.insert(nonReuseCheck.end(),
                                      newHandles.begin(), newHandles.end());
-                if (inheritHandles) {
-                    ObjectSnap snap;
-                    for (int i = 0; i < 3; ++i) {
+                ObjectSnap snap;
+                bool consoleOpened[3] = {false, false, false};
+                for (int i = 0; i < 3; ++i) {
+                    if (inheritHandles && newHandles[i].value() != nullptr) {
                         // The parent's standard handle is used, without
                         // validation or duplication.  It is not inherited
                         // simply because it is listed in STARTUPINFO.
-                        if (newConsole && newHandles[i].value() == nullptr) {
-                            // If the handle is NULL, though, then Windows
-                            // instead opens a new console handle.  It's
-                            // checked below.
-                            continue;
-                        }
                         CHECK(childHandles[i].value() ==
                             newHandles[i].value());
                         if (newHandles[i].value() == INVALID_HANDLE_VALUE) {
@@ -172,23 +167,17 @@ static void Test_CreateProcess_UseStdHandles() {
                             CHECK(snap.eq(newHandles[i], childHandles[i]) ==
                                 newHandles[i].inheritable());
                         }
-                    }
-                    if (newConsole) {
-                        checkModernConsoleHandleInit(c,
-                            newHandles[0].value() == nullptr,
-                            newHandles[1].value() == nullptr,
-                            newHandles[2].value() == nullptr,
-                            nonReuseCheck);
-                    }
-                } else {
-                    if (!newConsole) {
-                        CHECK(handleInts(stdHandles(c)) ==
-                            (std::vector<uint64_t> {0,0,0}));
+                    } else if (newConsole) {
+                        consoleOpened[i] = true;
                     } else {
-                        checkModernConsoleHandleInit(c,
-                            true, true, true, nonReuseCheck);
+                        CHECK(childHandles[i].value() == nullptr);
                     }
                 }
+                checkModernConsoleHandleInit(c,
+                    consoleOpened[0],
+                    consoleOpened[1],
+                    consoleOpened[2],
+                    nonReuseCheck);
             }
         };
 
