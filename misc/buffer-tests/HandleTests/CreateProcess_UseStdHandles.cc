@@ -20,9 +20,10 @@
 template <typename T>
 void checkVariousInputs(T check) {
     {
-        // Specify the original std values.  With CreationConsoleMode==Inherit,
-        // this code used to work (i.e. produce valid standard handles in the
-        // child).  As of Windows 8, the standard handles are now NULL instead.
+        // Specify the original std values.  With CreationConsoleMode==Inherit
+        // and bInheritHandles=FALSE, this code used to work (i.e. produce
+        // valid standard handles in the child).  As of Windows 8, the standard
+        // handles are now NULL instead.
         Worker p;
         check(p, stdHandles(p));
     }

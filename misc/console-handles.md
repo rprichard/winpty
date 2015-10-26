@@ -75,7 +75,7 @@ language.  C and C++ standard I/O is implemented on top of Windows `HANDLE`s.)
 Traditional semantics
 ---------------------
 
-### Console handles and handle sets
+### Console handles and handle sets (traditional)
 
 In releases prior to Windows 8, console handles are not true NT handles.
 Instead, the values are always multiples of four minus one (i.e. 0x3, 0x7,
@@ -99,7 +99,7 @@ during startup or when it calls `AttachConsole`), Windows completely replaces
 that process' *ConsoleHandleSet* with the set of inheritable open handles
 from the originating process.  These "imported" handles are also inheritable.
 
-### Standard handles, CreateProcess
+### CreateProcess (traditional)
 
 The manner in which Windows sets standard handles is influenced by two flags:
 
@@ -129,7 +129,7 @@ the first matching rule:
     of the parent's non-console standard handles into the child.  Any
     standard handle that looks like a traditional console handle, up to
     0x0FFFFFFF, is copied as-is, whether or not the handle is open.
-    <sup>[[1]](#foot_inv_con)</sup>
+    <sup>[[1]](#foot_dup_noninherit_con)</sup>
 
     If Windows fails to duplicate a handle for any reason (e.g. because
     it is `NULL` or not open), then the child's new handle is `NULL`.
@@ -145,7 +145,7 @@ erratic behavior may result from specifying a traditional console handle in
 `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`'s `HANDLE` list.  (See the
 `Test_CreateProcess_STARTUPINFOEX` test in `misc/buffer-tests`.)
 
-### AllocConsole, AttachConsole
+### AllocConsole, AttachConsole (traditional)
 
 `AllocConsole` and `AttachConsole` set the standard handles as follows:
 
@@ -153,7 +153,7 @@ erratic behavior may result from specifying a traditional console handle in
  - If !*UseStdHandles*, then Windows changes the standard handles to
    (0x3, 0x7, 0xb), even if those handles are not open.
 
-### FreeConsole
+### FreeConsole (traditional)
 
 After calling `FreeConsole`, no console APIs work, and all previous console
 handles are apparently closed -- even `GetHandleInformation` fails on the
@@ -162,10 +162,10 @@ handles.  `FreeConsole` has no effect on the `STDIN/STDOUT/STDERR` values.
 
 
 
-Windows 8 semantics
--------------------
+Modern semantics
+----------------
 
-### Console handles
+### Console handles (modern)
 
 Starting with Windows 8, console handles are true NT kernel handles that
 reference NT kernel objects.
@@ -200,7 +200,7 @@ calling process has any console attached.
 Unlike traditional console handles, modern console handles **can** be
 duplicated to other processes.
 
-### Standard handles, CreateProcess
+### CreateProcess (modern)
 
 Whenever a process is attached to a console (during startup, `AttachConsole`,
 or `AllocConsole`), Windows will sometimes create new *Unbound* console
@@ -217,7 +217,7 @@ Each of the child's standard handles is set using the first match:
     field is non-`NULL`, then Windows uses the `STARTUPINFO` field.  As with
     previous releases, Windows makes no effort to validate the handle, nor
     will it treat a non-inheritable handle as inheritable simply because it
-    is listed in `STARTUPINFO`.
+    is listed in `STARTUPINFO`.  <sup>[[2]](#foot_explicit_stdhnd_con)</sup>
 
  2. If *CreationConsoleMode* is *NewConsole* or *NewConsoleNoWindow*, then
     Windows opens a handle to a new *Unbound* console object.  This handle will
@@ -243,7 +243,7 @@ Each of the child's standard handles is set using the first match:
 XXX: Also, I don't expect the `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` attribute
 to matter here, but it needs to be tested.
 
-### AllocConsole, AttachConsole
+### AllocConsole, AttachConsole (modern)
 
 `AllocConsole` and `AttachConsole` set the standard handles as follows:
 
@@ -259,7 +259,7 @@ currently active screen buffer, which decrements only when the process
 detaches from the console.  All *Unbound* *Output* console objects reference
 this screen buffer.
 
-### FreeConsole
+### FreeConsole (modern)
 
 As in previous Windows releases, `FreeConsole` in Windows 8 does not change
 the `STDIN/STDOUT/STDERR` values.  If Windows opened new console handles for
@@ -394,9 +394,9 @@ XXX: Document this.  It's a problem...
 Footnotes
 ---------
 
-<a name="foot_inv_con">1</a>: From the previous discussion, it follows that
-if a standard handle is a non-inheritable console handle, then the child's
-standard handle will be invalid:
+<a name="foot_dup_noninherit_con">1</a>: From the previous discussion,
+it follows that if a standard handle is a non-inheritable console handle,
+then the child's standard handle will be invalid:
 
  - Traditional console standard handles are copied as-is to the child.
  - The child has the same *ConsoleHandleSet* as the parent, excluding
@@ -404,3 +404,14 @@ standard handle will be invalid:
 
 It's an interesting edge case, though, so I test for it specifically.  As of
 Windows 8, the non-inheritable console handle would be successfully duplicated.
+
+<a name="foot_explicit_stdhnd_con">2</a>: Suppose a console program invokes
+`CreateProcess` with these parameters:
+
+ - `bInheritHandles` is `FALSE`.
+ - `STARTF_USESTDHANDLES` is set.
+ - `STARTUPINFO` refers to inheritable console handles (e.g. the default
+   standard handles)
+
+Prior to Windows 8, the child would have received valid standard handles.  As
+of Windows 8, the child's standard handles will be `NULL` instead.
