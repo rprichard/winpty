@@ -82,8 +82,6 @@ static void Test_CreateProcess_DetachedProcess() {
     CHECK(c.scanForConsoleHandles().empty());
     CHECK(c.consoleWindow() == NULL);
 
-    // XXX: With bInheritHandles=TRUE and DETACHED_PROCESS, are the standard handles always reset?
-    //  - There are multiple cases to consider.  i.e. Omitting STARTF_USESTDHANDLES vs specifying it.
     // XXX: What do GetConsoleCP and GetConsoleOutputCP do when no console is attached?
 
     // Verify that we have a blank slate even with an implicit console
@@ -251,4 +249,59 @@ static void Test_Detach_Implicitly_Closes_Handles() {
     for (auto h : orig) {
         CHECK(!h.tryFlags());
     }
+}
+
+REGISTER(Test_AttachConsole_AllocConsole_StdHandles, isTraditionalConio);
+static void Test_AttachConsole_AllocConsole_StdHandles() {
+    // Verify that AttachConsole does the right thing w.r.t. console handle
+    // sets and standard handles.
+
+    auto check = [](bool newConsole, bool useStdHandles) {
+        trace("checking: newConsole=%d useStdHandles=%d",
+            newConsole, useStdHandles);
+        Worker p;
+        SpawnParams sp = useStdHandles
+            ? SpawnParams { true, 0, stdHandles(p) }
+            : SpawnParams { false, 0 };
+        p.openConout(false); // 0x0f
+        p.openConout(true);  // 0x13
+
+        auto c = p.child(sp);
+        auto pipe = newPipe(c, true);
+        std::get<0>(pipe).setStdin();
+        std::get<1>(pipe).setStdout().setStdout();
+        auto origStdHandles = stdHandles(c);
+        c.detach();
+        CHECK(handleValues(stdHandles(c)) == handleValues(origStdHandles));
+
+        if (newConsole) {
+            c.alloc();
+            checkInitConsoleHandleSet(c);
+        } else {
+            Worker other;
+            auto out = other.newBuffer(true, 'N');      // 0x0f
+            other.openConin(false);                     // 0x13
+            auto in = other.openConin(true);            // 0x17
+            out.activate();                             // activate new buffer
+            other.getStdin().close();                   // close 0x03
+            other.getStdout().close();                  // close 0x07
+            other.getStderr().close();                  // close 0x0b
+            in.setStdin();                              // 0x17
+            out.setStdout().dup(true).setStderr();      // 0x0f and 0x1b
+            c.attach(other);
+            checkInitConsoleHandleSet(c, other);
+        }
+
+        if (useStdHandles) {
+            CHECK(handleValues(stdHandles(c)) == handleValues(origStdHandles));
+        } else {
+            CHECK(handleInts(stdHandles(c)) ==
+                (std::vector<uint64_t> { 0x3, 0x7, 0xb }));
+        }
+    };
+
+    check(false, false);
+    check(false, true);
+    check(true, false);
+    check(true, true);
 }
