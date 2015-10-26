@@ -392,9 +392,9 @@ to the last screen buffer, then (2) creating a new screen buffer:
 
 ### <a name="win7inh">Windows 7 inheritability [win7inh]</a>
 
- * Calling `DuplicateHandle(h, FALSE)` on an inheritable console handle
-   produces an inheritable handle.  According to documentation and previous
-   releases, it should be non-inheritable.
+ * Calling `DuplicateHandle(bInheritHandle=FALSE)` on an inheritable console
+   handle produces an inheritable handle.  According to documentation and
+   previous releases, it should be non-inheritable.
 
  * Calling `SetHandleInformation` fails on console handles.
 
