@@ -147,9 +147,6 @@ static void Test_CreateProcess_UseStdHandles() {
                     }
                 }
             } else {
-                auto nonReuseCheck = stdHandles(p);
-                nonReuseCheck.insert(nonReuseCheck.end(),
-                                     newHandles.begin(), newHandles.end());
                 ObjectSnap snap;
                 bool consoleOpened[3] = {false, false, false};
                 for (int i = 0; i < 3; ++i) {
@@ -176,8 +173,7 @@ static void Test_CreateProcess_UseStdHandles() {
                 checkModernConsoleHandleInit(c,
                     consoleOpened[0],
                     consoleOpened[1],
-                    consoleOpened[2],
-                    nonReuseCheck);
+                    consoleOpened[2]);
             }
         };
 

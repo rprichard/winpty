@@ -78,5 +78,4 @@ bool isUsableConsoleInputHandle(RemoteHandle h);
 bool isUsableConsoleOutputHandle(RemoteHandle h);
 bool isUnboundConsoleObject(RemoteHandle h);
 void checkModernConsoleHandleInit(RemoteWorker &proc,
-                                  bool in, bool out, bool err,
-                                  std::vector<RemoteHandle> nonReuseCheck);
+                                  bool in, bool out, bool err);
