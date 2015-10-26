@@ -7,9 +7,15 @@
 #include <WinptyAssert.h>
 
 inline std::tuple<int, int> osversion() {
-    OSVERSIONINFO info = { sizeof(info), 0 };
-    ASSERT(GetVersionEx(&info));
+    OSVERSIONINFOW info = { sizeof(info) };
+    ASSERT(GetVersionExW(&info));
     return std::make_tuple(info.dwMajorVersion, info.dwMinorVersion);
+}
+
+inline bool isWorkstation() {
+    OSVERSIONINFOEXW info = { sizeof(info) };
+    ASSERT(GetVersionExW(reinterpret_cast<OSVERSIONINFO*>(&info)));
+    return info.wProductType == VER_NT_WORKSTATION;
 }
 
 inline bool isWin7() {

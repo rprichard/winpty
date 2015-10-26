@@ -398,9 +398,36 @@ to the last screen buffer, then (2) creating a new screen buffer:
 
  * Calling `SetHandleInformation` fails on console handles.
 
-### Windows 7 `conhost.exe` crash with `CONOUT$`
+### <a name="win7_conout_crash">Windows 7 `conhost.exe` crash with `CONOUT$` [win7_conout_crash]</a>
 
-XXX: Document this.  It's a problem...
+There is a bug in Windows 7 involving `CONOUT$` and `CloseHandle` that can
+easily crash `conhost.exe` and/or activate the wrong screen buffer.  The
+bug is triggered when a process without a handle to the active screen buffer
+opens `CONOUT$` and then closes it using `CloseHandle`.
+
+Here's what *seems* to be going on:
+
+Each process may have at most one "console object" referencing
+a particular buffer.  A single console object can be shared between multiple
+processes, and whenever console handles are imported (`CreateProcess` and
+`AttachConsole`), the objects are reused.
+
+If a process opens `CONOUT$`, however, and does not already have a reference
+to the active screen buffer, then Windows creates a new console object.  The
+bug in Windows 7 is this: if a process calls `CloseHandle` on the last handle
+for a console object, then the screen buffer is freed, even if there are other
+handles/objects still referencing it.  At that point, the console might display
+the wrong screen buffer, but using the other handles to the buffer can return
+garbage and/or crash `conhost.exe`.  Closing a dangling handle is especially
+likely to trigger a crash.
+
+Rather than using `CloseHandle`, letting Windows automatically clean up a
+console handle via `DetachConsole` or exiting somehow avoids the problem.
+
+The bug affects Windows 7 SP1, but does not affect
+Windows Server 2008 R2 SP1, the server version of the OS.
+
+See `misc/buffer-tests/HandleTests/Win7_Conout_Crash.cc`.
 
 
 

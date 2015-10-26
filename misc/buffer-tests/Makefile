@@ -53,6 +53,7 @@ HANDLETESTS_OBJECTS = \
     build/obj/HandleTests/MiscTests.o \
     build/obj/HandleTests/Modern.o \
     build/obj/HandleTests/Traditional.o \
+    build/obj/HandleTests/Win7_Conout_Crash.o \
     build/obj/HandleTests/main.o
 
 include tests.mk
