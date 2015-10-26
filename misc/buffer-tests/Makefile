@@ -42,10 +42,10 @@ TEST_OBJECTS = \
 
 HANDLETESTS_OBJECTS = \
     build/obj/HandleTests/CreateProcess.o \
-    build/obj/HandleTests/CreateProcess_DefaultInherit.o \
-    build/obj/HandleTests/CreateProcess_DefaultInherit_PseudoHandleBug.o \
-    build/obj/HandleTests/CreateProcess_DefaultInherit_XPPipeBug.o \
     build/obj/HandleTests/CreateProcess_Detached.o \
+    build/obj/HandleTests/CreateProcess_Duplicate.o \
+    build/obj/HandleTests/CreateProcess_Duplicate_PseudoHandleBug.o \
+    build/obj/HandleTests/CreateProcess_Duplicate_XPPipeBug.o \
     build/obj/HandleTests/CreateProcess_NewConsole.o \
     build/obj/HandleTests/CreateProcess_UseStdHandles.o \
     build/obj/HandleTests/MiscTests.o \

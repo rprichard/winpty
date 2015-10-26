@@ -9,8 +9,8 @@
 // There are variations between OS releases, especially with regards to
 // how console handles work.
 
-REGISTER(Test_CreateProcess_DefaultInherit, always);
-static void Test_CreateProcess_DefaultInherit() {
+REGISTER(Test_CreateProcess_Duplicate, always);
+static void Test_CreateProcess_Duplicate() {
     {
         // Base case: a non-inheritable pipe is still inherited.
         Worker p;
@@ -85,9 +85,8 @@ static void Test_CreateProcess_DefaultInherit() {
     {
         // Test setting STDIN/STDOUT/STDERR to non-inheritable console handles.
         //
-        // On old releases, default inheritance's handle duplication does not
-        // apply to console handles, and a console handle is inherited if and
-        // only if it is inheritable.
+        // Handle duplication does not apply to traditional console handles,
+        // and a console handle is inherited if and only if it is inheritable.
         //
         // On new releases, this will Just Work.
         //

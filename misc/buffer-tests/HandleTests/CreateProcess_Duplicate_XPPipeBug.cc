@@ -3,8 +3,8 @@
 // Windows XP bug: default inheritance doesn't work with the read end
 // of a pipe, even if it's inheritable.  It works with the write end.
 
-REGISTER(Test_CreateProcess_DefaultInherit_XPPipeBug, always);
-static void Test_CreateProcess_DefaultInherit_XPPipeBug() {
+REGISTER(Test_CreateProcess_Duplicate_XPPipeBug, always);
+static void Test_CreateProcess_Duplicate_XPPipeBug() {
     auto check = [](Worker &proc, Handle correct, bool expectBroken) {
         CHECK((proc.getStdin().value() == nullptr) == expectBroken);
         CHECK((proc.getStdout().value() == nullptr) == expectBroken);

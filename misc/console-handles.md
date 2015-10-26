@@ -346,7 +346,7 @@ On Windows XP, `CreateProcess` fails to propagate a handle in this situation:
 In this situation, Windows XP will set the child process's standard handle to
 `NULL`.  The write end of the pipe works fine.  Passing a `bInheritHandles`
 of `TRUE` (and an inheritable pipe handle) works fine.  Using
-`STARTF_USESTDHANDLES` also works.  See `Test_CreateProcess_DefaultInherit`
+`STARTF_USESTDHANDLES` also works.  See `Test_CreateProcess_Duplicate_XPPipeBug`
 in `misc/buffer-tests` for a test case.
 
 ### <a name="dupproc">`CreateProcess` duplicates `INVALID_HANDLE_VALUE` until Windows 8.1 [dupproc]</a>

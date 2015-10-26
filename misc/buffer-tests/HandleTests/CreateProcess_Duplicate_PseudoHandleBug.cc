@@ -6,8 +6,8 @@
 // Naturally, this was unintended behavior, and as of Windows 8.1, the handle
 // is instead translated to NULL.
 
-REGISTER(Test_CreateProcess_DefaultInherit_PseudoHandleBug, always);
-static void Test_CreateProcess_DefaultInherit_PseudoHandleBug() {
+REGISTER(Test_CreateProcess_Duplicate_PseudoHandleBug, always);
+static void Test_CreateProcess_Duplicate_PseudoHandleBug() {
     Worker p;
     Handle::invent(GetCurrentProcess(), p).setStdout();
     auto c = p.child({ false });
