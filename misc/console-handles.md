@@ -135,7 +135,11 @@ the first matching rule:
     it is `NULL` or not open), then the child's new handle is `NULL`.
     The child handles have the same inheritability as the parent handles.
     These handles are not closed by `FreeConsole`.
-    (Bugs: [[dupproc]](#dupproc) [[xppipe]](#xppipe))
+    (Bugs:
+    [[xppipe]](#xppipe)
+    [[xpinh]](#xpinh)
+    [[dupproc]](#dupproc)
+    [[wow64dup]](#wow64dup))
 
 The `bInheritHandles` parameter to `CreateProcess` does not affect whether
 console handles are inherited.  Console handles are inherited if and only if
@@ -348,9 +352,9 @@ are specified:
  - *UseStdHandles* is false
  - *CreationConsoleMode* is *Inherit*
 
-### <a name="xppipe">Windows XP pipe read handle inheritance anomaly [xppipe]</a>
+### <a name="xppipe">Windows XP does not duplicate a pipe's read handle [xppipe]</a>
 
-On Windows XP, `CreateProcess` fails to propagate a handle in this situation:
+On Windows XP, `CreateProcess` fails to duplicate a handle in this situation:
 
  - `bInheritHandles` is `FALSE`.
  - `STARTF_USESTDHANDLES` is not specified in `STARTUPINFO.dwFlags`.
@@ -363,12 +367,33 @@ of `TRUE` (and an inheritable pipe handle) works fine.  Using
 `STARTF_USESTDHANDLES` also works.  See `Test_CreateProcess_Duplicate_XPPipeBug`
 in `misc/buffer-tests` for a test case.
 
+### <a name="xpinh">Windows XP duplication inheritability [xpinh]</a>
+
+When `CreateProcess` in XP duplicates an inheritable handle, the duplicated
+handle is non-inheritable.  In Vista and later, the new handle is also
+inheritable.
+
 ### <a name="dupproc">`CreateProcess` duplicates `INVALID_HANDLE_VALUE` until Windows 8.1 [dupproc]</a>
 
 From Windows XP to Windows 8, when `CreateProcess` duplicates parent standard
 handles into the child, it duplicates `INVALID_HANDLE_VALUE` (aka the
 `GetCurrentProcess()` pseudo-handle) to a true handle to the parent process.
 This bug was fixed in Windows 8.1.
+
+On some older operating systems, the WOW64 mode also translates
+`INVALID_HANDLE_VALUE` to `NULL`.
+
+### <a name="wow64dup">CreateProcess duplication broken w/WOW64 [wow64dup]</a>
+
+On some versions of Windows, when a 32-bit program invokes another 32-bit
+program, `CreateProcess`'s handle duplication does not occur.  Traditional
+console handles are passed through, but other handles are converted to `NULL`.
+The problem does not occur when 64-bit programs invoke 64-bit programs.  (I
+have not tested 32-bit to 64-bit or vice versa.)
+
+The problem affects at least:
+
+ - Windows 7 SP2
 
 ### Windows Vista BSOD
 

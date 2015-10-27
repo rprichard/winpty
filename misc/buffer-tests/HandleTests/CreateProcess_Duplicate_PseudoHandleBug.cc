@@ -1,30 +1,45 @@
 #include <TestCommon.h>
 
-// With CreateProcess's default inheritance, the GetCurrentProcess()
-// psuedo-handle (i.e. INVALID_HANDLE_VALUE) is translated to a real handle
-// value for the child process.  It is a handle to the parent process.
-// Naturally, this was unintended behavior, and as of Windows 8.1, the handle
-// is instead translated to NULL.
+// With CreateProcess's default handle duplication behavior, the
+// GetCurrentProcess() psuedo-handle (i.e. INVALID_HANDLE_VALUE) is translated
+// to a real handle value for the child process.  It is a handle to the parent
+// process.  Naturally, this was unintended behavior, and as of Windows 8.1,
+// the handle is instead translated to NULL.  On some older operating systems,
+// the WOW64 mode also translates it to NULL.
+
+const std::string bugParentProc = "BUG(parent-proc)";
+const std::string okInvalid = "OK(INVALID)";
+const std::string okNull = "OK(NULL)";
+
+static std::string determineChildStdout(Worker &c, Worker &p) {
+    if (c.getStdout().value() == nullptr) {
+        return okNull;
+    } else if (c.getStdout().value() == INVALID_HANDLE_VALUE) {
+        return okInvalid;
+    } else {
+        auto handleToPInP = Handle::dup(p.processHandle(), p);
+        CHECK(compareObjectHandles(c.getStdout(), handleToPInP));
+        return bugParentProc;
+    }
+}
 
 REGISTER(Test_CreateProcess_Duplicate_PseudoHandleBug, always);
 static void Test_CreateProcess_Duplicate_PseudoHandleBug() {
-    // This form of the bug occurs on these server OSs:
-    //  - Server 2003 R2 SP2 64bit (64-bit and WOW64)
-    //  - Server 2008 SP2 64bit (64-bit)
-    //  - Server 2008 R2 SP1 64bit (WOW64)
-    // This form of the bug is fixed on these server OSs:
-    //  - Server 2008 SP2 64bit (WOW64)
-    //  - Server 2008 R2 SP1 64bit (WOW64)
     Worker p;
     Handle::invent(GetCurrentProcess(), p).setStdout();
     auto c = p.child({ false });
-    if (isAtLeastWin8_1()) {
-        CHECK(c.getStdout().value() == nullptr);
-    } else {
-        CHECK(c.getStdout().value() != GetCurrentProcess());
-        auto handleToPInP = Handle::dup(p.processHandle(), p);
-        CHECK(compareObjectHandles(c.getStdout(), handleToPInP));
-    }
+
+    const std::string expect =
+        (isAtLeastWin8_1() || (isAtLeastVista() && isWow64()))
+            ? okNull
+            : bugParentProc;
+
+    const std::string actual = determineChildStdout(c, p);
+
+    trace("%s: actual: %s", __FUNCTION__, actual.c_str());
+    std::cout << __FUNCTION__ << ": expect: " << expect << std::endl;
+    std::cout << __FUNCTION__ << ": actual: " << actual << std::endl;
+    CHECK_EQ(actual, expect);
 }
 
 REGISTER(Test_CreateProcess_Duplicate_PseudoHandleBug_IL, isAtLeastVista);
@@ -35,16 +50,32 @@ static void Test_CreateProcess_Duplicate_PseudoHandleBug_IL() {
         Worker p;
         Handle::invent(INVALID_HANDLE_VALUE, p).setStdout();
         auto c = childWithDummyInheritList(p, {}, useDummyPipe != 0);
+
+        // Figure out what we expect to see.
+        std::string expect;
         if (isAtLeastWin8_1()) {
-            CHECK(c.getStdout().value() == nullptr);
+            // Windows 8.1 turns INVALID_HANDLE_VALUE into NULL.
+            expect = okNull;
         } else if (isAtLeastWin8()) {
-            CHECK(c.getStdout().value() != GetCurrentProcess());
-            auto handleToPInP = Handle::dup(p.processHandle(), p);
-            CHECK(compareObjectHandles(c.getStdout(), handleToPInP));
+            // Windows 8 tries to duplicate the handle.  WOW64 seems to be
+            // OK, though.
+            if (isWow64()) {
+                expect = okNull;
+            } else {
+                expect = bugParentProc;
+            }
         } else {
-            // Prior to Windows 8, duplication doesn't occur, so the bug isn't
-            // relevant.  We run the test anyway, but it's less interesting.
-            CHECK(c.getStdout().value() == INVALID_HANDLE_VALUE);
+            // Prior to Windows 8, duplication doesn't occur in this case, so
+            // the bug isn't relevant.  We run the test anyway, but it's less
+            // interesting.
+            expect = okInvalid;
         }
+
+        const std::string actual = determineChildStdout(c, p);
+
+        trace("%s: actual: %s", __FUNCTION__, actual.c_str());
+        std::cout << __FUNCTION__ << ": expect: " << expect << std::endl;
+        std::cout << __FUNCTION__ << ": actual: " << actual << std::endl;
+        CHECK_EQ(actual, expect);
     }
 }

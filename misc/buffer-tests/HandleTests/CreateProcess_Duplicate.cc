@@ -9,31 +9,104 @@
 // There are variations between OS releases, especially with regards to
 // how console handles work.
 
+// This handle duplication seems to be broken in WOW64 mode.  It affects
+// at least:
+//  - Windows 7 SP2
+// For some reason, the problem apparently only affects the client operating
+// system, not the server OS.
+//
+// Export this function to the other duplicate tests.
+bool brokenDuplicationInWow64() {
+    return isWin7() && isWorkstation() && isWow64();
+}
+
 namespace {
+
+static bool handlesAreNull(Worker &p) {
+    return handleInts(stdHandles(p)) == std::vector<uint64_t> {0, 0, 0};
+}
+
+static std::string testMessage(bool isNull) {
+    return isNull ? "BUG(dup->NULL)" : "OK(dup)";
+}
 
 template <typename T>
 void Test_CreateProcess_Duplicate_Impl(T makeChild) {
     printTestName(__FUNCTION__);
+
     {
-        // Base case: a non-inheritable pipe is still inherited.
+        // An inheritable pipe is still inherited.
+        Worker p;
+        auto pipe = newPipe(p, true);
+        auto wh = std::get<1>(pipe).setStdin().setStdout().setStderr();
+        CHECK(wh.inheritable());
+        auto c = makeChild(p, { false });
+
+        const auto expect = testMessage(brokenDuplicationInWow64());
+        const auto actual = testMessage(handlesAreNull(c));
+        std::cout << __FUNCTION__ << ": expect: " << expect << std::endl;
+        std::cout << __FUNCTION__ << ": actual: " << actual << std::endl;
+        CHECK_EQ(actual, expect);
+
+        if (c.getStdout().value() != nullptr) {
+            {
+                ObjectSnap snap;
+                CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
+            }
+            for (auto h : stdHandles(c)) {
+                CHECK(h.tryFlags());
+                if (!h.tryFlags()) {
+                    continue;
+                }
+                auto inheritMessage = [](bool inheritable) {
+                    return inheritable
+                        ? "OK(inherit)"
+                        : "BAD(dup->non-inheritable)";
+                };
+                const std::string expect = inheritMessage(isAtLeastVista());
+                const std::string actual = inheritMessage(h.inheritable());
+                if (expect == actual && isAtLeastVista()) {
+                    continue; // We'll just stay silent in this case.
+                }
+                std::cout << __FUNCTION__ << ": expect: " << expect << std::endl;
+                std::cout << __FUNCTION__ << ": actual: " << actual << std::endl;
+                CHECK_EQ(actual, expect);
+            }
+        }
+    }
+    {
+        // A non-inheritable pipe is still inherited.
         Worker p;
         auto pipe = newPipe(p, false);
         auto wh = std::get<1>(pipe).setStdin().setStdout().setStderr();
         auto c = makeChild(p, { false });
-        {
-            ObjectSnap snap;
-            CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
-        }
-        // CreateProcess makes separate handles for stdin/stdout/stderr.
-        CHECK(c.getStdin().value() != c.getStdout().value());
-        CHECK(c.getStdout().value() != c.getStderr().value());
-        CHECK(c.getStdin().value() != c.getStderr().value());
-        // Calling FreeConsole in the child does not free the duplicated
-        // handles.
-        c.detach();
-        {
-            ObjectSnap snap;
-            CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
+
+        const auto expect = testMessage(brokenDuplicationInWow64());
+        const auto actual = testMessage(handlesAreNull(c));
+        std::cout << __FUNCTION__ << ": expect: " << expect << std::endl;
+        std::cout << __FUNCTION__ << ": actual: " << actual << std::endl;
+        CHECK_EQ(actual, expect);
+
+        if (c.getStdout().value() != nullptr) {
+            {
+                ObjectSnap snap;
+                CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
+            }
+            // CreateProcess makes separate handles for stdin/stdout/stderr,
+            // even though the parent has the same handle for each of them.
+            CHECK(c.getStdin().value() != c.getStdout().value());
+            CHECK(c.getStdout().value() != c.getStderr().value());
+            CHECK(c.getStdin().value() != c.getStderr().value());
+            for (auto h : stdHandles(c)) {
+                CHECK(h.tryFlags() && !h.inheritable());
+            }
+            // Calling FreeConsole in the child does not free the duplicated
+            // handles.
+            c.detach();
+            {
+                ObjectSnap snap;
+                CHECK(snap.eq({ c.getStdin(), c.getStdout(), c.getStderr(), wh }));
+            }
         }
     }
     {
