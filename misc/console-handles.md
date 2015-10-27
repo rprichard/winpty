@@ -1,10 +1,20 @@
 Console Handles and Standard Handles
 ====================================
 
-This document will attempt to explain how console handles work and how they
+This document attempts to explain how console handles work and how they
 interact with process creation and console attachment and detachment.  It is
 based on experiments that I ran against various versions of Windows from
 Windows XP to Windows 10.
+
+The information here is verified by the test suite in the `misc/buffer-tests`
+directory.  It should be taken with a large grain of salt.  I don't have access
+to many operating systems.  There may be important things I didn't think to
+test.  A lot of the behavior is surprising, so it's hard to be sure I have
+fully identified the behavior.
+
+Feel free to report errors or omissions.  An easy thing to do is to run the
+accompanying test suite and report errors.  The [test suite](#test_suite) is
+designed to expect bugs on the appropriate Windows releases.
 
 
 
@@ -453,6 +463,19 @@ The bug affects Windows 7 SP1, but does not affect
 Windows Server 2008 R2 SP1, the server version of the OS.
 
 See `misc/buffer-tests/HandleTests/Win7_Conout_Crash.cc`.
+
+### <a name="test_suite">Test suite</a>
+
+To run the `misc/buffer-tests` test suite, follow the instructions for
+building winpty.  Then, enter the `misc/buffer-tests` directory, run `make`,
+and then run `build/HandleTests.exe`.
+
+For a WOW64 run:
+
+ * Build the 64-bit `Worker.exe`.
+ * Rename it to `Worker64.exe` and save it somewhere.
+ * Build the 32-bit binaries.
+ * Copy `Worker64.exe` to the `build` directory alongside `Worker.exe`.
 
 
 
