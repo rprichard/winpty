@@ -19,3 +19,5 @@ typedef struct _SYSTEM_HANDLE_INFORMATION {
 } SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
 
 std::vector<SYSTEM_HANDLE_ENTRY> queryNtHandles();
+void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
+                      DWORD pid, HANDLE h);

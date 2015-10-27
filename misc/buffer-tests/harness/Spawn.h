@@ -13,6 +13,7 @@ struct SpawnParams {
     static const size_t NoInheritList = static_cast<size_t>(~0);
     size_t inheritCount = NoInheritList;
     std::array<HANDLE, 1024> inheritList = {};
+    bool nativeWorkerBitness = false;
 
     SpawnParams(bool bInheritHandles=false, DWORD dwCreationFlags=0) :
         bInheritHandles(bInheritHandles),

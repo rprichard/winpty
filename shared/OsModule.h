@@ -21,6 +21,7 @@
 #ifndef OS_MODULE_H
 #define OS_MODULE_H
 
+#include "DebugClient.h"
 #include "WinptyAssert.h"
 
 class OsModule {

@@ -46,7 +46,7 @@ RemoteWorker::RemoteWorker(SpawnParams params) : RemoteWorker(DoNotSpawn) {
     m_valid = true;
     // Perform an RPC just to ensure that the worker process is ready, and
     // the console exists, before returning.
-    rpc(Command::GetStdin);
+    rpc(Command::Hello);
 }
 
 RemoteWorker RemoteWorker::child(SpawnParams params) {
@@ -77,7 +77,7 @@ RemoteWorker RemoteWorker::tryChild(SpawnParams params, SpawnFailure *failure) {
         ret.m_valid = true;
         // Perform an RPC just to ensure that the worker process is ready, and
         // the console exists, before returning.
-        ret.rpc(Command::GetStdin);
+        ret.rpc(Command::Hello);
     }
     return ret;
 }
@@ -146,6 +146,16 @@ std::vector<DWORD> RemoteWorker::consoleProcessList() {
     return std::vector<DWORD>(
         &cmd().u.processList[0],
         &cmd().u.processList[count]);
+}
+
+uint64_t RemoteWorker::lookupKernelObject(DWORD pid, HANDLE h) {
+    const uint64_t h64 = reinterpret_cast<uint64_t>(h);
+    cmd().lookupKernelObject.pid = pid;
+    memcpy(&cmd().lookupKernelObject.handle, &h64, sizeof(h64));
+    rpc(Command::LookupKernelObject);
+    uint64_t ret;
+    memcpy(&ret, &cmd().lookupKernelObject.kernelObject, sizeof(ret));
+    return ret;
 }
 
 void RemoteWorker::rpc(Command::Kind kind) {

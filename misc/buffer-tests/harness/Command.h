@@ -4,6 +4,7 @@
 #include "Spawn.h"
 
 #include <array>
+#include <cstdint>
 
 struct Command {
     enum Kind {
@@ -26,6 +27,8 @@ struct Command {
         GetStdin,
         GetStderr,
         GetStdout,
+        Hello,
+        LookupKernelObject,
         NewBuffer,
         OpenConin,
         OpenConout,
@@ -43,7 +46,17 @@ struct Command {
         WriteText,
     };
 
+    // These fields must appear first so that the LookupKernelObject RPC will
+    // work.  This RPC occurs from 32-bit test programs to a 64-bit worker.
+    // In that case, most of this struct's fields do not have the same
+    // addresses or sizes.
     Kind kind;
+    struct {
+        uint32_t pid;
+        uint32_t handle[2];
+        uint32_t kernelObject[2];
+    } lookupKernelObject;
+
     HANDLE handle;
     HANDLE targetProcess;
     DWORD dword;

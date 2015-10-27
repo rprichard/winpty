@@ -3,6 +3,8 @@
 #include <sstream>
 
 #include "UnicodeConversions.h"
+
+#include <OsModule.h>
 #include <WinptyAssert.h>
 
 std::string pathDirName(const std::string &path)
@@ -81,4 +83,19 @@ std::string errorString(DWORD errCode) {
     }
     ss << ">";
     return ss.str();
+}
+
+bool isWow64() {
+    static bool valueInitialized = false;
+    static bool value = false;
+    if (!valueInitialized) {
+        OsModule kernel32(L"kernel32.dll");
+        auto proc = reinterpret_cast<decltype(IsWow64Process)*>(
+            kernel32.proc("IsWow64Process"));
+        BOOL isWow64 = FALSE;
+        BOOL ret = proc(GetCurrentProcess(), &isWow64);
+        value = ret && isWow64;
+        valueInitialized = true;
+    }
+    return value;
 }

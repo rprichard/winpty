@@ -14,6 +14,7 @@
 
 class RemoteWorker {
     friend class RemoteHandle;
+    friend uint64_t wow64LookupKernelObject(DWORD pid, HANDLE handle);
     static DWORD dwDefaultCreationFlags;
 
 public:
@@ -110,7 +111,10 @@ public:
     }
 
 private:
-    Command &cmd() { return m_parcel.value(); }
+    uint64_t lookupKernelObject(DWORD pid, HANDLE h);
+
+private:
+    Command &cmd() { return m_parcel.value()[0]; }
     void rpc(Command::Kind kind);
     void rpcAsync(Command::Kind kind);
     void rpcImpl(Command::Kind kind);
@@ -118,7 +122,16 @@ private:
 private:
     bool m_valid = false;
     std::string m_name;
-    ShmemParcelTyped<Command> m_parcel;
+
+    // HACK: Use Command[2] instead of Command.  To accommodate WOW64, we need
+    // to have a 32-bit test program communicate with a 64-bit worker to query
+    // kernel handles.  The sizes of the parcels will not match, but it's
+    // mostly OK as long as the creation size is larger than the open size, and
+    // the 32-bit program creates the parcel.  In principle, a better fix might
+    // be to use parcels of different sizes or make the Command struct's size
+    // independent of architecture, but those changes are hard.
+    ShmemParcelTyped<Command[2]> m_parcel;
+
     Event m_startEvent;
     Event m_finishEvent;
     HANDLE m_process = NULL;

@@ -23,7 +23,11 @@ static std::vector<wchar_t> wstrToWVector(const std::wstring &str) {
 HANDLE spawn(const std::string &workerName,
              const SpawnParams &params,
              SpawnFailure &error) {
-    auto workerPath = pathDirName(getModuleFileName(NULL)) + "\\Worker.exe";
+    auto exeBaseName = (isWow64() && params.nativeWorkerBitness)
+        ? "Worker64.exe" // always 64-bit binary, used to escape WOW64 environ
+        : "Worker.exe";  // 32 or 64-bit binary, same arch as test program
+    auto workerPath =
+        pathDirName(getModuleFileName(NULL)) + "\\" + exeBaseName;
     const std::wstring workerPathWStr = widenString(workerPath);
     const std::string cmdLine = "\"" + workerPath + "\" " + workerName;
     auto cmdLineWVec = wstrToWVector(widenString(cmdLine));

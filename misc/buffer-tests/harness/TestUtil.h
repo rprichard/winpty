@@ -53,17 +53,13 @@ using RegistrationTable = std::vector<std::tuple<std::string, bool(*)(), void(*)
 RegistrationTable registeredTests();
 inline bool always() { return true; }
 
-// NT kernel handle query
-void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
-                      RemoteHandle h);
-bool hasBuiltinCompareObjectHandles();
 bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2);
 
 // NT kernel handle->object snapshot
 class ObjectSnap {
 public:
     ObjectSnap();
-    void *object(RemoteHandle h);
+    uint64_t object(RemoteHandle h);
     bool eq(std::initializer_list<RemoteHandle> handles);
     bool eq(RemoteHandle h1, RemoteHandle h2) { return eq({h1, h2}); }
 private:

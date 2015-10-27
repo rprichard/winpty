@@ -58,3 +58,17 @@ std::vector<SYSTEM_HANDLE_ENTRY> queryNtHandles() {
     std::copy(info.Handle, info.Handle + info.Count, ret.begin());
     return ret;
 }
+
+// Get the ObjectPointer (underlying NT object) for the NT handle.
+void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
+                      DWORD pid, HANDLE h) {
+    HANDLE ret = nullptr;
+    for (auto &entry : table) {
+        if (entry.OwnerPid == pid &&
+                entry.HandleValue == reinterpret_cast<uint64_t>(h)) {
+            ASSERT(ret == nullptr);
+            ret = entry.ObjectPointer;
+        }
+    }
+    return ret;
+}

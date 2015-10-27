@@ -10,6 +10,7 @@
 #include "RemoteHandle.h"
 #include "RemoteWorker.h"
 #include "UnicodeConversions.h"
+#include "Util.h"
 
 #include <DebugClient.h>
 #include <OsModule.h>
@@ -39,21 +40,7 @@ RegistrationTable registeredTests() {
     return *g_testFunctions;
 }
 
-// Get the ObjectPointer (underlying NT object) for the NT handle.
-void *ntHandlePointer(const std::vector<SYSTEM_HANDLE_ENTRY> &table,
-                      RemoteHandle h) {
-    HANDLE ret = nullptr;
-    for (auto &entry : table) {
-        if (entry.OwnerPid == h.worker().pid() &&
-                entry.HandleValue == h.uvalue()) {
-            ASSERT(ret == nullptr);
-            ret = entry.ObjectPointer;
-        }
-    }
-    return ret;
-}
-
-bool hasBuiltinCompareObjectHandles() {
+static bool hasBuiltinCompareObjectHandles() {
     static auto kernelbase = LoadLibraryW(L"KernelBase.dll");
     if (kernelbase != nullptr) {
         static auto proc = GetProcAddress(kernelbase, "CompareObjectHandles");
@@ -64,53 +51,79 @@ bool hasBuiltinCompareObjectHandles() {
     return false;
 }
 
-bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
-    if (hasBuiltinCompareObjectHandles()) {
-        static OsModule kernelbase(L"KernelBase.dll");
-        static auto comp =
-            reinterpret_cast<BOOL(WINAPI*)(HANDLE,HANDLE)>(
-                kernelbase.proc("CompareObjectHandles"));
-        ASSERT(comp != nullptr);
-        HANDLE h1local = nullptr;
-        HANDLE h2local = nullptr;
-        bool dup1 = DuplicateHandle(
-            h1.worker().processHandle(),
-            h1.value(),
-            GetCurrentProcess(),
-            &h1local,
-            0, false, DUPLICATE_SAME_ACCESS);
-        bool dup2 = DuplicateHandle(
-            h2.worker().processHandle(),
-            h2.value(),
-            GetCurrentProcess(),
-            &h2local,
-            0, false, DUPLICATE_SAME_ACCESS);
-        bool ret = dup1 && dup2 && comp(h1local, h2local);
-        if (dup1) {
-            CloseHandle(h1local);
-        }
-        if (dup2) {
-            CloseHandle(h2local);
-        }
-        return ret;
-    } else {
-        auto table = queryNtHandles();
-        return ntHandlePointer(table, h1) == ntHandlePointer(table, h2);
+static bool needsWow64HandleLookup() {
+    // The Worker.exe and the test programs must always be the same bitness.
+    // However, in WOW64 mode, prior to Windows 7 64-bit, the WOW64 version of
+    // NtQuerySystemInformation returned almost no handle information.  Even
+    // in Windows 7, the pointers are truncated to 32-bits, so for maximum
+    // reliability, use the RPC technique there too.  Windows 10 has a proper
+    // API.
+    static bool value = isWow64();
+    return value;
+}
+
+static RemoteWorker makeLookupWorker() {
+    SpawnParams sp(false, DETACHED_PROCESS);
+    sp.nativeWorkerBitness = true;
+    return RemoteWorker(sp);
+}
+
+uint64_t wow64LookupKernelObject(DWORD pid, HANDLE handle) {
+    static auto lookupWorker = makeLookupWorker();
+    return lookupWorker.lookupKernelObject(pid, handle);
+}
+
+static bool builtinCompareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
+    static OsModule kernelbase(L"KernelBase.dll");
+    static auto comp =
+        reinterpret_cast<BOOL(WINAPI*)(HANDLE,HANDLE)>(
+            kernelbase.proc("CompareObjectHandles"));
+    ASSERT(comp != nullptr);
+    HANDLE h1local = nullptr;
+    HANDLE h2local = nullptr;
+    bool dup1 = DuplicateHandle(
+        h1.worker().processHandle(),
+        h1.value(),
+        GetCurrentProcess(),
+        &h1local,
+        0, false, DUPLICATE_SAME_ACCESS);
+    bool dup2 = DuplicateHandle(
+        h2.worker().processHandle(),
+        h2.value(),
+        GetCurrentProcess(),
+        &h2local,
+        0, false, DUPLICATE_SAME_ACCESS);
+    bool ret = dup1 && dup2 && comp(h1local, h2local);
+    if (dup1) {
+        CloseHandle(h1local);
     }
+    if (dup2) {
+        CloseHandle(h2local);
+    }
+    return ret;
+}
+
+bool compareObjectHandles(RemoteHandle h1, RemoteHandle h2) {
+    ObjectSnap snap;
+    return snap.eq(h1, h2);
 }
 
 ObjectSnap::ObjectSnap() {
-    if (!hasBuiltinCompareObjectHandles()) {
+    if (!hasBuiltinCompareObjectHandles() && !needsWow64HandleLookup()) {
         m_table = queryNtHandles();
         m_hasTable = true;
     }
 }
 
-void *ObjectSnap::object(RemoteHandle h) {
+uint64_t ObjectSnap::object(RemoteHandle h) {
+    if (needsWow64HandleLookup()) {
+        return wow64LookupKernelObject(h.worker().pid(), h.value());
+    }
     if (!m_hasTable) {
         m_table = queryNtHandles();
     }
-    return ntHandlePointer(m_table, h);
+    return reinterpret_cast<uint64_t>(ntHandlePointer(
+        m_table, h.worker().pid(), h.value()));
 }
 
 bool ObjectSnap::eq(std::initializer_list<RemoteHandle> handles) {
@@ -119,14 +132,14 @@ bool ObjectSnap::eq(std::initializer_list<RemoteHandle> handles) {
     }
     if (hasBuiltinCompareObjectHandles()) {
         for (auto i = handles.begin() + 1; i < handles.end(); ++i) {
-            if (!compareObjectHandles(*handles.begin(), *i)) {
+            if (!builtinCompareObjectHandles(*handles.begin(), *i)) {
                 return false;
             }
         }
     } else {
-        HANDLE first = ntHandlePointer(m_table, *handles.begin());
+        auto first = object(*handles.begin());
         for (auto i = handles.begin() + 1; i < handles.end(); ++i) {
-            if (first != ntHandlePointer(m_table, *i)) {
+            if (first != object(*i)) {
                 return false;
             }
         }

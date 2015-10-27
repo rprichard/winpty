@@ -21,6 +21,7 @@
 #include "RemoteWorker.h"
 #include "TestUtil.h"
 #include "UnicodeConversions.h"
+#include "Util.h"
 
 #include <DebugClient.h>
 #include <WinptyAssert.h>

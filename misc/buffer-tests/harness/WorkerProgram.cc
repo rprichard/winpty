@@ -8,9 +8,11 @@
 
 #include "Command.h"
 #include "Event.h"
+#include "NtHandleQuery.h"
 #include "OsVersion.h"
 #include "ShmemParcel.h"
 #include "Spawn.h"
+
 #include <DebugClient.h>
 
 static const char *g_prefix = "";
@@ -261,6 +263,26 @@ int main(int argc, char *argv[]) {
             case Command::GetStdout:
                 cmd.handle = GetStdHandle(STD_OUTPUT_HANDLE);
                 break;
+            case Command::Hello:
+                // NOOP for Worker startup synchronization.
+                break;
+            case Command::LookupKernelObject: {
+                uint64_t h64;
+                memcpy(&h64, &cmd.lookupKernelObject.handle, sizeof(h64));
+                auto handles = queryNtHandles();
+                uint64_t result =
+                    reinterpret_cast<uint64_t>(
+                        ntHandlePointer(
+                            handles, cmd.lookupKernelObject.pid,
+                                reinterpret_cast<HANDLE>(h64)));
+                memcpy(&cmd.lookupKernelObject.kernelObject,
+                       &result, sizeof(result));
+                trace("LOOKUP: p%d: 0x%I64x => 0x%I64x",
+                    (int)cmd.lookupKernelObject.pid,
+                    h64,
+                    result);
+                break;
+            }
             case Command::NewBuffer:
                 cmd.handle = createBuffer(cmd.bInheritHandle);
                 break;
