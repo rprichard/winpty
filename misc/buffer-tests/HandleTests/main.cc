@@ -19,5 +19,15 @@ int main() {
             }
         }
     }
+    std::cout << std::endl;
+    const auto failures = failedTests();
+    if (failures.empty()) {
+        std::cout << "All tests passed!" << std::endl;
+    } else {
+        std::cout << "Failed tests:" << std::endl;
+        for (auto name : failures) {
+            std::cout << "  " << name << std::endl;
+        }
+    }
     return 0;
 }

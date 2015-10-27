@@ -3,6 +3,7 @@
 #include <array>
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "OsVersion.h"
@@ -17,12 +18,23 @@
 #include <WinptyAssert.h>
 
 static RegistrationTable *g_testFunctions;
+static std::unordered_set<std::string> g_testFailures;
 
 void printTestName(const std::string &name) {
     trace("----------------------------------------------------------");
     trace("%s", name.c_str());
     printf("%s\n", name.c_str());
     fflush(stdout);
+}
+
+void recordFailure(const std::string &name) {
+    g_testFailures.insert(name);
+}
+
+std::vector<std::string> failedTests() {
+    std::vector<std::string> ret(g_testFailures.begin(), g_testFailures.end());
+    std::sort(ret.begin(), ret.end());
+    return ret;
 }
 
 void registerTest(const std::string &name, bool (&cond)(), void (&func)()) {

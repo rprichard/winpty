@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <tuple>
+#include <vector>
 
 #include "NtHandleQuery.h"
 #include "RemoteHandle.h"
@@ -15,6 +16,7 @@ class RemoteWorker;
 #define CHECK(cond) \
     do {                                                                      \
         if (!(cond)) {                                                        \
+            recordFailure(__FUNCTION__);                                      \
             trace("%s:%d: ERROR: check failed: " #cond, __FILE__, __LINE__);  \
             std::cout << __FILE__ << ":" << __LINE__                          \
                       << (": ERROR: check failed: " #cond)                    \
@@ -27,6 +29,7 @@ class RemoteWorker;
         auto a = (actual);                                                    \
         auto e = (expected);                                                  \
         if (a != e) {                                                         \
+            recordFailure(__FUNCTION__);                                      \
             trace("%s:%d: ERROR: check failed "                               \
                   "(" #actual " != " #expected ")", __FILE__, __LINE__);      \
             std::cout << __FILE__ << ":" << __LINE__                          \
@@ -48,6 +51,8 @@ static void extendVector(std::vector<T> &base, const std::vector<T> &to_add) {
 
 // Test registration
 void printTestName(const std::string &name);
+void recordFailure(const std::string &name);
+std::vector<std::string> failedTests();
 void registerTest(const std::string &name, bool(&cond)(), void(&func)());
 using RegistrationTable = std::vector<std::tuple<std::string, bool(*)(), void(*)()>>;
 RegistrationTable registeredTests();
