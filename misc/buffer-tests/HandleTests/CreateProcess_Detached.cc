@@ -41,7 +41,7 @@ static void Test_CreateProcess_Detached() {
         }
     }
     {
-        Worker p;
+        Worker p({ false, DETACHED_PROCESS });
         auto pipe = newPipe(p, true);
         std::get<0>(pipe).setStdin();
         std::get<1>(pipe).setStdout().setStderr();
@@ -56,7 +56,7 @@ static void Test_CreateProcess_Detached() {
             // The worker p2 was started with STARTF_USESTDHANDLES and with
             // standard handles referring to a pipe.  Nevertheless, its
             // children's standard handles are NULL.
-            auto p2 = p.child({ true, 0, stdHandles(p) });
+            auto p2 = p.child({ true, DETACHED_PROCESS, stdHandles(p) });
             auto c1 = p2.child({ true, DETACHED_PROCESS });
             CHECK_NULL(c1);
             auto c2 = p2.child({ false, DETACHED_PROCESS });
