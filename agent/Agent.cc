@@ -708,7 +708,8 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
     // necessary so long as the cursor is inside the current window.)
     const int firstReadLine = std::min(firstVirtLine - m_scrolledCount,
                                        m_dirtyLineCount - 1);
-    const int stopReadLine = windowRect.top() + windowRect.height();
+    const int stopReadLine = std::max(windowRect.top() + windowRect.height(),
+                                      m_dirtyLineCount);
     ASSERT(firstReadLine >= 0 && stopReadLine > firstReadLine);
     largeConsoleRead(m_readBuffer,
                      *m_console,
