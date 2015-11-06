@@ -2,10 +2,12 @@
 #define LARGE_CONSOLE_READ_H
 
 #include <windows.h>
+#include <stdlib.h>
 
 #include <vector>
 
 #include "SmallRect.h"
+#include "../shared/DebugClient.h"
 #include "../shared/WinptyAssert.h"
 
 class Win32Console;
@@ -15,14 +17,22 @@ public:
     LargeConsoleReadBuffer();
     const SmallRect &rect() const { return m_rect; }
     const CHAR_INFO *lineData(int line) const {
-        ASSERT(line >= m_rect.Top && line <= m_rect.Bottom);
+        validateLineNumber(line);
         return &m_data[(line - m_rect.Top) * m_rectWidth];
     }
 
 private:
     CHAR_INFO *lineDataMut(int line) {
-        ASSERT(line >= m_rect.Top && line <= m_rect.Bottom);
+        validateLineNumber(line);
         return &m_data[(line - m_rect.Top) * m_rectWidth];
+    }
+
+    void validateLineNumber(int line) const {
+        if (line < m_rect.Top || line > m_rect.Bottom) {
+            trace("Fatal error: LargeConsoleReadBuffer: invalid line %d for "
+                  "read rect %s", line, m_rect.toString().c_str());
+            abort();
+        }
     }
 
     SmallRect m_rect;
