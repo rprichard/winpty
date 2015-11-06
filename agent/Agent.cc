@@ -77,12 +77,47 @@ T constrained(T min, T val, T max) {
     return std::min(std::max(min, val), max);
 }
 
+static void sendSysCommand(HWND hwnd, int command) {
+    SendMessage(hwnd, WM_SYSCOMMAND, command, 0);
+}
+
+static void sendEscape(HWND hwnd) {
+    SendMessage(hwnd, WM_CHAR, 27, 0x00010001);
+}
+
+// In versions of the Windows console before Windows 10, the SelectAll and
+// Mark commands both run quickly, but Mark changes the cursor position read
+// by GetConsoleScreenBufferInfo.  Therefore, use SelectAll to be less
+// intrusive.
+//
+// Starting with the new Windows 10 console, the Mark command no longer moves
+// the cursor, and SelectAll uses a lot of CPU time.  Therefore, use Mark.
+//
+// The Windows 10 legacy-mode console behaves the same way as previous console
+// versions, so detect which syscommand to use by testing whether Mark changes
+// the cursor position.
+static bool detectWhetherMarkMovesCursor(Win32Console &console)
+{
+    const ConsoleScreenBufferInfo info = console.bufferInfo();
+    console.resizeBuffer(Coord(
+        std::max<int>(2, info.dwSize.X),
+        std::max<int>(2, info.dwSize.Y)));
+    console.moveWindow(SmallRect(0, 0, 2, 2));
+    const Coord initialPosition(1, 1);
+    console.setCursorPosition(initialPosition);
+    sendSysCommand(console.hwnd(), SC_CONSOLE_MARK);
+    bool ret = console.cursorPosition() != initialPosition;
+    sendEscape(console.hwnd());
+    return ret;
+}
+
 } // anonymous namespace
 
 Agent::Agent(LPCWSTR controlPipeName,
              LPCWSTR dataPipeName,
              int initialCols,
              int initialRows) :
+    m_useMark(false),
     m_closingDataSocket(false),
     m_terminal(NULL),
     m_childProcess(NULL),
@@ -97,6 +132,9 @@ Agent::Agent(LPCWSTR controlPipeName,
 
     m_console = new Win32Console;
     setSmallFont(m_console->conout());
+    m_useMark = !detectWhetherMarkMovesCursor(*m_console);
+    trace("Using %s syscommand to freeze console",
+        m_useMark ? "MARK" : "SELECT_ALL");
     m_console->moveWindow(SmallRect(0, 0, 1, 1));
     m_console->resizeBuffer(Coord(initialCols, BUFFER_LINE_COUNT));
     m_console->moveWindow(SmallRect(0, 0, initialCols, initialRows));
@@ -735,12 +773,13 @@ void Agent::reopenConsole()
 
 void Agent::freezeConsole()
 {
-    SendMessage(m_console->hwnd(), WM_SYSCOMMAND, SC_CONSOLE_SELECT_ALL, 0);
+    sendSysCommand(m_console->hwnd(), m_useMark ? SC_CONSOLE_MARK
+                                                : SC_CONSOLE_SELECT_ALL);
 }
 
 void Agent::unfreezeConsole()
 {
-    SendMessage(m_console->hwnd(), WM_CHAR, 27, 0x00010001);
+    sendEscape(m_console->hwnd());
 }
 
 void Agent::syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN])

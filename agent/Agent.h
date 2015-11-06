@@ -91,6 +91,7 @@ private:
     void createSyncMarker(int row);
 
 private:
+    bool m_useMark;
     Win32Console *m_console;
     NamedPipe *m_controlSocket;
     NamedPipe *m_dataSocket;
