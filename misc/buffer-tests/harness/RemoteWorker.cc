@@ -3,35 +3,15 @@
 #include <string>
 
 #include "UnicodeConversions.h"
+#include "Util.h"
 
 #include <DebugClient.h>
 #include <WinptyAssert.h>
 
-namespace {
-
-static std::string timeString() {
-    FILETIME fileTime;
-    GetSystemTimeAsFileTime(&fileTime);
-    auto ret = ((uint64_t)fileTime.dwHighDateTime << 32) |
-                fileTime.dwLowDateTime;
-    return std::to_string(ret);
-}
-
-static std::string newWorkerName() {
-    static int workerCounter = 0;
-    static auto initialTimeString = timeString();
-    return std::string("WinptyBufferTests-") +
-        std::to_string(static_cast<int>(GetCurrentProcessId())) + "-" +
-        initialTimeString + "-" +
-        std::to_string(++workerCounter);
-}
-
-} // anonymous namespace
-
 DWORD RemoteWorker::dwDefaultCreationFlags = CREATE_NEW_CONSOLE;
 
 RemoteWorker::RemoteWorker(decltype(DoNotSpawn)) :
-    m_name(newWorkerName()),
+    m_name(makeTempName("WinptyBufferTests")),
     m_parcel(m_name + "-shmem", ShmemParcel::CreateNew),
     m_startEvent(m_name + "-start"),
     m_finishEvent(m_name + "-finish")

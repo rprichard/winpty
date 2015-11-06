@@ -1,11 +1,27 @@
 #include "Util.h"
 
+#include <windows.h>
+
+#include <cstdint>
 #include <sstream>
+#include <string>
 
 #include "UnicodeConversions.h"
 
 #include <OsModule.h>
 #include <WinptyAssert.h>
+
+namespace {
+
+static std::string timeString() {
+    FILETIME fileTime;
+    GetSystemTimeAsFileTime(&fileTime);
+    auto ret = ((uint64_t)fileTime.dwHighDateTime << 32) |
+                fileTime.dwLowDateTime;
+    return std::to_string(ret);
+}
+
+} // anonymous namespace
 
 std::string pathDirName(const std::string &path)
 {
@@ -98,4 +114,13 @@ bool isWow64() {
         valueInitialized = true;
     }
     return value;
+}
+
+std::string makeTempName(const std::string &baseName) {
+    static int workerCounter = 0;
+    static auto initialTimeString = timeString();
+    return baseName + "-" +
+        std::to_string(static_cast<int>(GetCurrentProcessId())) + "-" +
+        initialTimeString + "-" +
+        std::to_string(++workerCounter);
 }
