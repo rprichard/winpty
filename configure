@@ -52,7 +52,7 @@ IS_MSYS=0
 # also statically linked and therefore depend only on Windows DLLs.  I started
 # linking the Cygwin/MSYS binary statically, because G++ 4.7 changed the
 # Windows C++ ABI.
-UNIX_LDFLAGS_STATIC_LIBSTDCXX='-static -static-libgcc -static-libstdc++'
+UNIX_LDFLAGS_STATIC='-static -static-libgcc -static-libstdc++'
 
 # Detect the environment -- Cygwin or MSYS.
 case $(uname -s) in
@@ -109,7 +109,7 @@ case $(uname -s) in
                     # This is suboptimal because MSYS2 is not actually the
                     # second version of MSYS--it's a brand-new fork of Cygwin.
                     #
-                    UNIX_LDFLAGS_STATIC_LIBSTDCXX=
+                    UNIX_LDFLAGS_STATIC=
                 fi
                 ;;
             x86_64)
@@ -136,8 +136,7 @@ findTool "MinGW G++ compiler" "$MINGW_GPP"
 MINGW_GPP=$FINDTOOL_OUT
 
 # Write config files.
-echo Writing config-unix.mk
-echo CXX=$UNIX_GPP > config-unix.mk
-echo LDFLAGS_STATIC_LIBSTDCXX=$UNIX_LDFLAGS_STATIC_LIBSTDCXX >> config-unix.mk
-echo Writing config-mingw.mk
-echo CXX=$MINGW_GPP > config-mingw.mk
+echo Writing config.mk
+echo UNIX_CXX=$UNIX_GPP > config.mk
+echo UNIX_LDFLAGS_STATIC=$UNIX_LDFLAGS_STATIC >> config.mk
+echo MINGW_CXX=$MINGW_GPP >> config.mk

@@ -18,29 +18,27 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-include ../config.mk
-include ../config-mingw.mk
+ALL_TARGETS += build/winpty-agent.exe
 
-LIBRARY = ../build/winpty.dll
-OBJECTS = winpty.o DebugClient.o
-LDFLAGS += -shared -static -static-libgcc -static-libstdc++
+AGENT_OBJECTS = \
+	build/mingw/agent/Agent.o \
+	build/mingw/agent/ConsoleFont.o \
+	build/mingw/agent/ConsoleInput.o \
+	build/mingw/agent/ConsoleLine.o \
+	build/mingw/agent/Coord.o \
+	build/mingw/agent/EventLoop.o \
+	build/mingw/agent/LargeConsoleRead.o \
+	build/mingw/agent/NamedPipe.o \
+	build/mingw/agent/SmallRect.o \
+	build/mingw/agent/Terminal.o \
+	build/mingw/agent/Win32Console.o \
+	build/mingw/agent/main.o \
+	build/mingw/shared/DebugClient.o \
+	build/mingw/shared/WinptyAssert.o \
+	build/mingw/shared/winpty_wcsnlen.o
 
-CXXFLAGS += \
-	-I../include \
-	-DUNICODE \
-	-D_UNICODE \
-	-D_WIN32_WINNT=0x0501 \
-	-DWINPTY \
-	-fno-exceptions \
-	-fno-rtti \
-	-O2
-
-$(LIBRARY) : $(OBJECTS)
+build/winpty-agent.exe : $(AGENT_OBJECTS)
 	@echo Linking $@
-	@$(CXX) $(LDFLAGS) -o $@ $^
+	@$(MINGW_CXX) $(MINGW_LDFLAGS) -o $@ $^
 
-.PHONY : clean
-clean :
-	rm -f $(LIBRARY) *.o *.d
-
--include $(OBJECTS:.o=.d)
+-include $(AGENT_OBJECTS:.o=.d)

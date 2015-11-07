@@ -1,8 +1,3 @@
-*.o
-*.d
-*.h.gch
-*.exe
-*.dll
 *.sln
 *.suo
 *.vcxproj
@@ -10,5 +5,5 @@
 Default
 winpty.sdf
 winpty.opensdf
-config-mingw.mk
-config-unix.mk
+/config.mk
+/build

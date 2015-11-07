@@ -1,4 +1,4 @@
-# Copyright (c) 2015 Ryan Prichard
+# Copyright (c) 2011-2012 Ryan Prichard
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -18,22 +18,14 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-include ../config.mk
-include ../config-mingw.mk
+ALL_TARGETS += build/$(UNIX_ADAPTER_EXE)
 
-LDFLAGS += -static-libgcc -static-libstdc++
+UNIX_ADAPTER_OBJECTS = \
+	build/unix/unix-adapter/main.o \
+	build/unix/shared/DebugClient.o
 
-../build/%.exe : %.cc
-	@echo Building $@
-	@$(CXX) $(CXXFLAGS) -std=c++11 -o $@ $^ $(LDFLAGS) ../build/winpty.dll
+build/$(UNIX_ADAPTER_EXE) : $(UNIX_ADAPTER_OBJECTS) build/winpty.dll
+	@echo Linking $@
+	@$(UNIX_CXX) $(UNIX_LDFLAGS) -o $@ $^
 
-TEST_PROGRAMS := \
-        ../build/trivial_test.exe
-
-all : $(TEST_PROGRAMS)
-
-.PHONY : clean
-clean:
-	rm -f *.o *.d $(TEST_PROGRAMS) $(TEST_PROGRAMS:.exe=.d)
-
--include $(TEST_PROGRAMS:.exe=.d)
+-include $(UNIX_ADAPTER_OBJECTS:.o=.d)

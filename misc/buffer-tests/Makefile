@@ -1,4 +1,5 @@
-include ../../config-mingw.mk
+include ../../config.mk
+CXX = $(MINGW_CXX)
 
 # Pass -Wno-format to disable format checking because gcc complains about
 # %I64x.  I can't use %lld because it's broken on MinGW-on-WinXP, though it

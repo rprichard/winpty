@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2012 Ryan Prichard
+# Copyright (c) 2015 Ryan Prichard
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -18,46 +18,13 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-include ../config.mk
-include ../config-mingw.mk
+ALL_TARGETS += build/winpty-debugserver.exe
 
-PROGRAM = ../build/winpty-agent.exe
+DEBUGSERVER_OBJECTS = \
+	build/mingw/debugserver/DebugServer.o
 
-OBJECTS = \
-	EventLoop.o \
-	NamedPipe.o \
-	Agent.o \
-	WinptyAssert.o \
-	Terminal.o \
-	Win32Console.o \
-	ConsoleInput.o \
-	DebugClient.o \
-	Coord.o \
-	SmallRect.o \
-	ConsoleLine.o \
-	ConsoleFont.o \
-	LargeConsoleRead.o \
-	winpty_wcsnlen.o \
-	main.o
-
-CXXFLAGS += \
-	-DUNICODE \
-	-D_UNICODE \
-	-D_WIN32_WINNT=0x0501 \
-	-fno-exceptions \
-	-fno-rtti \
-	-O2
-
-LDFLAGS += -static -static-libgcc -static-libstdc++
-
-all : $(PROGRAM)
-
-$(PROGRAM) : $(OBJECTS)
+build/winpty-debugserver.exe : $(DEBUGSERVER_OBJECTS)
 	@echo Linking $@
-	@$(CXX) -o $@ $^ $(LDFLAGS)
+	@$(MINGW_CXX) $(MINGW_LDFLAGS) -o $@ $^
 
-.PHONY : clean
-clean:
-	rm -f $(PROGRAM) *.o *.d
-
--include $(OBJECTS:.o=.d)
+-include $(DEBUGSERVER_OBJECTS:.o=.d)

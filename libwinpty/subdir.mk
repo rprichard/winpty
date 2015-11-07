@@ -18,22 +18,14 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-include ../config.mk
-include ../config-unix.mk
+ALL_TARGETS += build/winpty.dll
 
-PROGRAM = ../build/console.exe
-OBJECTS = main.o Shared.o
-CXXFLAGS += -I../include
-LDFLAGS += $(LDFLAGS_STATIC_LIBSTDCXX) ../build/winpty.dll
+LIBWINPTY_OBJECTS = \
+	build/mingw/libwinpty/winpty.o \
+	build/mingw/shared/DebugClient.o
 
-all : $(PROGRAM)
-
-$(PROGRAM) : $(OBJECTS)
+build/winpty.dll : $(LIBWINPTY_OBJECTS)
 	@echo Linking $@
-	@$(CXX) -o $@ $^ $(LDFLAGS)
+	@$(MINGW_CXX) $(MINGW_LDFLAGS) -shared -o $@ $^
 
-.PHONY : clean
-clean:
-	rm -f $(PROGRAM) *.o *.d
-
--include $(OBJECTS:.o=.d)
+-include $(LIBWINPTY_OBJECTS:.o=.d)
