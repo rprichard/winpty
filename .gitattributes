@@ -13,3 +13,4 @@ configure       text
 
 *.sh            eol=lf
 configure       eol=lf
+shared/GetCommitHash.cmd text eol=crlf

@@ -23,6 +23,7 @@
 
 #include "Agent.h"
 #include "../shared/WinptyAssert.h"
+#include "../shared/WinptyVersion.h"
 
 static wchar_t *heapMbsToWcs(const char *text)
 {
@@ -36,11 +37,18 @@ static wchar_t *heapMbsToWcs(const char *text)
 
 int main(int argc, char *argv[])
 {
+    if (argc == 2 && !strcmp(argv[1], "--version")) {
+        dumpVersionToStdout();
+        return 0;
+    }
+
     if (argc != 5) {
         fprintf(stderr,
             "Usage: %s controlPipeName dataPipeName cols rows\n"
+            "Usage: %s --version\n"
+            "\n"
             "(Note: This program is intended to be run by libwinpty.dll.)\n",
-            argv[0]);
+            argv[0], argv[0]);
         return 1;
     }
 

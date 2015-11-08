@@ -31,13 +31,20 @@ ifeq "$(wildcard config.mk)" ""
 endif
 include config.mk
 
-UNIX_CXXFLAGS += -MMD -Wall
-
-MINGW_CXXFLAGS += \
+COMMON_CXXFLAGS += \
+	-DWINPTY_VERSION=$$(cat VERSION.txt | tr -d '\r\n') \
+	-DWINPTY_VERSION_SUFFIX=$(VERSION_SUFFIX) \
+	-DWINPTY_COMMIT_HASH=$(COMMIT_HASH) \
 	-MMD -Wall \
 	-DUNICODE \
 	-D_UNICODE \
-	-D_WIN32_WINNT=0x0501 \
+	-D_WIN32_WINNT=0x0501
+
+UNIX_CXXFLAGS += \
+	$(COMMON_CXXFLAGS)
+
+MINGW_CXXFLAGS += \
+	$(COMMON_CXXFLAGS) \
 	-fno-exceptions \
 	-fno-rtti \
 	-O2

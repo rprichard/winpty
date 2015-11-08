@@ -22,7 +22,8 @@ ALL_TARGETS += build/$(UNIX_ADAPTER_EXE)
 
 UNIX_ADAPTER_OBJECTS = \
 	build/unix/unix-adapter/main.o \
-	build/unix/shared/DebugClient.o
+	build/unix/shared/DebugClient.o \
+	build/unix/shared/WinptyVersion.o
 
 build/$(UNIX_ADAPTER_EXE) : $(UNIX_ADAPTER_OBJECTS) build/winpty.dll
 	@echo Linking $@

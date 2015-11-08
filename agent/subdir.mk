@@ -35,6 +35,7 @@ AGENT_OBJECTS = \
 	build/mingw/agent/main.o \
 	build/mingw/shared/DebugClient.o \
 	build/mingw/shared/WinptyAssert.o \
+	build/mingw/shared/WinptyVersion.o \
 	build/mingw/shared/winpty_wcsnlen.o
 
 build/winpty-agent.exe : $(AGENT_OBJECTS)
