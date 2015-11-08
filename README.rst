@@ -68,6 +68,9 @@ and select at least these components:
 When running ``./configure``, make sure that ``mingw32-g++`` is in your
 ``PATH``.  It will be in the ``C:\MinGW\bin`` directory.
 
+MSYS2 packages
+--------------
+
 For MSYS2, use ``pacman`` and install at least these packages:
 
 * ``msys/gcc``
