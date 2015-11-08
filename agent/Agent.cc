@@ -437,7 +437,7 @@ void Agent::clearBufferLines(
 {
     ASSERT(!m_directMode);
     for (int row = firstRow; row < firstRow + count; ++row) {
-        const int bufLine = row + m_scrolledCount;
+        const int64_t bufLine = row + m_scrolledCount;
         m_maxBufferedLine = std::max(m_maxBufferedLine, bufLine);
         m_bufferData[bufLine % BUFFER_LINE_COUNT].blank(attributes);
     }
@@ -641,7 +641,7 @@ void Agent::directScrapeOutput(const ConsoleScreenBufferInfo &info)
     }
 
     m_terminal->finishOutput(
-        std::pair<int, int>(
+        std::pair<int, int64_t>(
             constrained(0, cursor.X - scrapeRect.Left, w - 1),
             constrained(0, cursor.Y - scrapeRect.Top, h - 1)));
 }
@@ -697,8 +697,8 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
     ASSERT(m_dirtyLineCount >= 1);
 
     // The first line to scrape, in virtual line coordinates.
-    const int firstVirtLine = std::min(m_scrapedLineCount,
-                                       windowRect.top() + m_scrolledCount);
+    const int64_t firstVirtLine = std::min(m_scrapedLineCount,
+                                           windowRect.top() + m_scrolledCount);
 
     // Read all the data we will need from the console.  Start reading with the
     // first line to scrape, but adjust the the read area upward to account for
@@ -706,8 +706,8 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
     // bottom of the window.  (It's not clear to me whether the
     // m_dirtyLineCount adjustment here is strictly necessary.  It isn't
     // necessary so long as the cursor is inside the current window.)
-    const int firstReadLine = std::min(firstVirtLine - m_scrolledCount,
-                                       m_dirtyLineCount - 1);
+    const int firstReadLine = std::min<int>(firstVirtLine - m_scrolledCount,
+                                            m_dirtyLineCount - 1);
     const int stopReadLine = std::max(windowRect.top() + windowRect.height(),
                                       m_dirtyLineCount);
     ASSERT(firstReadLine >= 0 && stopReadLine > firstReadLine);
@@ -724,14 +724,14 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
     // be non-dirty.
 
     // The line to stop scraping at, in virtual line coordinates.
-    const int stopVirtLine = std::min(m_dirtyLineCount,
-                                      windowRect.top() + windowRect.height()) +
+    const int64_t stopVirtLine =
+        std::min(m_dirtyLineCount, windowRect.top() + windowRect.height()) +
             m_scrolledCount;
 
     bool sawModifiedLine = false;
 
     const int w = m_readBuffer.rect().width();
-    for (int line = firstVirtLine; line < stopVirtLine; ++line) {
+    for (int64_t line = firstVirtLine; line < stopVirtLine; ++line) {
         const CHAR_INFO *curLine =
             m_readBuffer.lineData(line - m_scrolledCount);
         ConsoleLine &bufLine = m_bufferData[line % BUFFER_LINE_COUNT];
@@ -760,8 +760,9 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
         createSyncMarker(newSyncRow);
     }
 
-    m_terminal->finishOutput(std::pair<int, int>(cursor.X,
-                                                 cursor.Y + m_scrolledCount));
+    m_terminal->finishOutput(
+        std::pair<int, int64_t>(cursor.X,
+                                cursor.Y + m_scrolledCount));
 }
 
 void Agent::reopenConsole()

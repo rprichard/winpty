@@ -292,7 +292,7 @@ void Terminal::setConsoleMode(int mode)
         m_consoleMode = false;
 }
 
-void Terminal::reset(SendClearFlag sendClearFirst, int newLine)
+void Terminal::reset(SendClearFlag sendClearFirst, int64_t newLine)
 {
     if (sendClearFirst == SendClear && !m_consoleMode) {
         // 0m   ==> reset SGR parameters
@@ -302,11 +302,11 @@ void Terminal::reset(SendClearFlag sendClearFirst, int newLine)
     }
     m_remoteLine = newLine;
     m_cursorHidden = false;
-    m_cursorPos = std::pair<int, int>(0, newLine);
+    m_cursorPos = std::pair<int, int64_t>(0, newLine);
     m_remoteColor = -1;
 }
 
-void Terminal::sendLine(int line, const CHAR_INFO *lineData, int width)
+void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width)
 {
     hideTerminalCursor();
     moveTerminalToLine(line);
@@ -362,7 +362,7 @@ void Terminal::sendLine(int line, const CHAR_INFO *lineData, int width)
     }
 }
 
-void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)
+void Terminal::finishOutput(const std::pair<int, int64_t> &newCursorPos)
 {
     if (newCursorPos != m_cursorPos)
         hideTerminalCursor();
@@ -386,7 +386,7 @@ void Terminal::hideTerminalCursor()
     m_cursorHidden = true;
 }
 
-void Terminal::moveTerminalToLine(int line)
+void Terminal::moveTerminalToLine(int64_t line)
 {
     // Do not use CPL or CNL.  Konsole 2.5.4 does not support Cursor Previous
     // Line (CPL) -- there are "Undecodable sequence" errors.  gnome-terminal
@@ -396,7 +396,7 @@ void Terminal::moveTerminalToLine(int line)
     if (line < m_remoteLine) {
         // CUrsor Up (CUU)
         char buffer[32];
-        sprintf(buffer, "\r" CSI"%dA", m_remoteLine - line);
+        sprintf(buffer, "\r" CSI"%dA", static_cast<int>(m_remoteLine - line));
         if (!m_consoleMode)
             m_output->write(buffer);
         m_remoteLine = line;

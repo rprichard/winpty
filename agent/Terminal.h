@@ -22,6 +22,7 @@
 #define TERMINAL_H
 
 #include <windows.h>
+#include <stdint.h>
 
 #include <string>
 #include <utility>
@@ -35,20 +36,20 @@ class Terminal
 public:
     explicit Terminal(NamedPipe *output);
     enum SendClearFlag { OmitClear, SendClear };
-    void reset(SendClearFlag sendClearFirst, int newLine);
-    void sendLine(int line, const CHAR_INFO *lineData, int width);
-    void finishOutput(const std::pair<int, int> &newCursorPos);
+    void reset(SendClearFlag sendClearFirst, int64_t newLine);
+    void sendLine(int64_t line, const CHAR_INFO *lineData, int width);
+    void finishOutput(const std::pair<int, int64_t> &newCursorPos);
     void setConsoleMode(int mode);
 
 private:
     void hideTerminalCursor();
-    void moveTerminalToLine(int line);
+    void moveTerminalToLine(int64_t line);
 
 private:
     NamedPipe *m_output;
-    int m_remoteLine;
+    int64_t m_remoteLine;
     bool m_cursorHidden;
-    std::pair<int, int> m_cursorPos;
+    std::pair<int, int64_t> m_cursorPos;
     int m_remoteColor;
     bool m_consoleMode;
     std::string m_termLine;

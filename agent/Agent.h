@@ -22,6 +22,7 @@
 #define AGENT_H
 
 #include <windows.h>
+#include <stdint.h>
 
 #include <string>
 #include <vector>
@@ -106,9 +107,9 @@ private:
 
     bool m_directMode;
     Coord m_ptySize;
-    int m_scrapedLineCount;
-    int m_scrolledCount;
-    int m_maxBufferedLine;
+    int64_t m_scrapedLineCount;
+    int64_t m_scrolledCount;
+    int64_t m_maxBufferedLine;
     LargeConsoleReadBuffer m_readBuffer;
     std::vector<ConsoleLine> m_bufferData;
     int m_dirtyWindowTop;
