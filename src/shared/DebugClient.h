@@ -22,6 +22,7 @@
 #define DEBUGCLIENT_H
 
 bool isTracingEnabled();
+bool hasDebugFlag(const char *flag);
 void trace(const char *format, ...);
 
 #endif // DEBUGCLIENT_H
