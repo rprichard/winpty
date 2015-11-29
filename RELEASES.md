@@ -1,3 +1,9 @@
+# Next version
+
+ * The main project source was moved into a `src` directory for better code
+   organization and to fix
+   [#51](https://github.com/rprichard/winpty/issues/51).
+
 # Version 0.2.0 (2015-11-13)
 
 No changes to the API, but many small changes to the implementation.  The big
