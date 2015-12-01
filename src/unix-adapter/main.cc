@@ -38,6 +38,7 @@
 #include <pthread.h>
 #include <winpty.h>
 #include "../shared/DebugClient.h"
+#include "../shared/UnixCtrlChars.h"
 #include "../shared/WinptyVersion.h"
 #include <map>
 #include <string>
@@ -86,6 +87,36 @@ static void restoreTerminalMode(termios original)
         perror("error restoring terminal mode");
         exit(1);
     }
+}
+
+static void debugShowKey()
+{
+    printf("\r\nPress any keys -- Ctrl-D exits\r\n\r\n");
+    const termios saved = setRawTerminalMode();
+    char buf[128];
+    while (true) {
+        const ssize_t len = read(STDIN_FILENO, buf, sizeof(buf));
+        if (len <= 0) {
+            break;
+        }
+        for (int i = 0; i < len; ++i) {
+            char ctrl = decodeUnixCtrlChar(buf[i]);
+            if (ctrl == '\0') {
+                putchar(buf[i]);
+            } else {
+                putchar('^');
+                putchar(ctrl);
+            }
+        }
+        for (int i = 0; i < len; ++i) {
+            printf("\t%3d %04o 0x%02x\r\n", buf[i], buf[i], buf[i]);
+        }
+        if (buf[0] == 4) {
+            // Ctrl-D
+            break;
+        }
+    }
+    restoreTerminalMode(saved);
 }
 
 static void writeToSignalFd()
@@ -359,6 +390,7 @@ static void usage(const char *program, int exitCode)
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help  Show this help message\n");
+    printf("  --showkey   Dump STDIN escape sequences\n");
     printf("  --version   Show the winpty version number\n");
     exit(exitCode);
 }
@@ -378,6 +410,9 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
                 usage(program, 0);
             } else if (arg == "--version") {
                 dumpVersionToStdout();
+                exit(0);
+            } else if (arg == "--showkey") {
+                debugShowKey();
                 exit(0);
             } else if (arg == "--") {
                 break;

@@ -3,6 +3,9 @@
  * The main project source was moved into a `src` directory for better code
    organization and to fix
    [#51](https://github.com/rprichard/winpty/issues/51).
+ * For debugging, added a --showkey option to the unix adapter and a
+   WINPTY_DEBUG=input option for logging both input bytes and synthesized
+   console keyboard events.
 
 # Version 0.2.0 (2015-11-13)
 

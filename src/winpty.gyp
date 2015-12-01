@@ -58,6 +58,7 @@
                 'shared/DebugClient.h',
                 'shared/DebugClient.cc',
                 'shared/OsModule.h',
+                'shared/UnixCtrlChars.h',
                 'shared/WinptyAssert.h',
                 'shared/WinptyAssert.cc',
                 'shared/WinptyVersion.h',
