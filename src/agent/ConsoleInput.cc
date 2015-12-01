@@ -50,6 +50,7 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
         const char *encoding;
         InputMap::Key key;
     };
+    const int vkLB = VkKeyScan('[') & 0xFF;
     static const KeyDescriptor keyDescriptorTable[] = {
         // Ctrl-<letter/digit> seems to be handled OK by the default code path.
         // TODO: Alt-ESC is encoded as ESC ESC.  Can it be handled?
@@ -57,8 +58,8 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
         {   ESC,        { VK_ESCAPE,    '\x1B', 0,                  } },
 
         // Alt-<letter/digit>
-        {   ESC"O",     { 'O',          '\0',   LEFT_ALT_PRESSED    } },
-        {   ESC"[",     { '[',          '\0',   LEFT_ALT_PRESSED    } },
+        {   ESC"O",     { 'O',          'O',    LEFT_ALT_PRESSED | SHIFT_PRESSED    } },
+        {   ESC"[",     { vkLB,         '[',    LEFT_ALT_PRESSED                    } },
 
         // F1-F4 function keys.  F5-F12 seem to be handled more consistently among
         // various TERM=xterm terminals (gnome-terminal, konsole, xterm, mintty),

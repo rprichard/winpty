@@ -6,6 +6,7 @@
  * For debugging, added a --showkey option to the unix adapter and a
    WINPTY_DEBUG=input option for logging both input bytes and synthesized
    console keyboard events.
+ * Fixed handling of Shift-Alt-O and Alt-[.
 
 # Version 0.2.0 (2015-11-13)
 
