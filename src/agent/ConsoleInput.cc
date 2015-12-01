@@ -40,40 +40,43 @@ const int kIncompleteEscapeTimeoutMs = 1000;
 #define CSI ESC"["
 #define DIM(x) (sizeof(x) / sizeof((x)[0]))
 
-ConsoleInput::KeyDescriptor ConsoleInput::keyDescriptorTable[] = {
-    // Ctrl-<letter/digit> seems to be handled OK by the default code path.
-    // TODO: Alt-ESC is encoded as ESC ESC.  Can it be handled?
-
-    {   ESC,            VK_ESCAPE,  '\x1B', 0,              },
-
-    // Alt-<letter/digit>
-    {   ESC"O",         'O',        0,  LEFT_ALT_PRESSED    },
-    {   ESC"[",         '[',        0,  LEFT_ALT_PRESSED    },
-
-    // F1-F4 function keys.  F5-F12 seem to be handled more consistently among
-    // various TERM=xterm terminals (gnome-terminal, konsole, xterm, mintty),
-    // using a CSI-prefix with an optional extra modifier digit.  (putty is
-    // also TERM=xterm, though, and has completely different modified F5-F12
-    // encodings.)
-    {   ESC"OP",        VK_F1,      0,  0,                  }, // xt gt kon
-    {   ESC"OQ",        VK_F2,      0,  0,                  }, // xt gt kon
-    {   ESC"OR",        VK_F3,      0,  0,                  }, // xt gt kon
-    {   ESC"OS",        VK_F4,      0,  0,                  }, // xt gt kon
-
-    {   "\x7F",         VK_BACK,    '\x08', 0,                  },
-    {   ESC"\x7F",      VK_BACK,    '\x08', LEFT_ALT_PRESSED,   },
-    {   ESC"OH",        VK_HOME,    0,  0,                      }, // gnome-terminal
-    {   ESC"OF",        VK_END,     0,  0,                      }, // gnome-terminal
-    {   ESC"[Z",        VK_TAB,     '\t', SHIFT_PRESSED         },
-};
-
 ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
     m_console(new Win32Console),
     m_dsrSender(dsrSender),
     m_dsrSent(false),
     lastWriteTick(0)
 {
-    // Generate CSI encodings and add them to the table.
+    struct KeyDescriptor {
+        const char *encoding;
+        InputMap::Key key;
+    };
+    static const KeyDescriptor keyDescriptorTable[] = {
+        // Ctrl-<letter/digit> seems to be handled OK by the default code path.
+        // TODO: Alt-ESC is encoded as ESC ESC.  Can it be handled?
+
+        {   ESC,        { VK_ESCAPE,    '\x1B', 0,                  } },
+
+        // Alt-<letter/digit>
+        {   ESC"O",     { 'O',          '\0',   LEFT_ALT_PRESSED    } },
+        {   ESC"[",     { '[',          '\0',   LEFT_ALT_PRESSED    } },
+
+        // F1-F4 function keys.  F5-F12 seem to be handled more consistently among
+        // various TERM=xterm terminals (gnome-terminal, konsole, xterm, mintty),
+        // using a CSI-prefix with an optional extra modifier digit.  (putty is
+        // also TERM=xterm, though, and has completely different modified F5-F12
+        // encodings.)
+        {   ESC"OP",    { VK_F1,        '\0',   0,                  } }, // xt gt kon
+        {   ESC"OQ",    { VK_F2,        '\0',   0,                  } }, // xt gt kon
+        {   ESC"OR",    { VK_F3,        '\0',   0,                  } }, // xt gt kon
+        {   ESC"OS",    { VK_F4,        '\0',   0,                  } }, // xt gt kon
+
+        {   "\x7F",     { VK_BACK,      '\x08', 0,                  } },
+        {   ESC"\x7F",  { VK_BACK,      '\x08', LEFT_ALT_PRESSED,   } },
+        {   ESC"OH",    { VK_HOME,      '\0',   0,                  } }, // gt
+        {   ESC"OF",    { VK_END,       '\0',   0,                  } }, // gt
+        {   ESC"[Z",    { VK_TAB,       '\t',   SHIFT_PRESSED       } },
+    };
+
     struct CsiEncoding {
         int id;
         char letter;
@@ -108,6 +111,7 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
         {   23, '~',    VK_F11      },
         {   24, '~',    VK_F12      },
     };
+
     const int kCsiShiftModifier = 1;
     const int kCsiAltModifier   = 2;
     const int kCsiCtrlModifier  = 4;
@@ -118,23 +122,16 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
             sprintf(encoding, CSI"%c", e->letter);
         else
             sprintf(encoding, CSI"%d%c", e->id, e->letter);
-        KeyDescriptor *k = new KeyDescriptor;
-        k->encoding = NULL;
-        k->encodingLen = strlen(encoding);
-        k->keyState = 0;
-        k->unicodeChar = 0;
-        k->virtualKey = csiEncodings[i].virtualKey;
-        m_lookup.set(encoding, k);
+        InputMap::Key k = { csiEncodings[i].virtualKey, 0, 0 };
+        m_inputMap.set(encoding, k);
         int id = !e->id ? 1 : e->id;
         for (int mod = 2; mod <= 8; ++mod) {
             sprintf(encoding, CSI"%d;%d%c", id, mod, e->letter);
-            KeyDescriptor *k2 = new KeyDescriptor;
-            *k2 = *k;
-            k2->encodingLen = strlen(encoding);
-            if ((mod - 1) & kCsiShiftModifier)  k2->keyState |= SHIFT_PRESSED;
-            if ((mod - 1) & kCsiAltModifier)    k2->keyState |= LEFT_ALT_PRESSED;
-            if ((mod - 1) & kCsiCtrlModifier)   k2->keyState |= LEFT_CTRL_PRESSED;
-            m_lookup.set(encoding, k2);
+            k.keyState = 0;
+            if ((mod - 1) & kCsiShiftModifier)  k.keyState |= SHIFT_PRESSED;
+            if ((mod - 1) & kCsiAltModifier)    k.keyState |= LEFT_ALT_PRESSED;
+            if ((mod - 1) & kCsiCtrlModifier)   k.keyState |= LEFT_CTRL_PRESSED;
+            m_inputMap.set(encoding, k);
         }
     }
 
@@ -149,26 +146,19 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
                     // konsole
                     sprintf(encoding, ESC"O%d%c", mod, 'P' + fn);
                 }
-                KeyDescriptor *k = new KeyDescriptor;
-                k->encoding = NULL;
-                k->encodingLen = strlen(encoding);
-                k->keyState = 0;
-                if ((mod - 1) & kCsiShiftModifier)  k->keyState |= SHIFT_PRESSED;
-                if ((mod - 1) & kCsiAltModifier)    k->keyState |= LEFT_ALT_PRESSED;
-                if ((mod - 1) & kCsiCtrlModifier)   k->keyState |= LEFT_CTRL_PRESSED;
-                k->unicodeChar = 0;
-                k->virtualKey = VK_F1 + fn;
-                m_lookup.set(encoding, k);
+                InputMap::Key k = { VK_F1 + fn, 0, 0 };
+                if ((mod - 1) & kCsiShiftModifier)  k.keyState |= SHIFT_PRESSED;
+                if ((mod - 1) & kCsiAltModifier)    k.keyState |= LEFT_ALT_PRESSED;
+                if ((mod - 1) & kCsiCtrlModifier)   k.keyState |= LEFT_CTRL_PRESSED;
+                m_inputMap.set(encoding, k);
             }
         }
     }
 
     // Static key encodings.
-    for (size_t i = 0; i < sizeof(keyDescriptorTable) / sizeof(keyDescriptorTable[0]); ++i) {
-        KeyDescriptor *k = new KeyDescriptor;
-        *k = keyDescriptorTable[i];
-        k->encodingLen = strlen(k->encoding);
-        m_lookup.set(k->encoding, k);
+    for (size_t i = 0; i < DIM(keyDescriptorTable); ++i) {
+        m_inputMap.set(keyDescriptorTable[i].encoding,
+                       keyDescriptorTable[i].key);
     }
 }
 
@@ -231,38 +221,6 @@ void ConsoleInput::flushIncompleteEscapeCode()
     }
 }
 
-ConsoleInput::KeyLookup::KeyLookup() : match(NULL), children(NULL)
-{
-}
-
-ConsoleInput::KeyLookup::~KeyLookup()
-{
-    delete match;
-    if (children != NULL) {
-        for (int i = 0; i < 256; ++i)
-            delete (*children)[i];
-    }
-    delete [] children;
-}
-
-void ConsoleInput::KeyLookup::set(const char *encoding,
-                                  const KeyDescriptor *descriptor)
-{
-    unsigned char ch = encoding[0];
-    if (ch == '\0') {
-        match = descriptor;
-        return;
-    }
-    if (children == NULL) {
-        children = (KeyLookup*(*)[256])new KeyLookup*[256];
-        memset(children, 0, sizeof(KeyLookup*) * 256);
-    }
-    if ((*children)[ch] == NULL) {
-        (*children)[ch] = new KeyLookup;
-    }
-    (*children)[ch]->set(encoding + 1, descriptor);
-}
-
 void ConsoleInput::doWrite(bool isEof)
 {
     const char *data = m_byteQueue.c_str();
@@ -306,10 +264,12 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
     }
 
     // Recognize Alt-<character>.
+    InputMap *const escapeSequences = m_inputMap.getChild('\x1B');
     if (input[0] == '\x1B' &&
             input[1] != '\0' &&
             input[1] != '\x1B' &&
-            m_lookup.getChild('\x1B')->getChild(input[1]) == NULL) {
+            escapeSequences != NULL &&
+            escapeSequences->getChild(input[1]) == NULL) {
         int len = utf8CharLength(input[1]);
         if (1 + len > inputSize) {
             // Incomplete character.
@@ -322,7 +282,8 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
 
     // Recognize an ESC-encoded keypress.
     bool incomplete;
-    const KeyDescriptor *match = lookupKey(input, isEof, &incomplete);
+    int matchLen;
+    const InputMap::Key *match = lookupKey(input, isEof, incomplete, matchLen);
     if (incomplete) {
         // Incomplete match -- need more characters (or wait for a
         // timeout to signify flushed input).
@@ -333,7 +294,7 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
                        match->virtualKey,
                        match->unicodeChar,
                        match->keyState);
-        return match->encodingLen;
+        return matchLen;
     }
 
     // A UTF-8 character.
@@ -571,32 +532,41 @@ int ConsoleInput::utf8CharLength(char firstByte)
 }
 
 // Find the longest matching key and node.
-const ConsoleInput::KeyDescriptor *
-ConsoleInput::lookupKey(const char *encoding, bool isEof, bool *incomplete)
+const InputMap::Key *
+ConsoleInput::lookupKey(const char *encoding, bool isEof, bool &incompleteOut,
+                        int &matchLenOut)
 {
     //trace("lookupKey");
     //for (int i = 0; encoding[i] != '\0'; ++i)
     //   trace("%d", encoding[i]);
 
-    *incomplete = false;
-    KeyLookup *node = &m_lookup;
-    const KeyDescriptor *longestMatch = NULL;
+    incompleteOut = false;
+    matchLenOut = 0;
+
+    InputMap *node = &m_inputMap;
+    const InputMap::Key *longestMatch = NULL;
+    int longestMatchLen = 0;
+
     for (int i = 0; encoding[i] != '\0'; ++i) {
         unsigned char ch = encoding[i];
         node = node->getChild(ch);
         //trace("ch: %d --> node:%p", ch, node);
         if (node == NULL) {
+            matchLenOut = longestMatchLen;
             return longestMatch;
-        } else if (node->getMatch() != NULL) {
-            longestMatch = node->getMatch();
+        } else if (node->getKey() != NULL) {
+            longestMatchLen = i + 1;
+            longestMatch = node->getKey();
         }
     }
     if (isEof) {
+        matchLenOut = longestMatchLen;
         return longestMatch;
     } else if (node->hasChildren()) {
-        *incomplete = true;
+        incompleteOut = true;
         return NULL;
     } else {
+        matchLenOut = longestMatchLen;
         return longestMatch;
     }
 }

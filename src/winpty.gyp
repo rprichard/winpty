@@ -41,6 +41,8 @@
                 'agent/DsrSender.h',
                 'agent/EventLoop.h',
                 'agent/EventLoop.cc',
+                'agent/InputMap.h',
+                'agent/InputMap.cc',
                 'agent/LargeConsoleRead.h',
                 'agent/LargeConsoleRead.cc',
                 'agent/NamedPipe.h',
