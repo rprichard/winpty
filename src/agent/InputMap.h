@@ -39,7 +39,7 @@ public:
 
     InputMap();
     ~InputMap();
-    void set(const char *encoding, const Key &key);
+    void set(const char *encoding, int encodingLen, const Key &key);
     void setKey(const Key &key);
     const Key *getKey() const { return m_key; }
     bool hasChildren() const { return m_children != NULL; }

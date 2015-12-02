@@ -22,6 +22,7 @@
 
 #include <windows.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "InputMap.h"
 
@@ -184,6 +185,7 @@ static void addSimpleEntries(InputMap &inputMap) {
 
     for (size_t i = 0; i < DIM(simpleEncodings); ++i) {
         inputMap.set(simpleEncodings[i].encoding,
+                     strlen(simpleEncodings[i].encoding),
                      simpleEncodings[i].key);
     }
 }
@@ -194,10 +196,11 @@ struct ExpandContext {
     char *buffer;
 };
 
-static inline void setEncoding(const ExpandContext &ctx, int extraKeyState) {
+static inline void setEncoding(const ExpandContext &ctx, char *end,
+                               int extraKeyState) {
     InputMap::Key k = ctx.e.key;
     k.keyState |= extraKeyState;
-    ctx.inputMap.set(ctx.buffer, k);
+    ctx.inputMap.set(ctx.buffer, end - ctx.buffer, k);
 }
 
 static inline int keyStateForMod(int mod) {
@@ -213,26 +216,22 @@ static void expandNumericEncodingSuffix(const ExpandContext &ctx, char *p,
     {
         char *q = p;
         *q++ = '~';
-        *q++ = '\0';
-        setEncoding(ctx, extraKeyState);
+        setEncoding(ctx, q, extraKeyState);
     }
     if (ctx.e.modifiers & kSuffixShift) {
         char *q = p;
         *q++ = '$';
-        *q++ = '\0';
-        setEncoding(ctx, extraKeyState | SHIFT_PRESSED);
+        setEncoding(ctx, q, extraKeyState | SHIFT_PRESSED);
     }
     if (ctx.e.modifiers & kSuffixCtrl) {
         char *q = p;
         *q++ = '^';
-        *q++ = '\0';
-        setEncoding(ctx, extraKeyState | LEFT_CTRL_PRESSED);
+        setEncoding(ctx, q, extraKeyState | LEFT_CTRL_PRESSED);
     }
     if (ctx.e.modifiers & (kSuffixCtrl | kSuffixShift)) {
         char *q = p;
         *q++ = '@';
-        *q++ = '\0';
-        setEncoding(ctx, extraKeyState | SHIFT_PRESSED | LEFT_CTRL_PRESSED);
+        setEncoding(ctx, q, extraKeyState | SHIFT_PRESSED | LEFT_CTRL_PRESSED);
     }
 }
 
@@ -248,8 +247,7 @@ static inline void expandEncodingAfterAltPrefix(
             expandNumericEncodingSuffix(ctx, q, extraKeyState);
         } else {
             *q++ = ctx.e.id;
-            *q++ = '\0';
-            setEncoding(ctx, extraKeyState);
+            setEncoding(ctx, q, extraKeyState);
         }
     }
     if (ctx.e.modifiers & kBareMod) {
@@ -258,8 +256,7 @@ static inline void expandEncodingAfterAltPrefix(
             char *q = p;
             *q++ = '0' + mod;
             *q++ = ctx.e.id;
-            *q++ = '\0';
-            setEncoding(ctx, extraKeyState | keyStateForMod(mod));
+            setEncoding(ctx, q, extraKeyState | keyStateForMod(mod));
         }
     }
     if (ctx.e.modifiers & kSemiMod) {
@@ -276,8 +273,7 @@ static inline void expandEncodingAfterAltPrefix(
                 *q++ = ';';
                 *q++ = '0' + mod;
                 *q++ = ctx.e.id;
-                *q++ = '\0';
-                setEncoding(ctx, extraKeyState | keyStateForMod(mod));
+                setEncoding(ctx, q, extraKeyState | keyStateForMod(mod));
             }
         }
     }

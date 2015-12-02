@@ -148,12 +148,11 @@ InputMap::~InputMap() {
     delete [] m_children;
 }
 
-void InputMap::set(const char *encoding, const Key &key) {
-    unsigned char ch = encoding[0];
-    if (ch == '\0') {
+void InputMap::set(const char *encoding, int encodingLen, const Key &key) {
+    if (encodingLen == 0) {
         setKey(key);
     } else {
-        getOrCreateChild(ch)->set(encoding + 1, key);
+        getOrCreateChild(encoding[0])->set(encoding + 1, encodingLen - 1, key);
     }
 }
 
