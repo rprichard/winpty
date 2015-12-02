@@ -23,6 +23,8 @@
 
 #include <stdlib.h>
 
+#include <string>
+
 #include "../shared/WinptyAssert.h"
 
 class InputMap {
@@ -31,6 +33,8 @@ public:
         int virtualKey;
         int unicodeChar;
         int keyState;
+
+        std::string toString();
     };
 
     InputMap();
