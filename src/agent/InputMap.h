@@ -34,7 +34,7 @@ public:
         int unicodeChar;
         int keyState;
 
-        std::string toString();
+        std::string toString() const;
     };
 
     InputMap();
@@ -52,5 +52,7 @@ private:
     const Key *m_key;
     InputMap *(*m_children)[256];
 };
+
+void dumpInputMap(InputMap &inputMap);
 
 #endif // INPUT_MAP_H

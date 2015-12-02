@@ -24,6 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../shared/DebugClient.h"
+#include "../shared/UnixCtrlChars.h"
+
 namespace {
 
 static const char *getVirtualKeyString(int virtualKey)
@@ -102,9 +105,37 @@ static const char *getVirtualKeyString(int virtualKey)
     }
 }
 
+static void dumpInputMapHelper(InputMap &inputMap, std::string &encoding) {
+    if (inputMap.getKey() != NULL) {
+        trace("%s -> %s",
+            encoding.c_str(),
+            inputMap.getKey()->toString().c_str());
+    }
+    for (int i = 0; i < 256; ++i) {
+        InputMap *child = inputMap.getChild(i);
+        if (child != NULL) {
+            size_t oldSize = encoding.size();
+            if (!encoding.empty()) {
+                encoding.push_back(' ');
+            }
+            char ctrlChar = decodeUnixCtrlChar(i);
+            if (ctrlChar != '\0') {
+                encoding.push_back('^');
+                encoding.push_back(static_cast<char>(ctrlChar));
+            } else if (i == ' ') {
+                encoding.append("' '");
+            } else {
+                encoding.push_back(static_cast<char>(i));
+            }
+            dumpInputMapHelper(*child, encoding);
+            encoding.resize(oldSize);
+        }
+    }
+}
+
 } // anonymous namespace
 
-std::string InputMap::Key::toString() {
+std::string InputMap::Key::toString() const {
     std::string ret;
     if (keyState & SHIFT_PRESSED) {
         ret += "Shift-";
@@ -170,4 +201,9 @@ InputMap *InputMap::getOrCreateChild(unsigned char ch) {
         (*m_children)[ch] = new InputMap;
     }
     return (*m_children)[ch];
+}
+
+void dumpInputMap(InputMap &inputMap) {
+    std::string encoding;
+    dumpInputMapHelper(inputMap, encoding);
 }

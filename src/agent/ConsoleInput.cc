@@ -44,6 +44,9 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
     lastWriteTick(0)
 {
     addDefaultEntriesToInputMap(m_inputMap);
+    if (hasDebugFlag("dump_input_map")) {
+        dumpInputMap(m_inputMap);
+    }
 }
 
 ConsoleInput::~ConsoleInput()
