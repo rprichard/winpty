@@ -165,15 +165,21 @@ static void addSimpleEntries(InputMap &inputMap) {
     static const SimpleEncoding simpleEncodings[] = {
         // Ctrl-<letter/digit> seems to be handled OK by the default code path.
 
-        {   "\x7F",     { VK_BACK,      '\x08', 0,                                  } },
-        {   ESC"\x7F",  { VK_BACK,      '\x08', LEFT_ALT_PRESSED,                   } },
+        {   "\x7F",       { VK_BACK,    '\x08', 0,                                  } },
+        {   ESC"\x7F",    { VK_BACK,    '\x08', LEFT_ALT_PRESSED,                   } },
 
         // Handle special F1-F5 for TERM=linux and TERM=cygwin.
-        {   ESC"[[A",   { VK_F1,        '\0',   0                                   } },
-        {   ESC"[[B",   { VK_F2,        '\0',   0                                   } },
-        {   ESC"[[C",   { VK_F3,        '\0',   0                                   } },
-        {   ESC"[[D",   { VK_F4,        '\0',   0                                   } },
-        {   ESC"[[E",   { VK_F5,        '\0',   0                                   } },
+        {   ESC"[[A",     { VK_F1,      '\0',   0                                   } },
+        {   ESC"[[B",     { VK_F2,      '\0',   0                                   } },
+        {   ESC"[[C",     { VK_F3,      '\0',   0                                   } },
+        {   ESC"[[D",     { VK_F4,      '\0',   0                                   } },
+        {   ESC"[[E",     { VK_F5,      '\0',   0                                   } },
+
+        {   ESC ESC"[[A", { VK_F1,      '\0',   LEFT_ALT_PRESSED                    } },
+        {   ESC ESC"[[B", { VK_F2,      '\0',   LEFT_ALT_PRESSED                    } },
+        {   ESC ESC"[[C", { VK_F3,      '\0',   LEFT_ALT_PRESSED                    } },
+        {   ESC ESC"[[D", { VK_F4,      '\0',   LEFT_ALT_PRESSED                    } },
+        {   ESC ESC"[[E", { VK_F5,      '\0',   LEFT_ALT_PRESSED                    } },
     };
 
     for (size_t i = 0; i < DIM(simpleEncodings); ++i) {
