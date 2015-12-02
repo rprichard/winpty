@@ -253,7 +253,7 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
     }
 
     // Attempt to match the Device Status Report (DSR) reply.
-    int dsrLen = matchDsr(input);
+    int dsrLen = matchDsr(input, inputSize);
     if (dsrLen > 0) {
         trace("Received a DSR reply");
         m_dsrSent = false;
@@ -266,11 +266,9 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
 
     // Recognize Alt-<character>.
     InputMap *const escapeSequences = m_inputMap.getChild('\x1B');
-    if (input[0] == '\x1B' &&
-            input[1] != '\0' &&
-            input[1] != '\x1B' &&
-            escapeSequences != NULL &&
-            escapeSequences->getChild(input[1]) == NULL) {
+    if (input[0] == '\x1B' && inputSize >= 2 && input[1] != '\x1B' &&
+            (escapeSequences == NULL ||
+                escapeSequences->getChild(input[1]) == NULL)) {
         int len = utf8CharLength(input[1]);
         if (1 + len > inputSize) {
             // Incomplete character.
@@ -284,7 +282,8 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
     // Recognize an ESC-encoded keypress.
     bool incomplete;
     int matchLen;
-    const InputMap::Key *match = lookupKey(input, isEof, incomplete, matchLen);
+    const InputMap::Key *match =
+        lookupKey(input, inputSize, isEof, incomplete, matchLen);
     if (incomplete) {
         // Incomplete match -- need more characters (or wait for a
         // timeout to signify flushed input).
@@ -534,13 +533,9 @@ int ConsoleInput::utf8CharLength(char firstByte)
 
 // Find the longest matching key and node.
 const InputMap::Key *
-ConsoleInput::lookupKey(const char *encoding, bool isEof, bool &incompleteOut,
-                        int &matchLenOut)
+ConsoleInput::lookupKey(const char *input, int inputSize, bool isEof,
+                        bool &incompleteOut, int &matchLenOut)
 {
-    //trace("lookupKey");
-    //for (int i = 0; encoding[i] != '\0'; ++i)
-    //   trace("%d", encoding[i]);
-
     incompleteOut = false;
     matchLenOut = 0;
 
@@ -548,8 +543,8 @@ ConsoleInput::lookupKey(const char *encoding, bool isEof, bool &incompleteOut,
     const InputMap::Key *longestMatch = NULL;
     int longestMatchLen = 0;
 
-    for (int i = 0; encoding[i] != '\0'; ++i) {
-        unsigned char ch = encoding[i];
+    for (int i = 0; i < inputSize; ++i) {
+        unsigned char ch = input[i];
         node = node->getChild(ch);
         //trace("ch: %d --> node:%p", ch, node);
         if (node == NULL) {
@@ -577,25 +572,37 @@ ConsoleInput::lookupKey(const char *encoding, bool isEof, bool &incompleteOut,
 // 0   no match
 // >0  match, returns length of match
 // -1  incomplete match
-int ConsoleInput::matchDsr(const char *encoding)
+int ConsoleInput::matchDsr(const char *input, int inputSize)
 {
-    const char *pch = encoding;
+    const char *pch = input;
+    const char *stop = input + inputSize;
+
+    if (pch == stop) { return -1; }
+
 #define CHECK(cond) \
         do { \
-            if (cond) { pch++; } \
-            else if (*pch == '\0') { return -1; } \
-            else { return 0; } \
+            if (!(cond)) { return 0; } \
         } while(0)
-    CHECK(*pch == '\x1B');
-    CHECK(*pch == '[');
-    CHECK(isdigit(*pch));
-    while (isdigit(*pch))
-        pch++;
-    CHECK(*pch == ';');
-    CHECK(isdigit(*pch));
-    while (isdigit(*pch))
-        pch++;
+
+#define ADVANCE() \
+        do { \
+            pch++; \
+            if (pch == stop) { return -1; } \
+        } while(0)
+
+    CHECK(*pch == '\x1B');  ADVANCE();
+    CHECK(*pch == '[');     ADVANCE();
+    CHECK(isdigit(*pch));   ADVANCE();
+    while (isdigit(*pch)) {
+        ADVANCE();
+    }
+    CHECK(*pch == ';');     ADVANCE();
+    CHECK(isdigit(*pch));   ADVANCE();
+    while (isdigit(*pch)) {
+        ADVANCE();
+    }
     CHECK(*pch == 'R');
-    return pch - encoding;
+    return pch - input + 1;
 #undef CHECK
+#undef ADVANCE
 }

@@ -58,9 +58,10 @@ private:
                            int unicodeChar,
                            int keyState);
     static int utf8CharLength(char firstByte);
-    const InputMap::Key *lookupKey(const char *encoding, bool isEof,
-                                   bool &incompleteOut, int &matchLenOut);
-    static int matchDsr(const char *encoding);
+    const InputMap::Key *lookupKey(const char *input, int inputSize,
+                                   bool isEof, bool &incompleteOut,
+                                   int &matchLenOut);
+    static int matchDsr(const char *input, int inputSize);
 
 private:
     Win32Console *m_console;
