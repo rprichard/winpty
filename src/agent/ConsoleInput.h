@@ -59,8 +59,7 @@ private:
                            int keyState);
     static int utf8CharLength(char firstByte);
     const InputMap::Key *lookupKey(const char *input, int inputSize,
-                                   bool isEof, bool &incompleteOut,
-                                   int &matchLenOut);
+                                   bool &incompleteOut, int &matchLenOut);
     static int matchDsr(const char *input, int inputSize);
 
 private:

@@ -162,17 +162,8 @@ static void addSimpleEntries(InputMap &inputMap) {
         InputMap::Key key;
     };
 
-    const int vkLB = VkKeyScan('[') & 0xFF;
-
     static const SimpleEncoding simpleEncodings[] = {
         // Ctrl-<letter/digit> seems to be handled OK by the default code path.
-        // TODO: Alt-ESC is encoded as ESC ESC.  Can it be handled?
-
-        {   ESC,        { VK_ESCAPE,    '\x1B', 0,                                  } },
-
-        // Alt-<letter/digit>
-        {   ESC"O",     { 'O',          'O',    LEFT_ALT_PRESSED | SHIFT_PRESSED    } },
-        {   ESC"[",     { vkLB,         '[',    LEFT_ALT_PRESSED                    } },
 
         {   "\x7F",     { VK_BACK,      '\x08', 0,                                  } },
         {   ESC"\x7F",  { VK_BACK,      '\x08', LEFT_ALT_PRESSED,                   } },

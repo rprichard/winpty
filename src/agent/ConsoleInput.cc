@@ -147,30 +147,15 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
         return -1;
     }
 
-    // Recognize Alt-<character>.
-    InputMap *const escapeSequences = m_inputMap.getChild('\x1B');
-    if (input[0] == '\x1B' && inputSize >= 2 && input[1] != '\x1B' &&
-            (escapeSequences == NULL ||
-                escapeSequences->getChild(input[1]) == NULL)) {
-        int len = utf8CharLength(input[1]);
-        if (1 + len > inputSize) {
-            // Incomplete character.
-            trace("Incomplete Alt-char match");
-            return -1;
-        }
-        appendUtf8Char(records, &input[1], len, LEFT_ALT_PRESSED);
-        return 1 + len;
-    }
-
-    // Recognize an ESC-encoded keypress.
+    // Search the input map.
     bool incomplete;
     int matchLen;
     const InputMap::Key *match =
-        lookupKey(input, inputSize, isEof, incomplete, matchLen);
-    if (incomplete) {
+        lookupKey(input, inputSize, incomplete, matchLen);
+    if (!isEof && incomplete) {
         // Incomplete match -- need more characters (or wait for a
         // timeout to signify flushed input).
-        trace("Incomplete ESC-keypress match");
+        trace("Incomplete escape sequence");
         return -1;
     } else if (match != NULL) {
         appendKeyPress(records,
@@ -178,6 +163,24 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
                        match->unicodeChar,
                        match->keyState);
         return matchLen;
+    }
+
+    // Recognize Alt-<character>.
+    //
+    // This code doesn't match Alt-ESC, which is encoded as `ESC ESC`, but
+    // maybe it should.  I was concerned that pressing ESC rapidly enough could
+    // accidentally trigger Alt-ESC.  (e.g. The user would have to be faster
+    // than the DSR flushing mechanism or use a decrepit terminal.  The user
+    // might be on a slow network connection.)
+    if (input[0] == '\x1B' && inputSize >= 2 && input[1] != '\x1B') {
+        int len = utf8CharLength(input[1]);
+        if (1 + len > inputSize) {
+            // Incomplete character.
+            trace("Incomplete UTF-8 character in Alt-<Char>");
+            return -1;
+        }
+        appendUtf8Char(records, &input[1], len, LEFT_ALT_PRESSED);
+        return 1 + len;
     }
 
     // A UTF-8 character.
@@ -416,7 +419,7 @@ int ConsoleInput::utf8CharLength(char firstByte)
 
 // Find the longest matching key and node.
 const InputMap::Key *
-ConsoleInput::lookupKey(const char *input, int inputSize, bool isEof,
+ConsoleInput::lookupKey(const char *input, int inputSize,
                         bool &incompleteOut, int &matchLenOut)
 {
     incompleteOut = false;
@@ -438,16 +441,9 @@ ConsoleInput::lookupKey(const char *input, int inputSize, bool isEof,
             longestMatch = node->getKey();
         }
     }
-    if (isEof) {
-        matchLenOut = longestMatchLen;
-        return longestMatch;
-    } else if (node->hasChildren()) {
-        incompleteOut = true;
-        return NULL;
-    } else {
-        matchLenOut = longestMatchLen;
-        return longestMatch;
-    }
+    incompleteOut = node->hasChildren();
+    matchLenOut = longestMatchLen;
+    return longestMatch;
 }
 
 // Match the Device Status Report console input:  ESC [ nn ; mm R
