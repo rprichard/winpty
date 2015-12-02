@@ -25,8 +25,9 @@
 
 #include <string>
 
-#include "Win32Console.h"
+#include "DefaultInputMap.h"
 #include "DsrSender.h"
+#include "Win32Console.h"
 #include "../shared/DebugClient.h"
 #include "../shared/UnixCtrlChars.h"
 
@@ -36,131 +37,13 @@
 
 const int kIncompleteEscapeTimeoutMs = 1000;
 
-#define ESC "\x1B"
-#define CSI ESC"["
-#define DIM(x) (sizeof(x) / sizeof((x)[0]))
-
 ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
     m_console(new Win32Console),
     m_dsrSender(dsrSender),
     m_dsrSent(false),
     lastWriteTick(0)
 {
-    struct KeyDescriptor {
-        const char *encoding;
-        InputMap::Key key;
-    };
-    const int vkLB = VkKeyScan('[') & 0xFF;
-    static const KeyDescriptor keyDescriptorTable[] = {
-        // Ctrl-<letter/digit> seems to be handled OK by the default code path.
-        // TODO: Alt-ESC is encoded as ESC ESC.  Can it be handled?
-
-        {   ESC,        { VK_ESCAPE,    '\x1B', 0,                  } },
-
-        // Alt-<letter/digit>
-        {   ESC"O",     { 'O',          'O',    LEFT_ALT_PRESSED | SHIFT_PRESSED    } },
-        {   ESC"[",     { vkLB,         '[',    LEFT_ALT_PRESSED                    } },
-
-        // F1-F4 function keys.  F5-F12 seem to be handled more consistently among
-        // various TERM=xterm terminals (gnome-terminal, konsole, xterm, mintty),
-        // using a CSI-prefix with an optional extra modifier digit.  (putty is
-        // also TERM=xterm, though, and has completely different modified F5-F12
-        // encodings.)
-        {   ESC"OP",    { VK_F1,        '\0',   0,                  } }, // xt gt kon
-        {   ESC"OQ",    { VK_F2,        '\0',   0,                  } }, // xt gt kon
-        {   ESC"OR",    { VK_F3,        '\0',   0,                  } }, // xt gt kon
-        {   ESC"OS",    { VK_F4,        '\0',   0,                  } }, // xt gt kon
-
-        {   "\x7F",     { VK_BACK,      '\x08', 0,                  } },
-        {   ESC"\x7F",  { VK_BACK,      '\x08', LEFT_ALT_PRESSED,   } },
-        {   ESC"OH",    { VK_HOME,      '\0',   0,                  } }, // gt
-        {   ESC"OF",    { VK_END,       '\0',   0,                  } }, // gt
-        {   ESC"[Z",    { VK_TAB,       '\t',   SHIFT_PRESSED       } },
-    };
-
-    struct CsiEncoding {
-        int id;
-        char letter;
-        int virtualKey;
-    };
-    static const CsiEncoding csiEncodings[] = {
-        {   0,  'A',    VK_UP       },
-        {   0,  'B',    VK_DOWN     },
-        {   0,  'C',    VK_RIGHT    },
-        {   0,  'D',    VK_LEFT     },
-        {   0,  'E',    VK_NUMPAD5  },
-        {   0,  'F',    VK_END      },
-        {   0,  'H',    VK_HOME     },
-        {   0,  'P',    VK_F1       },  // mod+F1 for xterm and mintty
-        {   0,  'Q',    VK_F2       },  // mod+F2 for xterm and mintty
-        {   0,  'R',    VK_F3       },  // mod+F3 for xterm and mintty
-        {   0,  'S',    VK_F4       },  // mod+F4 for xterm and mintty
-        {   1,  '~',    VK_HOME     },
-        {   2,  '~',    VK_INSERT   },
-        {   3,  '~',    VK_DELETE   },
-        {   4,  '~',    VK_END      },  // gnome-terminal keypad home/end
-        {   5,  '~',    VK_PRIOR    },
-        {   6,  '~',    VK_NEXT     },
-        {   7,  '~',    VK_HOME     },
-        {   8,  '~',    VK_END      },
-        {   15, '~',    VK_F5       },
-        {   17, '~',    VK_F6       },
-        {   18, '~',    VK_F7       },
-        {   19, '~',    VK_F8       },
-        {   20, '~',    VK_F9       },
-        {   21, '~',    VK_F10      },
-        {   23, '~',    VK_F11      },
-        {   24, '~',    VK_F12      },
-    };
-
-    const int kCsiShiftModifier = 1;
-    const int kCsiAltModifier   = 2;
-    const int kCsiCtrlModifier  = 4;
-    char encoding[32];
-    for (size_t i = 0; i < DIM(csiEncodings); ++i) {
-        const CsiEncoding *e = &csiEncodings[i];
-        if (e->id == 0)
-            sprintf(encoding, CSI"%c", e->letter);
-        else
-            sprintf(encoding, CSI"%d%c", e->id, e->letter);
-        InputMap::Key k = { csiEncodings[i].virtualKey, 0, 0 };
-        m_inputMap.set(encoding, k);
-        int id = !e->id ? 1 : e->id;
-        for (int mod = 2; mod <= 8; ++mod) {
-            sprintf(encoding, CSI"%d;%d%c", id, mod, e->letter);
-            k.keyState = 0;
-            if ((mod - 1) & kCsiShiftModifier)  k.keyState |= SHIFT_PRESSED;
-            if ((mod - 1) & kCsiAltModifier)    k.keyState |= LEFT_ALT_PRESSED;
-            if ((mod - 1) & kCsiCtrlModifier)   k.keyState |= LEFT_CTRL_PRESSED;
-            m_inputMap.set(encoding, k);
-        }
-    }
-
-    // Modified F1-F4 on gnome-terminal and konsole.
-    for (int mod = 2; mod <= 8; ++mod) {
-        for (int fn = 0; fn < 4; ++fn) {
-            for (int fmt = 0; fmt < 1; ++fmt) {
-                if (fmt == 0) {
-                    // gnome-terminal
-                    sprintf(encoding, ESC"O1;%d%c", mod, 'P' + fn);
-                } else {
-                    // konsole
-                    sprintf(encoding, ESC"O%d%c", mod, 'P' + fn);
-                }
-                InputMap::Key k = { VK_F1 + fn, 0, 0 };
-                if ((mod - 1) & kCsiShiftModifier)  k.keyState |= SHIFT_PRESSED;
-                if ((mod - 1) & kCsiAltModifier)    k.keyState |= LEFT_ALT_PRESSED;
-                if ((mod - 1) & kCsiCtrlModifier)   k.keyState |= LEFT_CTRL_PRESSED;
-                m_inputMap.set(encoding, k);
-            }
-        }
-    }
-
-    // Static key encodings.
-    for (size_t i = 0; i < DIM(keyDescriptorTable); ++i) {
-        m_inputMap.set(keyDescriptorTable[i].encoding,
-                       keyDescriptorTable[i].key);
-    }
+    addDefaultEntriesToInputMap(m_inputMap);
 }
 
 ConsoleInput::~ConsoleInput()

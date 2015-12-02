@@ -26,6 +26,7 @@ AGENT_OBJECTS = \
 	build/mingw/agent/ConsoleInput.o \
 	build/mingw/agent/ConsoleLine.o \
 	build/mingw/agent/Coord.o \
+	build/mingw/agent/DefaultInputMap.o \
 	build/mingw/agent/EventLoop.o \
 	build/mingw/agent/InputMap.o \
 	build/mingw/agent/LargeConsoleRead.o \
