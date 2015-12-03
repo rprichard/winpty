@@ -111,15 +111,15 @@ static const char *getVirtualKeyString(int virtualKey)
 
 std::string InputMap::Key::toString() const {
     std::string ret;
-    if (keyState & SHIFT_PRESSED) {
-        ret += "Shift-";
-    }
-    if (keyState & LEFT_CTRL_PRESSED) {
-        ret += "Ctrl-";
-    }
-    if (keyState & LEFT_ALT_PRESSED) {
-        ret += "Alt-";
-    }
+    if (keyState & CAPSLOCK_ON)         { ret += "CapsLock-";   }
+    if (keyState & ENHANCED_KEY)        { ret += "Enhanced-";   }
+    if (keyState & LEFT_ALT_PRESSED)    { ret += "LAlt-";       }
+    if (keyState & LEFT_CTRL_PRESSED)   { ret += "LCtrl-";      }
+    if (keyState & NUMLOCK_ON)          { ret += "NumLock-";    }
+    if (keyState & RIGHT_ALT_PRESSED)   { ret += "RAlt-";       }
+    if (keyState & RIGHT_CTRL_PRESSED)  { ret += "RCtrl-";      }
+    if (keyState & SCROLLLOCK_ON)       { ret += "ScrollLock-"; }
+    if (keyState & SHIFT_PRESSED)       { ret += "Shift-";      }
     char buf[256];
     const char *vkString = getVirtualKeyString(virtualKey);
     if (vkString != NULL) {

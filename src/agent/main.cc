@@ -22,8 +22,22 @@
 #include <stdlib.h>
 
 #include "Agent.h"
+#include "InputMap.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/WinptyVersion.h"
+
+const char USAGE[] =
+"Usage: %s controlPipeName dataPipeName cols rows\n"
+"\n"
+"Ordinarily, this program is launched by winpty.dll and is not directly\n"
+"useful to winpty users.  However, it also has options intended for\n"
+"debugging winpty.\n"
+"\n"
+"Usage: %s [options]\n"
+"\n"
+"Options:\n"
+"  --showkey    Dump KEY_EVENT records read from the console input buffer\n"
+"  --version    Print the winpty version\n";
 
 static wchar_t *heapMbsToWcs(const char *text)
 {
@@ -35,6 +49,45 @@ static wchar_t *heapMbsToWcs(const char *text)
     return ret;
 }
 
+static void debugShowKey()
+{
+    HANDLE conin = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD consoleMode = 0;
+    if (!GetConsoleMode(conin, &consoleMode) ||
+            !SetConsoleMode(conin, consoleMode &
+                ~(ENABLE_PROCESSED_INPUT |
+                    ENABLE_LINE_INPUT |
+                    ENABLE_ECHO_INPUT))) {
+        printf("Error: could not set console mode -- "
+               "is STDIN a console handle?\n");
+        exit(1);
+    }
+    printf("\nPress any keys -- Ctrl-D exits\n\n");
+    INPUT_RECORD record;
+    DWORD actual = 0;
+    while (ReadConsoleInputW(conin, &record, 1, &actual) && actual == 1) {
+        if (record.EventType != KEY_EVENT) {
+            continue;
+        }
+        KEY_EVENT_RECORD &ker = record.Event.KeyEvent;
+        InputMap::Key key = {
+            ker.wVirtualKeyCode,
+            ker.uChar.UnicodeChar,
+            static_cast<uint16_t>(ker.dwControlKeyState),
+        };
+        printf("%s rpt=%d scn=%d %s\n",
+            ker.bKeyDown ? "dn" : "up",
+            ker.wRepeatCount,
+            ker.wVirtualScanCode,
+            key.toString().c_str());
+        if ((ker.dwControlKeyState & LEFT_CTRL_PRESSED) &&
+                ker.wVirtualKeyCode == 'D') {
+            break;
+        }
+    }
+    SetConsoleMode(conin, consoleMode);
+}
+
 int main(int argc, char *argv[])
 {
     if (argc == 2 && !strcmp(argv[1], "--version")) {
@@ -42,13 +95,13 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    if (argc == 2 && !strcmp(argv[1], "--showkey")) {
+        debugShowKey();
+        return 0;
+    }
+
     if (argc != 5) {
-        fprintf(stderr,
-            "Usage: %s controlPipeName dataPipeName cols rows\n"
-            "Usage: %s --version\n"
-            "\n"
-            "(Note: This program is intended to be run by libwinpty.dll.)\n",
-            argv[0], argv[0]);
+        fprintf(stderr, USAGE, argv[0], argv[0]);
         return 1;
     }
 
