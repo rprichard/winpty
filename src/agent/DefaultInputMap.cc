@@ -197,13 +197,13 @@ struct ExpandContext {
 };
 
 static inline void setEncoding(const ExpandContext &ctx, char *end,
-                               int extraKeyState) {
+                               uint16_t extraKeyState) {
     InputMap::Key k = ctx.e.key;
     k.keyState |= extraKeyState;
     ctx.inputMap.set(ctx.buffer, end - ctx.buffer, k);
 }
 
-static inline int keyStateForMod(int mod) {
+static inline uint16_t keyStateForMod(int mod) {
     int ret = 0;
     if ((mod - 1) & kCsiShiftModifier)  ret |= SHIFT_PRESSED;
     if ((mod - 1) & kCsiAltModifier)    ret |= LEFT_ALT_PRESSED;
@@ -212,7 +212,7 @@ static inline int keyStateForMod(int mod) {
 }
 
 static void expandNumericEncodingSuffix(const ExpandContext &ctx, char *p,
-        int extraKeyState) {
+        uint16_t extraKeyState) {
     {
         char *q = p;
         *q++ = '~';
@@ -237,7 +237,7 @@ static void expandNumericEncodingSuffix(const ExpandContext &ctx, char *p,
 
 template <bool is_numeric>
 static inline void expandEncodingAfterAltPrefix(
-        const ExpandContext &ctx, char *p, int extraKeyState) {
+        const ExpandContext &ctx, char *p, uint16_t extraKeyState) {
     *p++ = '\x1b';
     *p++ = ctx.e.prefix;
     if (ctx.e.modifiers & kBare) {

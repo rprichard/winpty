@@ -21,9 +21,11 @@
 #ifndef CONSOLEINPUT_H
 #define CONSOLEINPUT_H
 
+#include <windows.h>
+#include <stdint.h>
+
 #include <string>
 #include <vector>
-#include <windows.h>
 
 #include "InputMap.h"
 
@@ -47,19 +49,17 @@ private:
     void appendUtf8Char(std::vector<INPUT_RECORD> &records,
                         const char *charBuffer,
                         int charLen,
-                        int keyState);
+                        uint16_t keyState);
     void appendKeyPress(std::vector<INPUT_RECORD> &records,
-                        int virtualKey,
-                        int unicodeChar,
-                        int keyState);
+                        uint16_t virtualKey,
+                        uint16_t unicodeChar,
+                        uint16_t keyState);
     void appendInputRecord(std::vector<INPUT_RECORD> &records,
                            BOOL keyDown,
-                           int virtualKey,
-                           int unicodeChar,
-                           int keyState);
+                           uint16_t virtualKey,
+                           uint16_t unicodeChar,
+                           uint16_t keyState);
     static int utf8CharLength(char firstByte);
-    const InputMap::Key *lookupKey(const char *input, int inputSize,
-                                   bool &incompleteOut, int &matchLenOut);
     static int matchDsr(const char *input, int inputSize);
 
 private:

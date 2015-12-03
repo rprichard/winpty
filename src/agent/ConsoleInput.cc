@@ -45,7 +45,7 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
 {
     addDefaultEntriesToInputMap(m_inputMap);
     if (hasDebugFlag("dump_input_map")) {
-        dumpInputMap(m_inputMap);
+        m_inputMap.dumpInputMap();
     }
 }
 
@@ -151,20 +151,19 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
     }
 
     // Search the input map.
+    InputMap::Key match;
     bool incomplete;
-    int matchLen;
-    const InputMap::Key *match =
-        lookupKey(input, inputSize, incomplete, matchLen);
+    int matchLen = m_inputMap.lookupKey(input, inputSize, match, incomplete);
     if (!isEof && incomplete) {
         // Incomplete match -- need more characters (or wait for a
         // timeout to signify flushed input).
         trace("Incomplete escape sequence");
         return -1;
-    } else if (match != NULL) {
+    } else if (matchLen > 0) {
         appendKeyPress(records,
-                       match->virtualKey,
-                       match->unicodeChar,
-                       match->keyState);
+                       match.virtualKey,
+                       match.unicodeChar,
+                       match.keyState);
         return matchLen;
     }
 
@@ -200,7 +199,7 @@ int ConsoleInput::scanKeyPress(std::vector<INPUT_RECORD> &records,
 void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
                                   const char *charBuffer,
                                   const int charLen,
-                                  const int keyState)
+                                  const uint16_t keyState)
 {
     WCHAR wideInput[2];
     int wideLen = MultiByteToWideChar(CP_UTF8,
@@ -211,8 +210,8 @@ void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
                                       sizeof(wideInput) / sizeof(wideInput[0]));
     for (int i = 0; i < wideLen; ++i) {
         short charScan = VkKeyScan(wideInput[i]);
-        int virtualKey = 0;
-        int charKeyState = keyState;
+        uint16_t virtualKey = 0;
+        uint16_t charKeyState = keyState;
         if (charScan != -1) {
             virtualKey = charScan & 0xFF;
             if (charScan & 0x100)
@@ -227,9 +226,9 @@ void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
 }
 
 void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
-                                  int virtualKey,
-                                  int unicodeChar,
-                                  int keyState)
+                                  uint16_t virtualKey,
+                                  uint16_t unicodeChar,
+                                  uint16_t keyState)
 {
     const bool ctrl = keyState & LEFT_CTRL_PRESSED;
     const bool alt = keyState & LEFT_ALT_PRESSED;
@@ -243,7 +242,7 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
         }
     }
 
-    int stepKeyState = 0;
+    uint16_t stepKeyState = 0;
     if (ctrl) {
         stepKeyState |= LEFT_CTRL_PRESSED;
         appendInputRecord(records, TRUE, VK_CONTROL, 0, stepKeyState);
@@ -284,9 +283,9 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
 
 void ConsoleInput::appendInputRecord(std::vector<INPUT_RECORD> &records,
                                      BOOL keyDown,
-                                     int virtualKey,
-                                     int unicodeChar,
-                                     int keyState)
+                                     uint16_t virtualKey,
+                                     uint16_t unicodeChar,
+                                     uint16_t keyState)
 {
     INPUT_RECORD ir;
     memset(&ir, 0, sizeof(ir));
@@ -322,35 +321,6 @@ int ConsoleInput::utf8CharLength(char firstByte)
         // Malformed UTF-8.
         return 1;
     }
-}
-
-// Find the longest matching key and node.
-const InputMap::Key *
-ConsoleInput::lookupKey(const char *input, int inputSize,
-                        bool &incompleteOut, int &matchLenOut)
-{
-    incompleteOut = false;
-    matchLenOut = 0;
-
-    InputMap *node = &m_inputMap;
-    const InputMap::Key *longestMatch = NULL;
-    int longestMatchLen = 0;
-
-    for (int i = 0; i < inputSize; ++i) {
-        unsigned char ch = input[i];
-        node = node->getChild(ch);
-        //trace("ch: %d --> node:%p", ch, node);
-        if (node == NULL) {
-            matchLenOut = longestMatchLen;
-            return longestMatch;
-        } else if (node->getKey() != NULL) {
-            longestMatchLen = i + 1;
-            longestMatch = node->getKey();
-        }
-    }
-    incompleteOut = node->hasChildren();
-    matchLenOut = longestMatchLen;
-    return longestMatch;
 }
 
 // Match the Device Status Report console input:  ESC [ nn ; mm R

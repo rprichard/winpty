@@ -49,6 +49,7 @@
                 'agent/LargeConsoleRead.cc',
                 'agent/NamedPipe.h',
                 'agent/NamedPipe.cc',
+                'agent/SimplePool.h',
                 'agent/SmallRect.h',
                 'agent/SmallRect.cc',
                 'agent/Terminal.h',

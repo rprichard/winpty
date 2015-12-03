@@ -24,8 +24,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "SimplePool.h"
 #include "../shared/DebugClient.h"
 #include "../shared/UnixCtrlChars.h"
+#include "../shared/WinptyAssert.h"
 
 namespace {
 
@@ -105,34 +107,6 @@ static const char *getVirtualKeyString(int virtualKey)
     }
 }
 
-static void dumpInputMapHelper(InputMap &inputMap, std::string &encoding) {
-    if (inputMap.getKey() != NULL) {
-        trace("%s -> %s",
-            encoding.c_str(),
-            inputMap.getKey()->toString().c_str());
-    }
-    for (int i = 0; i < 256; ++i) {
-        InputMap *child = inputMap.getChild(i);
-        if (child != NULL) {
-            size_t oldSize = encoding.size();
-            if (!encoding.empty()) {
-                encoding.push_back(' ');
-            }
-            char ctrlChar = decodeUnixCtrlChar(i);
-            if (ctrlChar != '\0') {
-                encoding.push_back('^');
-                encoding.push_back(static_cast<char>(ctrlChar));
-            } else if (i == ' ') {
-                encoding.append("' '");
-            } else {
-                encoding.push_back(static_cast<char>(i));
-            }
-            dumpInputMapHelper(*child, encoding);
-            encoding.resize(oldSize);
-        }
-    }
-}
-
 } // anonymous namespace
 
 std::string InputMap::Key::toString() const {
@@ -166,44 +140,110 @@ std::string InputMap::Key::toString() const {
     return ret;
 }
 
-InputMap::InputMap() : m_key(NULL), m_children(NULL) {
+void InputMap::set(const char *encoding, int encodingLen, const Key &key) {
+    ASSERT(encodingLen > 0);
+    setHelper(m_root, encoding, encodingLen, key);
 }
 
-InputMap::~InputMap() {
-    delete m_key;
-    if (m_children != NULL) {
-        for (int i = 0; i < 256; ++i) {
-            delete (*m_children)[i];
+void InputMap::setHelper(Node &node, const char *encoding, int encodingLen, const Key &key) {
+    if (encodingLen == 0) {
+        node.key = key;
+    } else {
+        setHelper(getOrCreateChild(node, encoding[0]), encoding + 1, encodingLen - 1, key);
+    }
+}
+
+InputMap::Node &InputMap::getOrCreateChild(Node &node, unsigned char ch) {
+    Node *ret = getChild(node, ch);
+    if (ret != NULL) {
+        return *ret;
+    }
+    if (node.childCount < Node::kTinyCount) {
+        // Maintain sorted order for the sake of the InputMap dumping.
+        int insertIndex = node.childCount;
+        for (int i = 0; i < node.childCount; ++i) {
+            if (ch < node.u.tiny.values[i]) {
+                insertIndex = i;
+                break;
+            }
+        }
+        for (int j = node.childCount; j > insertIndex; --j) {
+            node.u.tiny.values[j] = node.u.tiny.values[j - 1];
+            node.u.tiny.children[j] = node.u.tiny.children[j - 1];
+        }
+        node.u.tiny.values[insertIndex] = ch;
+        node.u.tiny.children[insertIndex] = ret = m_nodePool.alloc();
+        ++node.childCount;
+        return *ret;
+    }
+    if (node.childCount == Node::kTinyCount) {
+        Branch *branch = m_branchPool.alloc();
+        for (int i = 0; i < node.childCount; ++i) {
+            branch->children[node.u.tiny.values[i]] = node.u.tiny.children[i];
+        }
+        node.u.branch = branch;
+    }
+    node.u.branch->children[ch] = ret = m_nodePool.alloc();
+    ++node.childCount;
+    return *ret;
+}
+
+// Find the longest matching key and node.
+int InputMap::lookupKey(const char *input, int inputSize,
+                        Key &keyOut, bool &incompleteOut) const {
+    keyOut = kKeyZero;
+    incompleteOut = false;
+
+    const Node *node = &m_root;
+    InputMap::Key longestMatch = kKeyZero;
+    int longestMatchLen = 0;
+
+    for (int i = 0; i < inputSize; ++i) {
+        unsigned char ch = input[i];
+        node = getChild(*node, ch);
+        if (node == NULL) {
+            keyOut = longestMatch;
+            return longestMatchLen;
+        } else if (node->hasKey()) {
+            longestMatchLen = i + 1;
+            longestMatch = node->key;
         }
     }
-    delete [] m_children;
+    keyOut = longestMatch;
+    incompleteOut = node->childCount > 0;
+    return longestMatchLen;
 }
 
-void InputMap::set(const char *encoding, int encodingLen, const Key &key) {
-    if (encodingLen == 0) {
-        setKey(key);
-    } else {
-        getOrCreateChild(encoding[0])->set(encoding + 1, encodingLen - 1, key);
-    }
-}
-
-void InputMap::setKey(const Key &key) {
-    delete m_key;
-    m_key = new Key(key);
-}
-
-InputMap *InputMap::getOrCreateChild(unsigned char ch) {
-    if (m_children == NULL) {
-        m_children = reinterpret_cast<InputMap*(*)[256]>(new InputMap*[256]);
-        memset(m_children, 0, sizeof(InputMap*) * 256);
-    }
-    if ((*m_children)[ch] == NULL) {
-        (*m_children)[ch] = new InputMap;
-    }
-    return (*m_children)[ch];
-}
-
-void dumpInputMap(InputMap &inputMap) {
+void InputMap::dumpInputMap() const {
     std::string encoding;
-    dumpInputMapHelper(inputMap, encoding);
+    dumpInputMapHelper(m_root, encoding);
+}
+
+void InputMap::dumpInputMapHelper(
+        const Node &node, std::string &encoding) const {
+    if (node.hasKey()) {
+        trace("%s -> %s",
+            encoding.c_str(),
+            node.key.toString().c_str());
+    }
+    for (int i = 0; i < 256; ++i) {
+        const Node *child = getChild(node, i);
+        if (child != NULL) {
+            size_t oldSize = encoding.size();
+            if (!encoding.empty()) {
+                encoding.push_back(' ');
+            }
+            char ctrlChar = decodeUnixCtrlChar(i);
+            if (ctrlChar != '\0') {
+                encoding.push_back('^');
+                encoding.push_back(static_cast<char>(ctrlChar));
+            } else if (i == ' ') {
+                encoding.append("' '");
+            } else {
+                encoding.push_back(static_cast<char>(i));
+            }
+            dumpInputMapHelper(*child, encoding);
+            encoding.resize(oldSize);
+        }
+    }
 }

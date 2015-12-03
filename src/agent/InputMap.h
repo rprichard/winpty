@@ -21,37 +21,93 @@
 #ifndef INPUT_MAP_H
 #define INPUT_MAP_H
 
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <string>
 
+#include "SimplePool.h"
 #include "../shared/WinptyAssert.h"
 
 class InputMap {
 public:
     struct Key {
-        int virtualKey;
-        int unicodeChar;
-        int keyState;
+        uint16_t virtualKey;
+        uint16_t unicodeChar;
+        uint16_t keyState;
 
         std::string toString() const;
     };
 
-    InputMap();
-    ~InputMap();
-    void set(const char *encoding, int encodingLen, const Key &key);
-    void setKey(const Key &key);
-    const Key *getKey() const { return m_key; }
-    bool hasChildren() const { return m_children != NULL; }
-    InputMap *getChild(unsigned char ch) {
-        return m_children != NULL ? (*m_children)[ch] : NULL;
-    }
-    InputMap *getOrCreateChild(unsigned char ch);
+private:
+    struct Node;
+
+    struct Branch {
+        Branch() {
+            memset(&children, 0, sizeof(children));
+        }
+
+        Node *children[256];
+    };
+
+    struct Node {
+        Node() : childCount(0) {
+            Key zeroKey = { 0, 0, 0 };
+            key = zeroKey;
+        }
+
+        Key key;
+        int childCount;
+        enum { kTinyCount = 8 };
+        union {
+            Branch *branch;
+            struct {
+                unsigned char values[kTinyCount];
+                Node *children[kTinyCount];
+            } tiny;
+        } u;
+
+        bool hasKey() const {
+            return key.virtualKey != 0 || key.unicodeChar != 0;
+        }
+    };
 
 private:
-    const Key *m_key;
-    InputMap *(*m_children)[256];
+    SimplePool<Node, 256> m_nodePool;
+    SimplePool<Branch, 8> m_branchPool;
+    Node m_root;
+
+public:
+    void set(const char *encoding, int encodingLen, const Key &key);
+    int lookupKey(const char *input, int inputSize,
+                  Key &keyOut, bool &incompleteOut) const;
+    void dumpInputMap() const;
+
+private:
+    Node *getChild(Node &node, unsigned char ch) {
+        return const_cast<Node*>(getChild(static_cast<const Node&>(node), ch));
+    }
+
+    const Node *getChild(const Node &node, unsigned char ch) const {
+        if (node.childCount <= Node::kTinyCount) {
+            for (int i = 0; i < node.childCount; ++i) {
+                if (node.u.tiny.values[i] == ch) {
+                    return node.u.tiny.children[i];
+                }
+            }
+            return NULL;
+        } else {
+            return node.u.branch->children[ch];
+        }
+    }
+
+    void setHelper(Node &node, const char *encoding, int encodingLen, const Key &key);
+    Node &getOrCreateChild(Node &node, unsigned char ch);
+    void dumpInputMapHelper(const Node &node, std::string &encoding) const;
 };
+
+const InputMap::Key kKeyZero = { 0, 0, 0 };
 
 void dumpInputMap(InputMap &inputMap);
 
