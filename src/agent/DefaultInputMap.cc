@@ -93,9 +93,9 @@ static const EscapeEncoding escapeLetterEncodings[] = {
     //    as with putty's arrow keys.
     //  * I never saw modifiers inserted into these escapes, but I think
     //    it should be completely OK with the CSI escapes.
-    { true,  '[', 'E', kBare | kSemiMod,            { VK_NUMPAD5, '\0', 0             } },
-    { true,  '[', 'G', kBare | kSemiMod,            { VK_NUMPAD5, '\0', 0             } },
-    { true,  'O', 'G', kBare,                       { VK_NUMPAD5, '\0', 0             } },
+    { true,  '[', 'E', kBare | kSemiMod,            { VK_CLEAR,   '\0', 0             } },
+    { true,  '[', 'G', kBare | kSemiMod,            { VK_CLEAR,   '\0', 0             } },
+    { true,  'O', 'G', kBare,                       { VK_CLEAR,   '\0', 0             } },
 
     // Home/End, letter version
     //  * gnome-terminal uses `ESC O [HF]`.  I never saw it modified.
