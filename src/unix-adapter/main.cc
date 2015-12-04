@@ -109,7 +109,8 @@ static void debugShowKey()
             }
         }
         for (int i = 0; i < len; ++i) {
-            printf("\t%3d %04o 0x%02x\r\n", buf[i], buf[i], buf[i]);
+            unsigned char uch = buf[i];
+            printf("\t%3d %04o 0x%02x\r\n", uch, uch, uch);
         }
         if (buf[0] == 4) {
             // Ctrl-D
