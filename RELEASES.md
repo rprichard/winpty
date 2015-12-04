@@ -3,10 +3,23 @@
  * The main project source was moved into a `src` directory for better code
    organization and to fix
    [#51](https://github.com/rprichard/winpty/issues/51).
- * For debugging, added a --showkey option to the unix adapter and a
-   WINPTY_DEBUG=input option for logging both input bytes and synthesized
-   console keyboard events.
+ * winpty recognizes many more escape sequences, including:
+    * putty/rxvt's F1-F4 keys
+      [#40](https://github.com/rprichard/winpty/issues/40)
+    * the Linux virtual console's F1-F5 keys
+    * the "application numpad" keys (e.g. enabled with DECPAM)
  * Fixed handling of Shift-Alt-O and Alt-[.
+
+Changes to debugging interfaces:
+
+ * The `WINPTY_DEBUG` variable is now a comma-separated list.  The old
+   behavior (i.e. tracing) is enabled with `WINPTY_DEBUG=trace`.
+ * The unix adapter and `winpty-agent.exe` programs now have a `--showkey`
+   argument that dumps input bytes and `KEY_EVENT` records, respectively.  The
+   agent now responds to `WINPTY_DEBUG=input`, which logs input bytes and
+   synthesized console keyboard events, and it responds to
+   `WINPTY_DEBUG=dump_input_map`, which dumps the internal table of escape
+   sequences.
 
 # Version 0.2.0 (2015-11-13)
 
