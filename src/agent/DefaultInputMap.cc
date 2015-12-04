@@ -47,7 +47,6 @@ struct EscapeEncoding {
 //  - kBare:    expands to: ESC <prefix> <suffix>
 //  - kSemiMod: expands to: ESC <prefix> <numid> ; <mod> <suffix>
 //  - kBareMod: expands to: ESC <prefix> <mod> <suffix>
-//          (kBareMod is used only for Konsole's modified F1-F4)
 const int kBare        = 0x01;
 const int kSemiMod     = 0x02;
 const int kBareMod     = 0x04;
@@ -118,6 +117,53 @@ static const EscapeEncoding escapeLetterEncodings[] = {
     { false, 'O', 'Q', kBare | kBareMod | kSemiMod, { VK_F2,      '\0', 0             } },
     { false, 'O', 'R', kBare | kBareMod | kSemiMod, { VK_F3,      '\0', 0             } },
     { false, 'O', 'S', kBare | kBareMod | kSemiMod, { VK_F4,      '\0', 0             } },
+
+    // Handle the "application numpad" escape sequences.
+    //
+    // Terminals output these codes under various circumstances:
+    //  * rxvt-unicode: numpad, hold down SHIFT
+    //  * rxvt: numpad, by default
+    //  * xterm: numpad, after enabling app-mode using DECPAM (`ESC =`).  xterm
+    //    generates `ESC O <mod> <letter>` for modified numpad presses,
+    //    necessitating kBareMod.
+    //  * mintty: by combining Ctrl with various keys such as '1' or ','.
+    //    Handling those keys is difficult, because mintty is generating the
+    //    same sequence for Ctrl-1 and Ctrl-NumPadEnd -- should the virtualKey
+    //    be '1' or VK_HOME?
+
+    { true,  'O', 'M', kBare | kBareMod,            { VK_RETURN,   '\r',   0 } },
+    { true,  'O', 'j', kBare | kBareMod,            { VK_MULTIPLY, '*',    0 } },
+    { true,  'O', 'k', kBare | kBareMod,            { VK_ADD,      '+',    0 } },
+    { true,  'O', 'm', kBare | kBareMod,            { VK_SUBTRACT, '-',    0 } },
+    { true,  'O', 'n', kBare | kBareMod,            { VK_DELETE,   '\0',   0 } },
+    { true,  'O', 'o', kBare | kBareMod,            { VK_DIVIDE,   '/',    0 } },
+    { true,  'O', 'p', kBare | kBareMod,            { VK_INSERT,   '\0',   0 } },
+    { true,  'O', 'q', kBare | kBareMod,            { VK_END,      '\0',   0 } },
+    { true,  'O', 'r', kBare | kBareMod,            { VK_DOWN,     '\0',   0 } },
+    { true,  'O', 's', kBare | kBareMod,            { VK_NEXT,     '\0',   0 } },
+    { true,  'O', 't', kBare | kBareMod,            { VK_LEFT,     '\0',   0 } },
+    { true,  'O', 'u', kBare | kBareMod,            { VK_CLEAR,    '\0',   0 } },
+    { true,  'O', 'v', kBare | kBareMod,            { VK_RIGHT,    '\0',   0 } },
+    { true,  'O', 'w', kBare | kBareMod,            { VK_HOME,     '\0',   0 } },
+    { true,  'O', 'x', kBare | kBareMod,            { VK_UP,       '\0',   0 } },
+    { true,  'O', 'y', kBare | kBareMod,            { VK_PRIOR,    '\0',   0 } },
+
+    { true,  '[', 'M', kBare | kSemiMod,            { VK_RETURN,   '\r',   0 } },
+    { true,  '[', 'j', kBare | kSemiMod,            { VK_MULTIPLY, '*',    0 } },
+    { true,  '[', 'k', kBare | kSemiMod,            { VK_ADD,      '+',    0 } },
+    { true,  '[', 'm', kBare | kSemiMod,            { VK_SUBTRACT, '-',    0 } },
+    { true,  '[', 'n', kBare | kSemiMod,            { VK_DELETE,   '\0',   0 } },
+    { true,  '[', 'o', kBare | kSemiMod,            { VK_DIVIDE,   '/',    0 } },
+    { true,  '[', 'p', kBare | kSemiMod,            { VK_INSERT,   '\0',   0 } },
+    { true,  '[', 'q', kBare | kSemiMod,            { VK_END,      '\0',   0 } },
+    { true,  '[', 'r', kBare | kSemiMod,            { VK_DOWN,     '\0',   0 } },
+    { true,  '[', 's', kBare | kSemiMod,            { VK_NEXT,     '\0',   0 } },
+    { true,  '[', 't', kBare | kSemiMod,            { VK_LEFT,     '\0',   0 } },
+    { true,  '[', 'u', kBare | kSemiMod,            { VK_CLEAR,    '\0',   0 } },
+    { true,  '[', 'v', kBare | kSemiMod,            { VK_RIGHT,    '\0',   0 } },
+    { true,  '[', 'w', kBare | kSemiMod,            { VK_HOME,     '\0',   0 } },
+    { true,  '[', 'x', kBare | kSemiMod,            { VK_UP,       '\0',   0 } },
+    { true,  '[', 'y', kBare | kSemiMod,            { VK_PRIOR,    '\0',   0 } },
 
     { false, '[', 'Z', kBare,                       { VK_TAB,     '\t', SHIFT_PRESSED } },
 };
@@ -200,6 +246,19 @@ static inline void setEncoding(const ExpandContext &ctx, char *end,
                                uint16_t extraKeyState) {
     InputMap::Key k = ctx.e.key;
     k.keyState |= extraKeyState;
+    if (k.keyState & LEFT_CTRL_PRESSED) {
+        switch (k.virtualKey) {
+            case VK_ADD:
+            case VK_DIVIDE:
+            case VK_MULTIPLY:
+            case VK_SUBTRACT:
+                k.unicodeChar = '\0';
+                break;
+            case VK_RETURN:
+                k.unicodeChar = '\n';
+                break;
+        }
+    }
     ctx.inputMap.set(ctx.buffer, end - ctx.buffer, k);
 }
 
