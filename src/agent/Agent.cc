@@ -160,6 +160,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     SetConsoleCtrlHandler(NULL, FALSE);
     SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
 
+    updateMouseInputFlag(true);
     setPollInterval(25);
 }
 
@@ -360,8 +361,23 @@ void Agent::pollDataSocket()
     }
 }
 
+void Agent::updateMouseInputFlag(bool forceTrace)
+{
+    DWORD mode = 0;
+    GetConsoleMode(m_console->conin(), &mode);
+    bool newFlag = mode & ENABLE_MOUSE_INPUT;
+    if (forceTrace || newFlag != m_consoleMouseInputFlag) {
+        trace("CONIN mode ENABLE_MOUSE_INPUT: %s",
+            newFlag ? "enabled" : "disabled");
+    }
+    m_consoleMouseInputFlag = newFlag;
+}
+
 void Agent::onPollTimeout()
 {
+    // Check the mouse input flag so we can output a trace message.
+    updateMouseInputFlag();
+
     // Give the ConsoleInput object a chance to flush input from an incomplete
     // escape sequence (e.g. pressing ESC).
     m_consoleInput->flushIncompleteEscapeCode();
