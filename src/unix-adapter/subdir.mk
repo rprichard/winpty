@@ -23,6 +23,7 @@ ALL_TARGETS += build/$(UNIX_ADAPTER_EXE)
 UNIX_ADAPTER_OBJECTS = \
 	build/unix/unix-adapter/InputHandler.o \
 	build/unix/unix-adapter/OutputHandler.o \
+	build/unix/unix-adapter/Util.o \
 	build/unix/unix-adapter/WakeupFd.o \
 	build/unix/unix-adapter/main.o \
 	build/unix/shared/DebugClient.o \

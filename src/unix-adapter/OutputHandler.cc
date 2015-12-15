@@ -30,6 +30,7 @@
 
 #include "../shared/DebugClient.h"
 #include "Event.h"
+#include "Util.h"
 #include "WakeupFd.h"
 
 OutputHandler::OutputHandler(HANDLE winpty, WakeupFd &completionWakeup) :
@@ -100,18 +101,7 @@ void OutputHandler::threadProc() {
             }
             break;
         }
-        // I don't know if this write can be interrupted or not, but handle it
-        // just in case.
-        int written;
-        do {
-            written = write(STDOUT_FILENO, &buffer[0], numRead);
-        } while (written == -1 && errno == EINTR);
-        if (numRead != static_cast<DWORD>(written)) {
-            trace("OutputHandler: write failed: "
-                "errno=%d numRead=%u written=%d",
-                errno,
-                static_cast<unsigned int>(numRead),
-                written);
+        if (!writeAll(STDOUT_FILENO, &buffer[0], numRead)) {
             break;
         }
     }
