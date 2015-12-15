@@ -41,7 +41,7 @@ ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
     m_console(new Win32Console),
     m_dsrSender(dsrSender),
     m_dsrSent(false),
-    lastWriteTick(0)
+    m_lastWriteTick(0)
 {
     addDefaultEntriesToInputMap(m_inputMap);
     if (hasDebugFlag("dump_input_map")) {
@@ -96,13 +96,13 @@ void ConsoleInput::writeInput(const std::string &input)
         m_dsrSender->sendDsr();
         m_dsrSent = true;
     }
-    lastWriteTick = GetTickCount();
+    m_lastWriteTick = GetTickCount();
 }
 
 void ConsoleInput::flushIncompleteEscapeCode()
 {
     if (!m_byteQueue.empty() &&
-            (int)(GetTickCount() - lastWriteTick) > kIncompleteEscapeTimeoutMs) {
+            (int)(GetTickCount() - m_lastWriteTick) > kIncompleteEscapeTimeoutMs) {
         doWrite(true);
         m_byteQueue.clear();
     }

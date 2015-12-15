@@ -68,7 +68,7 @@ private:
     bool m_dsrSent;
     std::string m_byteQueue;
     InputMap m_inputMap;
-    DWORD lastWriteTick;
+    DWORD m_lastWriteTick;
 };
 
 #endif // CONSOLEINPUT_H
