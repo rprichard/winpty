@@ -417,6 +417,10 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
                 exit(0);
             } else if (arg == "--") {
                 break;
+            } else {
+                fprintf(stderr, "Error: unrecognized option: '%s'\n",
+                    arg.c_str());
+                exit(1);
             }
         } else {
             out.childArgv.push_back(arg);
