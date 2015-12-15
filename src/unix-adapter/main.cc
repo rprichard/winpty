@@ -22,34 +22,44 @@
 // defined, which is defined in windows.h.  Therefore, include windows.h early.
 #include <windows.h>
 
+#include <assert.h>
+#include <cygwin/version.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
-#include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <sys/cygwin.h>
-#include <cygwin/version.h>
+#include <termios.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <errno.h>
-#include <pthread.h>
-#include <winpty.h>
-#include "../shared/DebugClient.h"
-#include "../shared/UnixCtrlChars.h"
-#include "../shared/WinptyVersion.h"
+
 #include <map>
 #include <string>
 #include <vector>
 
+#include <winpty.h>
+#include "../shared/DebugClient.h"
+#include "../shared/UnixCtrlChars.h"
+#include "../shared/WinptyVersion.h"
+#include "InputHandler.h"
+#include "OutputHandler.h"
+#include "WakeupFd.h"
 
-static int signalWriteFd;
-static volatile bool ioHandlerDied;
+static WakeupFd *g_mainWakeup = NULL;
 
+static WakeupFd &mainWakeup()
+{
+    if (g_mainWakeup == NULL) {
+        static const char msg[] = "Internal error: g_mainWakeup is NULL\r\n";
+        write(STDERR_FILENO, msg, sizeof(msg) - 1);
+        abort();
+    }
+    return *g_mainWakeup;
+}
 
-// Put the input terminal into non-blocking non-canonical mode.
+// Put the input terminal into non-canonical mode.
 static termios setRawTerminalMode()
 {
     if (!isatty(STDIN_FILENO)) {
@@ -120,135 +130,18 @@ static void debugShowKey()
     restoreTerminalMode(saved);
 }
 
-static void writeToSignalFd()
-{
-    char dummy = 0;
-    write(signalWriteFd, &dummy, 1);
-}
-
 static void terminalResized(int signo)
 {
-    writeToSignalFd();
+    mainWakeup().set();
 }
 
-// Create a manual reset, initially unset event.
-static HANDLE createEvent()
+static void registerResizeSignalHandler()
 {
-    return CreateEvent(NULL, TRUE, FALSE, NULL);
-}
-
-
-// Connect winpty overlapped I/O to Cygwin blocking STDOUT_FILENO.
-class OutputHandler {
-public:
-    OutputHandler(HANDLE winpty);
-    pthread_t getThread() { return thread; }
-private:
-    static void *threadProc(void *pvthis);
-    HANDLE winpty;
-    pthread_t thread;
-};
-
-OutputHandler::OutputHandler(HANDLE winpty) : winpty(winpty)
-{
-    pthread_create(&thread, NULL, OutputHandler::threadProc, this);
-}
-
-// TODO: See whether we can make the pipe non-overlapped if we still use
-// an OVERLAPPED structure in the ReadFile/WriteFile calls.
-void *OutputHandler::threadProc(void *pvthis)
-{
-    OutputHandler *pthis = (OutputHandler*)pvthis;
-    HANDLE event = createEvent();
-    OVERLAPPED over;
-    const int bufferSize = 4096;
-    char *buffer = new char[bufferSize];
-    while (true) {
-        DWORD amount;
-        memset(&over, 0, sizeof(over));
-        over.hEvent = event;
-        BOOL ret = ReadFile(pthis->winpty,
-                            buffer, bufferSize,
-                            &amount,
-                            &over);
-        if (!ret && GetLastError() == ERROR_IO_PENDING)
-            ret = GetOverlappedResult(pthis->winpty, &over, &amount, TRUE);
-        if (!ret || amount == 0)
-            break;
-        // TODO: partial writes?
-        // I don't know if this write can be interrupted or not, but handle it
-        // just in case.
-        int written;
-        do {
-            written = write(STDOUT_FILENO, buffer, amount);
-        } while (written == -1 && errno == EINTR);
-        if (written != (int)amount)
-            break;
-    }
-    delete [] buffer;
-    CloseHandle(event);
-    ioHandlerDied = true;
-    writeToSignalFd();
-    return NULL;
-}
-
-
-// Connect Cygwin non-blocking STDIN_FILENO to winpty overlapped I/O.
-class InputHandler {
-public:
-    InputHandler(HANDLE winpty);
-    pthread_t getThread() { return thread; }
-private:
-    static void *threadProc(void *pvthis);
-    HANDLE winpty;
-    pthread_t thread;
-};
-
-InputHandler::InputHandler(HANDLE winpty) : winpty(winpty)
-{
-    pthread_create(&thread, NULL, InputHandler::threadProc, this);
-}
-
-void *InputHandler::threadProc(void *pvthis)
-{
-    InputHandler *pthis = (InputHandler*)pvthis;
-    HANDLE event = createEvent();
-    const int bufferSize = 4096;
-    char *buffer = new char[bufferSize];
-    while (true) {
-        int amount = read(STDIN_FILENO, buffer, bufferSize);
-        if (amount == -1 && errno == EINTR) {
-            // Apparently, this read is interrupted on Cygwin 1.7 by a SIGWINCH
-            // signal even though I set the SA_RESTART flag on the handler.
-            continue;
-        }
-        if (amount <= 0)
-            break;
-        DWORD written;
-        OVERLAPPED over;
-        memset(&over, 0, sizeof(over));
-        over.hEvent = event;
-        BOOL ret = WriteFile(pthis->winpty,
-                             buffer, amount,
-                             &written,
-                             &over);
-        if (!ret && GetLastError() == ERROR_IO_PENDING)
-            ret = GetOverlappedResult(pthis->winpty, &over, &written, TRUE);
-        // TODO: partial writes?
-        if (!ret || (int)written != amount)
-            break;
-    }
-    delete [] buffer;
-    CloseHandle(event);
-    ioHandlerDied = true;
-    writeToSignalFd();
-    return NULL;
-}
-
-static void setFdNonBlock(int fd)
-{
-    int status = fcntl(fd, F_GETFL);
-    fcntl(fd, F_SETFL, status | O_NONBLOCK);
+    struct sigaction resizeSigAct;
+    memset(&resizeSigAct, 0, sizeof(resizeSigAct));
+    resizeSigAct.sa_handler = terminalResized;
+    resizeSigAct.sa_flags = SA_RESTART;
+    sigaction(SIGWINCH, &resizeSigAct, NULL);
 }
 
 // Convert the path to a Win32 path if it is a POSIX path, and convert slashes
@@ -437,6 +330,8 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
 
 int main(int argc, char *argv[])
 {
+    g_mainWakeup = new WakeupFd();
+
     Arguments args;
     parseArguments(argc, argv, args);
 
@@ -457,11 +352,11 @@ int main(int argc, char *argv[])
         args.childArgv[0] = convertPosixPathToWin(args.childArgv[0]);
         std::string cmdLine = argvToCommandLine(args.childArgv);
         wchar_t *cmdLineW = heapMbsToWcs(cmdLine.c_str());
-        int ret = winpty_start_process(winpty,
-                                         NULL,
-                                         cmdLineW,
-                                         NULL,
-                                         NULL);
+        const int ret = winpty_start_process(winpty,
+                                             NULL,
+                                             cmdLineW,
+                                             NULL,
+                                             NULL);
         if (ret != 0) {
             fprintf(stderr,
                     "Error %#x starting %s\n",
@@ -472,51 +367,22 @@ int main(int argc, char *argv[])
         delete [] cmdLineW;
     }
 
-    {
-        struct sigaction resizeSigAct;
-        memset(&resizeSigAct, 0, sizeof(resizeSigAct));
-        resizeSigAct.sa_handler = terminalResized;
-        resizeSigAct.sa_flags = SA_RESTART;
-        sigaction(SIGWINCH, &resizeSigAct, NULL);
-    }
-
+    registerResizeSignalHandler();
     termios mode = setRawTerminalMode();
-    int signalReadFd;
 
-    {
-        int pipeFd[2];
-        if (pipe(pipeFd) != 0) {
-            perror("Could not create pipe");
-            exit(1);
-        }
-        setFdNonBlock(pipeFd[0]);
-        setFdNonBlock(pipeFd[1]);
-        signalReadFd = pipeFd[0];
-        signalWriteFd = pipeFd[1];
-    }
-
-    OutputHandler outputHandler(winpty_get_data_pipe(winpty));
-    InputHandler inputHandler(winpty_get_data_pipe(winpty));
+    OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
+    InputHandler inputHandler(winpty_get_data_pipe(winpty), mainWakeup());
 
     while (true) {
         fd_set readfds;
         FD_ZERO(&readfds);
-        FD_SET(signalReadFd, &readfds);
-        if (select(signalReadFd + 1, &readfds, NULL, NULL, NULL) < 0 &&
+        FD_SET(mainWakeup().fd(), &readfds);
+        if (select(mainWakeup().fd() + 1, &readfds, NULL, NULL, NULL) < 0 &&
                 errno != EINTR) {
             perror("select failed");
-            exit(1);
+            abort();
         }
-
-        // Discard any data in the signal pipe.
-        {
-            char tmpBuf[256];
-            int amount = read(signalReadFd, tmpBuf, sizeof(tmpBuf));
-            if (amount == 0 || (amount < 0 && errno != EAGAIN)) {
-                perror("error reading internal signal fd");
-                exit(1);
-            }
-        }
+        mainWakeup().reset();
 
         // Check for terminal resize.
         {
@@ -530,13 +396,17 @@ int main(int argc, char *argv[])
 
         // Check for an I/O handler shutting down (possibly indicating that the
         // child process has exited).
-        if (ioHandlerDied)
+        if (outputHandler.isComplete() || inputHandler.isComplete()) {
             break;
+        }
     }
 
-    int exitCode = winpty_get_exit_code(winpty);
+    outputHandler.shutdown();
+    inputHandler.shutdown();
 
+    const int exitCode = winpty_get_exit_code(winpty);
     restoreTerminalMode(mode);
-    // TODO: Call winpty_close?  Shut down one or both I/O threads?
+    winpty_close(winpty);
+
     return exitCode;
 }
