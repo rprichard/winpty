@@ -9,6 +9,10 @@
     * the Linux virtual console's F1-F5 keys
     * the "application numpad" keys (e.g. enabled with DECPAM)
  * Fixed handling of Shift-Alt-O and Alt-[.
+ * Added support for mouse input.  The unix-adapter has a `--mouse` option
+   that puts the terminal into mouse mode, but the agent recognizes mouse
+   input even without the option.
+   [#57](https://github.com/rprichard/winpty/issues/57)
 
 Changes to debugging interfaces:
 
