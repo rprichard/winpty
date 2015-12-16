@@ -432,11 +432,11 @@ On some older operating systems, the WOW64 mode also translates
 
 ### <a name="wow64dup">CreateProcess duplication broken w/WOW64 [wow64dup]</a>
 
-On some versions of Windows, when a 32-bit program invokes another 32-bit
-program, `CreateProcess`'s handle duplication does not occur.  Traditional
-console handles are passed through, but other handles are converted to `NULL`.
-The problem does not occur when 64-bit programs invoke 64-bit programs.  (I
-have not tested 32-bit to 64-bit or vice versa.)
+On some versions of 64-bit Windows, when a 32-bit program invokes another
+32-bit program, `CreateProcess`'s handle duplication does not occur.
+Traditional console handles are passed through, but other handles are converted
+to `NULL`.  The problem does not occur when 64-bit programs invoke 64-bit
+programs.  (I have not tested 32-bit to 64-bit or vice versa.)
 
 The problem affects at least:
 
