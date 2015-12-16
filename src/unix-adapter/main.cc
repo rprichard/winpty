@@ -45,7 +45,10 @@
 #include "../shared/WinptyVersion.h"
 #include "InputHandler.h"
 #include "OutputHandler.h"
+#include "Util.h"
 #include "WakeupFd.h"
+
+#define CSI "\x1b["
 
 static WakeupFd *g_mainWakeup = NULL;
 
@@ -284,6 +287,7 @@ static void usage(const char *program, int exitCode)
     printf("\n");
     printf("Options:\n");
     printf("  -h, --help  Show this help message\n");
+    printf("  --mouse     Enable terminal mouse input\n");
     printf("  --showkey   Dump STDIN escape sequences\n");
     printf("  --version   Show the winpty version number\n");
     exit(exitCode);
@@ -291,10 +295,12 @@ static void usage(const char *program, int exitCode)
 
 struct Arguments {
     std::vector<std::string> childArgv;
+    bool mouseInput;
 };
 
 static void parseArguments(int argc, char *argv[], Arguments &out)
 {
+    out.mouseInput = false;
     const char *const program = argc >= 1 ? argv[0] : "<program>";
     int argi = 1;
     while (argi < argc) {
@@ -302,11 +308,13 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
         if (arg.size() >= 1 && arg[0] == '-') {
             if (arg == "-h" || arg == "--help") {
                 usage(program, 0);
-            } else if (arg == "--version") {
-                dumpVersionToStdout();
-                exit(0);
+            } else if (arg == "--mouse") {
+                out.mouseInput = true;
             } else if (arg == "--showkey") {
                 debugShowKey();
+                exit(0);
+            } else if (arg == "--version") {
+                dumpVersionToStdout();
                 exit(0);
             } else if (arg == "--") {
                 break;
@@ -370,6 +378,21 @@ int main(int argc, char *argv[])
     registerResizeSignalHandler();
     termios mode = setRawTerminalMode();
 
+    if (args.mouseInput) {
+        // Enable basic mouse support first (1000), then try to switch to
+        // button-move mode (1002), then try full mouse-move mode (1003).
+        // Terminals that don't support a mode will be stuck at the highest
+        // mode they do support.
+        //
+        // Enable encoding mode 1015 first, then try to switch to 1006.  On
+        // some terminals, both modes will be enabled, but 1006 will have
+        // priority.  On other terminals, 1006 wins because it's listed last.
+        //
+        // See misc/MouseInputNotes.txt for details.
+        writeStr(STDOUT_FILENO,
+            CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
+    }
+
     OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
     InputHandler inputHandler(winpty_get_data_pipe(winpty), mainWakeup());
 
@@ -401,6 +424,15 @@ int main(int argc, char *argv[])
     inputHandler.shutdown();
 
     const int exitCode = winpty_get_exit_code(winpty);
+
+    if (args.mouseInput) {
+        // Reseting both encoding modes (1006 and 1015) is necessary, but
+        // apparently we only need to use reset on one of the 100[023] modes.
+        // Doing both doesn't hurt.
+        writeStr(STDOUT_FILENO,
+            CSI"?1006l" CSI"?1015l" CSI"?1003l" CSI"?1002l" CSI"?1000l");
+    }
+
     restoreTerminalMode(mode);
     winpty_close(winpty);
 
