@@ -19,6 +19,39 @@ designed to expect bugs on the appropriate Windows releases.
 
 
 
+Table of Contents
+-----------------
+
+ * [Common semantics](#common-semantics)
+ * [Traditional semantics](#traditional-semantics)
+   * [Console handles and handle sets (traditional)](#console-handles-and-handle-sets-traditional)
+   * [CreateProcess (traditional)](#createprocess-traditional)
+   * [AllocConsole, AttachConsole (traditional)](#allocconsole-attachconsole-traditional)
+   * [FreeConsole (traditional)](#freeconsole-traditional)
+ * [Modern semantics](#modern-semantics)
+   * [Console handles (modern)](#console-handles-modern)
+   * [CreateProcess (modern)](#createprocess-modern)
+   * [AllocConsole, AttachConsole (modern)](#allocconsole-attachconsole-modern)
+   * [Implicit screen buffer refcount](#implicit-screen-buffer-refcount)
+   * [FreeConsole (modern)](#freeconsole-modern)
+   * [Interesting properties](#interesting-properties)
+ * [Other notes](#other-notes)
+   * [SetActiveConsoleScreenBuffer](#setactiveconsolescreenbuffer)
+   * [CREATE_NO_WINDOW process creation flag](#create_no_window-process-creation-flag)
+   * [PROC_THREAD_ATTRIBUTE_HANDLE_LIST](#proc_thread_attribute_handle_list)
+   * [Windows XP does not duplicate a pipe's read handle [xppipe]](#windows-xp-does-not-duplicate-a-pipes-read-handle-xppipe)
+   * [Windows XP duplication inheritability [xpinh]](#windows-xp-duplication-inheritability-xpinh)
+   * [CreateProcess duplicates `INVALID_HANDLE_VALUE` until Windows 8.1 [dupproc]](#createprocess-duplicates-invalid_handle_value-until-windows-81-dupproc)
+   * [CreateProcess duplication broken w/WOW64 [wow64dup]](#createprocess-duplication-broken-wwow64-wow64dup)
+   * [Windows Vista BSOD](#windows-vista-bsod)
+   * [Windows 7 inheritability [win7inh]](#windows-7-inheritability-win7inh)
+   * [Windows 7 conhost.exe crash with `CONOUT$` [win7_conout_crash]](#windows-7-conhostexe-crash-with-conout-win7_conout_crash)
+   * [Test suite](#test-suite)
+ * [Footnotes](#footnotes)
+
+
+
+
 Common semantics
 ----------------
 
