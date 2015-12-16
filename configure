@@ -93,7 +93,6 @@ case $(uname -s) in
             i686)
                 echo 'uname -m identifies an i686 environment.'
                 UNIX_CXX=i686-pc-msys-g++
-                MINGW_CXX='i686-w64-mingw32-g++.exe mingw32-g++'
                 if echo "$(uname -r)" | grep '^1[.]' > /dev/null; then
                     # The MSYS-targeting compiler for the original 32-bit-only
                     # MSYS does not recognize the -static-libstdc++ flag, and
@@ -110,6 +109,9 @@ case $(uname -s) in
                     # second version of MSYS--it's a brand-new fork of Cygwin.
                     #
                     UNIX_LDFLAGS_STATIC=
+                    MINGW_CXX=mingw32-g++
+                else
+                    MINGW_CXX=i686-w64-mingw32-g++.exe
                 fi
                 ;;
             x86_64)
