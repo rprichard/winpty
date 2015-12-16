@@ -27,7 +27,9 @@
 #include <string>
 #include <vector>
 
+#include "Coord.h"
 #include "InputMap.h"
+#include "SmallRect.h"
 
 class Win32Console;
 class DsrSender;
@@ -39,13 +41,18 @@ public:
     ~ConsoleInput();
     void writeInput(const std::string &input);
     void flushIncompleteEscapeCode();
+    void setMouseInputEnabled(bool val) { m_mouseInputEnabled = val; }
+    void setMouseWindowRect(SmallRect val) { m_mouseWindowRect = val; }
 
 private:
     void doWrite(bool isEof);
-    int scanKeyPress(std::vector<INPUT_RECORD> &records,
-                     const char *input,
-                     int inputSize,
-                     bool isEof);
+    int scanInput(std::vector<INPUT_RECORD> &records,
+                  const char *input,
+                  int inputSize,
+                  bool isEof);
+    int scanMouseInput(std::vector<INPUT_RECORD> &records,
+                       const char *input,
+                       int inputSize);
     void appendUtf8Char(std::vector<INPUT_RECORD> &records,
                         const char *charBuffer,
                         int charLen,
@@ -59,8 +66,6 @@ private:
                            uint16_t virtualKey,
                            uint16_t unicodeChar,
                            uint16_t keyState);
-    static int utf8CharLength(char firstByte);
-    static int matchDsr(const char *input, int inputSize);
 
 private:
     Win32Console *m_console;
@@ -69,6 +74,16 @@ private:
     std::string m_byteQueue;
     InputMap m_inputMap;
     DWORD m_lastWriteTick;
+    DWORD m_mouseButtonState;
+    struct DoubleClickDetection {
+        DoubleClickDetection() : button(0), tick(0), released(0) {}
+        DWORD button;
+        Coord pos;
+        DWORD tick;
+        bool released;
+    } m_doubleClick;
+    bool m_mouseInputEnabled;
+    SmallRect m_mouseWindowRect;
 };
 
 #endif // CONSOLEINPUT_H

@@ -371,6 +371,7 @@ void Agent::updateMouseInputFlag(bool forceTrace)
             newFlag ? "enabled" : "disabled");
     }
     m_consoleMouseInputFlag = newFlag;
+    m_consoleInput->setMouseInputEnabled(newFlag);
 }
 
 void Agent::onPollTimeout()
@@ -584,6 +585,7 @@ void Agent::syncConsoleContentAndSize(bool forceResize)
     syncConsoleTitle();
 
     const ConsoleScreenBufferInfo info = m_console->bufferInfo();
+    m_consoleInput->setMouseWindowRect(info.windowRect());
 
     // If an app resizes the buffer height, then we enter "direct mode", where
     // we stop trying to track incremental console changes.
