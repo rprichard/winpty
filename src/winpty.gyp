@@ -38,6 +38,8 @@
                 'agent/ConsoleLine.h',
                 'agent/Coord.h',
                 'agent/Coord.cc',
+                'agent/DebugShowInput.h',
+                'agent/DebugShowInput.cc',
                 'agent/DefaultInputMap.h',
                 'agent/DefaultInputMap.cc',
                 'agent/DsrSender.h',
