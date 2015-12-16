@@ -377,11 +377,7 @@ int main(int argc, char *argv[])
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(mainWakeup().fd(), &readfds);
-        if (select(mainWakeup().fd() + 1, &readfds, NULL, NULL, NULL) < 0 &&
-                errno != EINTR) {
-            perror("select failed");
-            abort();
-        }
+        selectWrapper("main thread", mainWakeup().fd() + 1, &readfds);
         mainWakeup().reset();
 
         // Check for terminal resize.

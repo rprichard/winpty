@@ -22,6 +22,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdio.h>
 #include <sys/select.h>
 #include <unistd.h>
 
@@ -30,6 +31,7 @@
 
 #include "../shared/DebugClient.h"
 #include "Event.h"
+#include "Util.h"
 #include "WakeupFd.h"
 
 InputHandler::InputHandler(HANDLE winpty, WakeupFd &completionWakeup) :
@@ -70,8 +72,7 @@ void InputHandler::threadProc() {
             const int max_fd = std::max(STDIN_FILENO, m_wakeup.fd());
             FD_SET(STDIN_FILENO, &readfds);
             FD_SET(m_wakeup.fd(), &readfds);
-            int ret = select(max_fd + 1, &readfds, NULL, NULL, NULL);
-            assert(ret >= 0);
+            selectWrapper("InputHandler", max_fd + 1, &readfds);
             if (!FD_ISSET(STDIN_FILENO, &readfds)) {
                 continue;
             }

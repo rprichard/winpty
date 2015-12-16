@@ -22,6 +22,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -56,4 +57,34 @@ bool writeAll(int fd, const void *buffer, size_t size) {
 
 bool writeStr(int fd, const char *str) {
     return writeAll(fd, str, strlen(str));
+}
+
+void selectWrapper(const char *diagName, int nfds, fd_set *readfds) {
+    int ret = select(nfds, readfds, NULL, NULL, NULL);
+    if (ret < 0) {
+        if (errno == EINTR) {
+            FD_ZERO(readfds);
+            return;
+        }
+#ifdef WINPTY_TARGET_MSYS1
+        // The select system call sometimes fails with EAGAIN instead of EINTR.
+        // This apparantly only happens with the old Cygwin fork "MSYS" used in
+        // the mingw.org project.  select is not supposed to fail with EAGAIN,
+        // and EAGAIN does not make much sense as an error code.  (The whole
+        // point of select is to block.)
+        //
+        // Try to detect old MSYS by noticing that CYGWIN_VERSION_CYGWIN_CONV
+        // is undefined.  I'm making this code conditional so it's easier to
+        // remove someday.
+        if (errno == EAGAIN) {
+            trace("%s select returned EAGAIN: interpreting like EINTR",
+                diagName);
+            FD_ZERO(readfds);
+            return;
+        }
+#endif
+        fprintf(stderr, "Internal error: %s select failed: "
+            "error %d", diagName, errno);
+        abort();
+    }
 }

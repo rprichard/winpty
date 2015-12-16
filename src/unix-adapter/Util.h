@@ -22,8 +22,10 @@
 #define UNIX_ADAPTER_UTIL_H
 
 #include <stdlib.h>
+#include <sys/select.h>
 
 bool writeAll(int fd, const void *buffer, size_t size);
 bool writeStr(int fd, const char *str);
+void selectWrapper(const char *diagName, int nfds, fd_set *readfds);
 
 #endif // UNIX_ADAPTER_UTIL_H
