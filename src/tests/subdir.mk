@@ -18,7 +18,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-build/%.exe : tests/%.cc build/winpty.dll
+build/%.exe : src/tests/%.cc build/winpty.dll
 	@echo Building $@
 	@$(MINGW_CXX) $(MINGW_CXXFLAGS) $(MINGW_LDFLAGS) -std=c++11 -o $@ $^
 
