@@ -440,7 +440,7 @@ have not tested 32-bit to 64-bit or vice versa.)
 
 The problem affects at least:
 
- - Windows 7 SP2
+ - Windows 7 SP1
 
 ### Windows Vista BSOD
 
