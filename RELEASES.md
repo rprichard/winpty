@@ -9,21 +9,23 @@
     * the Linux virtual console's F1-F5 keys
     * the "application numpad" keys (e.g. enabled with DECPAM)
  * Fixed handling of Shift-Alt-O and Alt-[.
- * Added support for mouse input.  The unix-adapter has a `--mouse` option
+ * Added support for mouse input.  The UNIX adapter has a `--mouse` argument
    that puts the terminal into mouse mode, but the agent recognizes mouse
-   input even without the option.
+   input even without the argument.
    [#57](https://github.com/rprichard/winpty/issues/57)
 
 Changes to debugging interfaces:
 
  * The `WINPTY_DEBUG` variable is now a comma-separated list.  The old
    behavior (i.e. tracing) is enabled with `WINPTY_DEBUG=trace`.
- * The unix adapter and `winpty-agent.exe` programs now have a `--showkey`
-   argument that dumps input bytes and `KEY_EVENT` records, respectively.  The
-   agent now responds to `WINPTY_DEBUG=input`, which logs input bytes and
-   synthesized console keyboard events, and it responds to
-   `WINPTY_DEBUG=dump_input_map`, which dumps the internal table of escape
-   sequences.
+ * The UNIX adapter program now has a `--showkey` argument that dumps input
+   bytes.
+ * The `winpty-agent.exe` program has a `--show-input` argument that dumps
+   `INPUT_RECORD` records.  (It omits mouse events unless `--with-mouse` is
+   also specified.)  The agent also responds to `WINPTY_DEBUG=trace,input`,
+   which logs input bytes and synthesized console events, and it responds to
+   `WINPTY_DEBUG=trace,dump_input_map`, which dumps the internal table of
+   escape sequences.
 
 # Version 0.2.0 (2015-11-13)
 
