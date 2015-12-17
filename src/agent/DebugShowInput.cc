@@ -145,8 +145,10 @@ void debugShowInput(bool enableMouse) {
     newConsoleMode &= ~ENABLE_PROCESSED_INPUT;
     newConsoleMode &= ~ENABLE_LINE_INPUT;
     newConsoleMode &= ~ENABLE_ECHO_INPUT;
+    newConsoleMode |= ENABLE_WINDOW_INPUT;
     if (enableMouse) {
         newConsoleMode |= ENABLE_MOUSE_INPUT;
+        newConsoleMode &= ~ENABLE_QUICK_EDIT_MODE;
     } else {
         newConsoleMode &= ~ENABLE_MOUSE_INPUT;
     }
