@@ -136,7 +136,7 @@ static bool pathExists(const std::wstring &path)
 static std::wstring findAgentProgram()
 {
     std::wstring progDir = dirname(getModuleFileName(getCurrentModule()));
-    std::wstring ret = progDir + L"\\"AGENT_EXE;
+    std::wstring ret = progDir + (L"\\" AGENT_EXE);
     assert(pathExists(ret));
     return ret;
 }

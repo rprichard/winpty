@@ -57,7 +57,7 @@ Terminal::Terminal(NamedPipe *output) :
 void Terminal::reset(bool sendClearFirst, int newLine)
 {
     if (sendClearFirst)
-        m_output->write(CSI"1;1H"CSI"2J");
+        m_output->write(CSI"1;1H" CSI"2J");
     m_remoteLine = newLine;
     m_cursorHidden = false;
     m_cursorPos = std::pair<int, int>(0, newLine);
@@ -162,7 +162,7 @@ void Terminal::finishOutput(const std::pair<int, int> &newCursorPos)
     if (m_cursorHidden) {
         moveTerminalToLine(newCursorPos.second);
         char buffer[32];
-        sprintf(buffer, CSI"%dG"CSI"?25h", newCursorPos.first + 1);
+        sprintf(buffer, CSI"%dG" CSI"?25h", newCursorPos.first + 1);
         m_output->write(buffer);
         m_cursorHidden = false;
     }
@@ -187,7 +187,7 @@ void Terminal::moveTerminalToLine(int line)
     if (line < m_remoteLine) {
         // CUrsor Up (CUU)
         char buffer[32];
-        sprintf(buffer, "\r"CSI"%dA", m_remoteLine - line);
+        sprintf(buffer, "\r" CSI"%dA", m_remoteLine - line);
         m_output->write(buffer);
         m_remoteLine = line;
     } else if (line > m_remoteLine) {
