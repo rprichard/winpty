@@ -1,4 +1,4 @@
-# Next version
+# Version 0.2.1 (2015-12-19)
 
  * The main project source was moved into a `src` directory for better code
    organization and to fix
@@ -11,7 +11,8 @@
  * Fixed handling of Shift-Alt-O and Alt-[.
  * Added support for mouse input.  The UNIX adapter has a `--mouse` argument
    that puts the terminal into mouse mode, but the agent recognizes mouse
-   input even without the argument.
+   input even without the argument.  The agent recognizes double-clicks using
+   Windows' double-click interval setting (i.e. GetDoubleClickTime).
    [#57](https://github.com/rprichard/winpty/issues/57)
 
 Changes to debugging interfaces:
