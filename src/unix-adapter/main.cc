@@ -379,6 +379,11 @@ int main(int argc, char *argv[])
     termios mode = setRawTerminalMode();
 
     if (args.mouseInput) {
+        // Start by disabling UTF-8 coordinate mode (1005), just in case we
+        // have a terminal that does not support 1006/1015 modes, and 1005
+        // happens to be enabled.  The UTF-8 coordinates can't be unambiguously
+        // decoded.
+        //
         // Enable basic mouse support first (1000), then try to switch to
         // button-move mode (1002), then try full mouse-move mode (1003).
         // Terminals that don't support a mode will be stuck at the highest
@@ -390,6 +395,7 @@ int main(int argc, char *argv[])
         //
         // See misc/MouseInputNotes.txt for details.
         writeStr(STDOUT_FILENO,
+            CSI"?1005l"
             CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
     }
 
