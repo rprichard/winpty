@@ -63,7 +63,7 @@ NamedPipe::IoWorker::IoWorker(NamedPipe *namedPipe) :
     m_pending(false),
     m_currentIoSize(-1)
 {
-    m_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    m_event = CreateEventW(NULL, TRUE, FALSE, NULL);
     ASSERT(m_event != NULL);
 }
 
@@ -171,13 +171,13 @@ int NamedPipe::OutputWorker::getPendingIoSize()
 bool NamedPipe::connectToServer(LPCWSTR pipeName)
 {
     ASSERT(isClosed());
-    HANDLE handle = CreateFile(pipeName,
-                               GENERIC_READ | GENERIC_WRITE,
-                               0,
-                               NULL,
-                               OPEN_EXISTING,
-                               FILE_FLAG_OVERLAPPED,
-                               NULL);
+    HANDLE handle = CreateFileW(pipeName,
+                                GENERIC_READ | GENERIC_WRITE,
+                                0,
+                                NULL,
+                                OPEN_EXISTING,
+                                FILE_FLAG_OVERLAPPED,
+                                NULL);
     trace("connection to [%ls], handle == 0x%x", pipeName, handle);
     if (handle == INVALID_HANDLE_VALUE)
         return false;

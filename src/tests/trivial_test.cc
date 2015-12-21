@@ -32,7 +32,7 @@
 
 // Create a manual reset, initially unset event.
 static HANDLE createEvent() {
-    return CreateEvent(NULL, TRUE, FALSE, NULL);
+    return CreateEventW(NULL, TRUE, FALSE, NULL);
 }
 
 static std::vector<unsigned char> filterContent(

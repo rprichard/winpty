@@ -58,12 +58,12 @@ winpty_s::winpty_s() : controlPipe(NULL), dataPipe(NULL)
 static HMODULE getCurrentModule()
 {
     HMODULE module;
-    if (!GetModuleHandleEx(
+    if (!GetModuleHandleExW(
                 GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                 GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                (LPCTSTR)getCurrentModule,
+                reinterpret_cast<LPCWSTR>(getCurrentModule),
                 &module)) {
-        assert(false);
+        assert(false && "GetModuleHandleEx failed");
     }
     return module;
 }
@@ -72,7 +72,7 @@ static std::wstring getModuleFileName(HMODULE module)
 {
     const int bufsize = 4096;
     wchar_t path[bufsize];
-    int size = GetModuleFileName(module, path, bufsize);
+    int size = GetModuleFileNameW(module, path, bufsize);
     assert(size != 0 && size != bufsize);
     return std::wstring(path);
 }
@@ -107,7 +107,7 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
     if (overlapped) {
         pover = &over;
         memset(&over, 0, sizeof(over));
-        over.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+        over.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
         assert(over.hEvent != NULL);
     }
     bool success = ConnectNamedPipe(handle, pover);
@@ -144,17 +144,17 @@ static int32_t readInt32(winpty_t *pc)
 
 static HANDLE createNamedPipe(const std::wstring &name, bool overlapped)
 {
-    return CreateNamedPipe(name.c_str(),
-                           /*dwOpenMode=*/
-                           PIPE_ACCESS_DUPLEX |
-                           FILE_FLAG_FIRST_PIPE_INSTANCE |
-                           (overlapped ? FILE_FLAG_OVERLAPPED : 0),
-                           /*dwPipeMode=*/0,
-                           /*nMaxInstances=*/1,
-                           /*nOutBufferSize=*/0,
-                           /*nInBufferSize=*/0,
-                           /*nDefaultTimeOut=*/3000,
-                           NULL);
+    return CreateNamedPipeW(name.c_str(),
+                            /*dwOpenMode=*/
+                            PIPE_ACCESS_DUPLEX |
+                            FILE_FLAG_FIRST_PIPE_INSTANCE |
+                            (overlapped ? FILE_FLAG_OVERLAPPED : 0),
+                            /*dwPipeMode=*/0,
+                            /*nMaxInstances=*/1,
+                            /*nOutBufferSize=*/0,
+                            /*nInBufferSize=*/0,
+                            /*nDefaultTimeOut=*/3000,
+                            NULL);
 }
 
 struct BackgroundDesktop {
@@ -174,15 +174,15 @@ static std::wstring getObjectName(HANDLE object)
 {
     BOOL success;
     DWORD lengthNeeded = 0;
-    GetUserObjectInformation(object, UOI_NAME,
-                             NULL, 0,
-                             &lengthNeeded);
+    GetUserObjectInformationW(object, UOI_NAME,
+                              NULL, 0,
+                              &lengthNeeded);
     assert(lengthNeeded % sizeof(wchar_t) == 0);
     wchar_t *tmp = new wchar_t[lengthNeeded / 2];
-    success = GetUserObjectInformation(object, UOI_NAME,
-                                       tmp, lengthNeeded,
-                                       NULL);
-    assert(success);
+    success = GetUserObjectInformationW(object, UOI_NAME,
+                                        tmp, lengthNeeded,
+                                        NULL);
+    assert(success && "GetUserObjectInformationW failed");
     std::wstring ret = tmp;
     delete [] tmp;
     return ret;
@@ -201,21 +201,21 @@ static bool shouldShowConsoleWindow()
 static BackgroundDesktop setupBackgroundDesktop()
 {
     BackgroundDesktop ret;
-    ret.originalStation = GetProcessWindowStation();
-
     if (!shouldShowConsoleWindow()) {
-        ret.station = CreateWindowStation(NULL, 0, WINSTA_ALL_ACCESS, NULL);
+        const HWINSTA originalStation = GetProcessWindowStation();
+        ret.station = CreateWindowStationW(NULL, 0, WINSTA_ALL_ACCESS, NULL);
         if (ret.station != NULL) {
+            ret.originalStation = originalStation;
             bool success = SetProcessWindowStation(ret.station);
-            assert(success);
-            ret.desktop = CreateDesktop(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
+            assert(success && "SetProcessWindowStation failed");
+            ret.desktop = CreateDesktopW(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
             assert(ret.originalStation != NULL);
             assert(ret.station != NULL);
             assert(ret.desktop != NULL);
             ret.desktopName =
                 getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
         } else {
-            trace("CreateWindowStation failed");
+            trace("CreateWindowStationW failed");
         }
     }
     return ret;
@@ -236,8 +236,8 @@ static std::wstring getDesktopFullName()
     // to be passed to CloseDesktop.
     HWINSTA station = GetProcessWindowStation();
     HDESK desktop = GetThreadDesktop(GetCurrentThreadId());
-    assert(station != NULL);
-    assert(desktop != NULL);
+    assert(station != NULL && "GetProcessWindowStation returned NULL");
+    assert(desktop != NULL && "GetThreadDesktop returned NULL");
     return getObjectName(station) + L"\\" + getObjectName(desktop);
 }
 
@@ -256,7 +256,7 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     std::wstring agentCmdLine = agentCmdLineStream.str();
 
     // Start the agent.
-    STARTUPINFO sui;
+    STARTUPINFOW sui;
     memset(&sui, 0, sizeof(sui));
     sui.cb = sizeof(sui);
     if (desktop.station != NULL) {
@@ -267,13 +267,13 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     std::vector<wchar_t> cmdline(agentCmdLine.size() + 1);
     agentCmdLine.copy(&cmdline[0], agentCmdLine.size());
     cmdline[agentCmdLine.size()] = L'\0';
-    success = CreateProcess(agentProgram.c_str(),
-                            &cmdline[0],
-                            NULL, NULL,
-                            /*bInheritHandles=*/FALSE,
-                            /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
-                            NULL, NULL,
-                            &sui, &pi);
+    success = CreateProcessW(agentProgram.c_str(),
+                             &cmdline[0],
+                             NULL, NULL,
+                             /*bInheritHandles=*/FALSE,
+                             /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
+                             NULL, NULL,
+                             &sui, &pi);
     if (success) {
         trace("Created agent successfully, pid=%ld, cmdline=%ls",
               (long)pi.dwProcessId, agentCmdLine.c_str());

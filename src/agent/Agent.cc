@@ -325,18 +325,18 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
     LPCWSTR envArg = env.empty() ? NULL : env.data();
 
-    STARTUPINFO sui;
+    STARTUPINFOW sui;
     PROCESS_INFORMATION pi;
     memset(&sui, 0, sizeof(sui));
     memset(&pi, 0, sizeof(pi));
-    sui.cb = sizeof(STARTUPINFO);
+    sui.cb = sizeof(sui);
     sui.lpDesktop = desktop.empty() ? NULL : (LPWSTR)desktop.c_str();
 
-    success = CreateProcess(programArg, cmdlineArg, NULL, NULL,
-                            /*bInheritHandles=*/FALSE,
-                            /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
-                            /*CREATE_NEW_PROCESS_GROUP*/0,
-                            (LPVOID)envArg, cwdArg, &sui, &pi);
+    success = CreateProcessW(programArg, cmdlineArg, NULL, NULL,
+                             /*bInheritHandles=*/FALSE,
+                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
+                             /*CREATE_NEW_PROCESS_GROUP*/0,
+                             (LPVOID)envArg, cwdArg, &sui, &pi);
     int ret = success ? 0 : GetLastError();
 
     trace("CreateProcess: %s %d",
@@ -378,8 +378,8 @@ void Agent::updateMouseInputFlags(bool forceTrace)
 {
     DWORD mode = 0;
     GetConsoleMode(m_console->conin(), &mode);
-    bool newFlagMI = mode & ENABLE_MOUSE_INPUT;
-    bool newFlagQE = mode & ENABLE_QUICK_EDIT_MODE;
+    const bool newFlagMI = mode & ENABLE_MOUSE_INPUT;
+    const bool newFlagQE = mode & ENABLE_QUICK_EDIT_MODE;
     if (forceTrace ||
             newFlagMI != m_consoleMouseInputEnabled ||
             newFlagQE != m_consoleQuickEditEnabled) {
