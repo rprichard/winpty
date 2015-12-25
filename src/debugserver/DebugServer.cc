@@ -37,7 +37,7 @@ int main() {
         10 * 1000,
         NULL);
 
-    char msgBuffer[MSG_SIZE];
+    char msgBuffer[MSG_SIZE + 1];
 
     while (true) {
         if (!ConnectNamedPipe(serverPipe, NULL)) {
@@ -52,8 +52,8 @@ int main() {
             DisconnectNamedPipe(serverPipe);
             continue;
         }
-        msgBuffer[bytesRead] = '\0';
-        printf("%s\n", msgBuffer);
+        msgBuffer[bytesRead] = '\n';
+        fwrite(msgBuffer, 1, bytesRead + 1, stdout);
         fflush(stdout);
 
         DWORD bytesWritten = 0;
