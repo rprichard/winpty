@@ -43,6 +43,7 @@ private:
         IoWorker(NamedPipe *namedPipe);
         virtual ~IoWorker();
         int service();
+        void waitForCanceledIo();
         HANDLE getWaitEvent();
     protected:
         NamedPipe *m_namedPipe;

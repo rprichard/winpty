@@ -121,6 +121,18 @@ int NamedPipe::IoWorker::service()
     return progress;
 }
 
+// This function is called after CancelIo has returned.  We need to block until
+// the I/O operations have completed, which should happen very quickly.
+// https://blogs.msdn.microsoft.com/oldnewthing/20110202-00/?p=11613
+void NamedPipe::IoWorker::waitForCanceledIo()
+{
+    if (m_pending) {
+        DWORD actual = 0;
+        GetOverlappedResult(m_namedPipe->m_handle, &m_over, &actual, TRUE);
+        m_pending = false;
+    }
+}
+
 HANDLE NamedPipe::IoWorker::getWaitEvent()
 {
     return m_pending ? m_event : NULL;
@@ -247,6 +259,8 @@ void NamedPipe::closePipe()
     if (m_handle == NULL)
         return;
     CancelIo(m_handle);
+    m_inputWorker->waitForCanceledIo();
+    m_outputWorker->waitForCanceledIo();
     delete m_inputWorker;
     delete m_outputWorker;
     CloseHandle(m_handle);

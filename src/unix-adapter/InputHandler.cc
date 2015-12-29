@@ -109,6 +109,7 @@ void InputHandler::threadProc() {
                 trace("InputHandler: shutting down, canceling I/O");
                 assert(m_shouldShutdown);
                 CancelIo(m_winpty);
+                GetOverlappedResult(m_winpty, &over, &written, TRUE);
                 break;
             }
             assert(waitRet == WAIT_OBJECT_0);
