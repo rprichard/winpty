@@ -2,6 +2,7 @@
 *.c             text
 *.cc            text
 *.gyp           text
+*.gypi          text
 *.h             text
 *.rst           text
 *.sh            text
