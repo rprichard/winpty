@@ -12,9 +12,9 @@
             '_UNICODE',
             '_WIN32_WINNT=0x0501',
             'NOMINMAX',
-            'WINPTY_VERSION=<!(type ..\VERSION.txt)',
+            'WINPTY_VERSION=<!(cmd /c "cd .. && type VERSION.txt")',
             'WINPTY_VERSION_SUFFIX=<(VERSION_SUFFIX)',
-            'WINPTY_COMMIT_HASH=<!(shared\GetCommitHash.cmd)',
+            'WINPTY_COMMIT_HASH=<!(cmd /c "cd shared && GetCommitHash.cmd")',
         ],
     },
     'targets' : [
