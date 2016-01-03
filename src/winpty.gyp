@@ -2,6 +2,16 @@
     # Pass -D VERSION_SUFFIX=<something> to gyp to override the suffix.
     #
     # The winpty.gyp file ignores the BUILD_INFO.txt file, if it exists.
+    #
+    # The MSVC generator is the default.  Select the compiler version by
+    # passing -G msvs_version=<ver> to gyp.  <ver> is a string like 2013e.
+    # See gyp\pylib\gyp\MSVSVersion.py for sample version strings.  You
+    # can also pass configurations.gypi to gyp for 32-bit and 64-bit builds.
+    # See that file for details.
+    #
+    # Pass --format=make to gyp to generate a Makefile instead.  The Makefile
+    # can be configured by passing variables to make, e.g.:
+    #    make -j4 CXX=i686-w64-mingw32-g++ LDFLAGS="-static -static-libgcc -static-libstdc++"
 
     'variables' : {
         'VERSION_SUFFIX%' : '-dev',
@@ -25,7 +35,7 @@
                 'include',
             ],
             'libraries' : [
-                '-luser32.lib',
+                '-luser32',
             ],
             'sources' : [
                 'agent/Agent.h',
@@ -82,7 +92,7 @@
                 'include',
             ],
             'libraries' : [
-                '-luser32.lib',
+                '-luser32',
             ],
             'sources' : [
                 'include/winpty.h',
