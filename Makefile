@@ -29,6 +29,9 @@ UNIX_ADAPTER_EXE ?= console.exe
 ifeq "$(wildcard config.mk)" ""
     $(error config.mk does not exist.  Please run ./configure)
 endif
+
+MINGW_OPTIMIZATION_FLAGS ?= -O2
+
 include config.mk
 
 COMMON_CXXFLAGS += \
@@ -45,7 +48,7 @@ UNIX_CXXFLAGS += \
 
 MINGW_CXXFLAGS += \
 	$(COMMON_CXXFLAGS) \
-	-O2 \
+	$(MINGW_OPTIMIZATION_FLAGS) \
 	-std=c++11
 
 MINGW_LDFLAGS += -static -static-libgcc -static-libstdc++
