@@ -25,9 +25,8 @@
 #define TIME_MEASUREMENT_H
 
 #include <windows.h>
+#include <assert.h>
 #include <stdint.h>
-
-#include "WinptyAssert.h"
 
 class TimeMeasurement {
 public:
@@ -46,14 +45,14 @@ private:
     uint64_t getFrequency() {
         LARGE_INTEGER freq;
         BOOL success = QueryPerformanceFrequency(&freq);
-        ASSERT(success && "QueryPerformanceFrequency failed");
+        assert(success && "QueryPerformanceFrequency failed");
         return freq.QuadPart;
     }
 
     uint64_t value() {
         LARGE_INTEGER ret;
         BOOL success = QueryPerformanceCounter(&ret);
-        ASSERT(success && "QueryPerformanceCounter failed");
+        assert(success && "QueryPerformanceCounter failed");
         return ret.QuadPart;
     }
 
