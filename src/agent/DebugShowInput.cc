@@ -200,6 +200,7 @@ void debugShowInput(bool enableMouse) {
             }
         }
         std::cout << ss.str();
+        std::cout.flush();
     }
     SetConsoleMode(conin, origConsoleMode);
 }
