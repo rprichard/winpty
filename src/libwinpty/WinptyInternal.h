@@ -18,32 +18,49 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef UNIX_ADAPTER_DUAL_WAKEUP_H
-#define UNIX_ADAPTER_DUAL_WAKEUP_H
+#ifndef LIBWINPTY_WINPTY_INTERNAL_H
+#define LIBWINPTY_WINPTY_INTERNAL_H
 
-#include "Event.h"
-#include "WakeupFd.h"
+#include <windows.h>
 
-class DualWakeup {
-public:
-    void set() {
-        m_event.set();
-        m_wakeupfd.set();
-    }
-    void reset() {
-        m_event.reset();
-        m_wakeupfd.reset();
-    }
-    HANDLE handle() {
-        return m_event.handle();
-    }
-    int fd() {
-        return m_wakeupfd.fd();
-    }
+#include <string>
 
-private:
-    Event m_event;
-    WakeupFd m_wakeupfd;
+#include "../include/winpty.h"
+#include "../shared/cxx11_mutex.h"
+#include "Util.h"
+
+// The structures in this header are not intended to be accessed directly by
+// client programs.
+
+struct winpty_error_s {
+    bool errorIsStatic;
+    winpty_result_t code;
+    LPCWSTR msg;
 };
 
-#endif // UNIX_ADAPTER_DUAL_WAKEUP_H
+struct winpty_config_s {
+    DWORD flags = 0;
+    int cols = 80;
+    int rows = 25;
+    DWORD timeoutMs = 30000;
+};
+
+struct winpty_s {
+    winpty_cxx11::mutex mutex;
+    libwinpty::OwnedHandle agentProcess;
+    libwinpty::OwnedHandle controlPipe;
+    DWORD agentTimeoutMs = 0;
+    libwinpty::OwnedHandle ioEvent;
+    std::wstring coninPipeName;
+    std::wstring conoutPipeName;
+};
+
+struct winpty_spawn_config_s {
+    DWORD winptyFlags = 0;
+    std::wstring appname;
+    std::wstring cmdline;
+    std::wstring cwd;
+    std::wstring env;
+};
+
+#endif // LIBWINPTY_WINPTY_INTERNAL_H

@@ -28,13 +28,12 @@
 #include "Event.h"
 #include "WakeupFd.h"
 
-// Connect winpty overlapped I/O to Cygwin blocking STDOUT_FILENO.
+// Connect winpty CONOUT to Cygwin blocking STDOUT_FILENO.
 class OutputHandler {
 public:
-    OutputHandler(HANDLE winpty, WakeupFd &completionWakeup);
+    OutputHandler(HANDLE conout, WakeupFd &completionWakeup);
     ~OutputHandler() { shutdown(); }
     bool isComplete() { return m_threadCompleted; }
-    void startShutdown() { m_shouldShutdown = 1; m_wakeup.set(); }
     void shutdown();
 
 private:
@@ -44,12 +43,10 @@ private:
     }
     void threadProc();
 
-    HANDLE m_winpty;
+    HANDLE m_conout;
     pthread_t m_thread;
     WakeupFd &m_completionWakeup;
-    Event m_wakeup;
     bool m_threadHasBeenJoined;
-    volatile sig_atomic_t m_shouldShutdown;
     volatile sig_atomic_t m_threadCompleted;
 };
 

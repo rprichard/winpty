@@ -18,38 +18,13 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef UNIX_ADAPTER_INPUT_HANDLER_H
-#define UNIX_ADAPTER_INPUT_HANDLER_H
+#ifndef WINPTY_CXX11_NOEXCEPT_H
+#define WINPTY_CXX11_NOEXCEPT_H
 
-#include <windows.h>
-#include <pthread.h>
-#include <signal.h>
+#if defined(__GNUC__)
+#define WINPTY_NOEXCEPT noexcept
+#else
+#define WINPTY_NOEXCEPT
+#endif
 
-#include "WakeupFd.h"
-
-// Connect Cygwin blocking tty STDIN_FILENO to winpty CONIN.
-class InputHandler {
-public:
-    InputHandler(HANDLE conin, WakeupFd &completionWakeup);
-    ~InputHandler() { shutdown(); }
-    bool isComplete() { return m_threadCompleted; }
-    void startShutdown() { m_shouldShutdown = 1; m_wakeup.set(); }
-    void shutdown();
-
-private:
-    static void *threadProcS(void *pvthis) {
-        reinterpret_cast<InputHandler*>(pvthis)->threadProc();
-        return NULL;
-    }
-    void threadProc();
-
-    HANDLE m_conin;
-    pthread_t m_thread;
-    WakeupFd &m_completionWakeup;
-    WakeupFd m_wakeup;
-    bool m_threadHasBeenJoined;
-    volatile sig_atomic_t m_shouldShutdown;
-    volatile sig_atomic_t m_threadCompleted;
-};
-
-#endif // UNIX_ADAPTER_INPUT_HANDLER_H
+#endif // WINPTY_CXX11_NOEXCEPT_H

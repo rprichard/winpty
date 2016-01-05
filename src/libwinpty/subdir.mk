@@ -21,7 +21,11 @@
 ALL_TARGETS += build/winpty.dll
 
 LIBWINPTY_OBJECTS = \
+	build/mingw/libwinpty/BackgroundDesktop.o \
+	build/mingw/libwinpty/Util.o \
+	build/mingw/libwinpty/WinptyException.o \
 	build/mingw/libwinpty/winpty.o \
+	build/mingw/shared/Buffer.o \
 	build/mingw/shared/DebugClient.o
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)

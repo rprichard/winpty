@@ -18,38 +18,34 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef UNIX_ADAPTER_INPUT_HANDLER_H
-#define UNIX_ADAPTER_INPUT_HANDLER_H
+#ifndef LIBWINPTY_BACKGROUND_DESKTOP_H
+#define LIBWINPTY_BACKGROUND_DESKTOP_H
 
 #include <windows.h>
-#include <pthread.h>
-#include <signal.h>
 
-#include "WakeupFd.h"
+#include <string>
 
-// Connect Cygwin blocking tty STDIN_FILENO to winpty CONIN.
-class InputHandler {
+namespace libwinpty {
+
+class BackgroundDesktop {
+    bool m_created = false;
+    HWINSTA m_originalStation = nullptr;
+    HWINSTA m_newStation = nullptr;
+    HDESK m_newDesktop = nullptr;
+    std::wstring m_newDesktopName;
 public:
-    InputHandler(HANDLE conin, WakeupFd &completionWakeup);
-    ~InputHandler() { shutdown(); }
-    bool isComplete() { return m_threadCompleted; }
-    void startShutdown() { m_shouldShutdown = 1; m_wakeup.set(); }
-    void shutdown();
-
-private:
-    static void *threadProcS(void *pvthis) {
-        reinterpret_cast<InputHandler*>(pvthis)->threadProc();
-        return NULL;
-    }
-    void threadProc();
-
-    HANDLE m_conin;
-    pthread_t m_thread;
-    WakeupFd &m_completionWakeup;
-    WakeupFd m_wakeup;
-    bool m_threadHasBeenJoined;
-    volatile sig_atomic_t m_shouldShutdown;
-    volatile sig_atomic_t m_threadCompleted;
+    void create();
+    void restoreWindowStation(bool nothrow=false);
+    const std::wstring &desktopName() const { return m_newDesktopName; }
+    BackgroundDesktop() {}
+    ~BackgroundDesktop();
+    // No copy ctor/assignment
+    BackgroundDesktop(const BackgroundDesktop &other) = delete;
+    BackgroundDesktop &operator=(const BackgroundDesktop &other) = delete;
 };
 
-#endif // UNIX_ADAPTER_INPUT_HANDLER_H
+std::wstring getDesktopFullName();
+
+} // libwinpty namespace
+
+#endif // LIBWINPTY_BACKGROUND_DESKTOP_H

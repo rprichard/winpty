@@ -45,6 +45,7 @@ private:
         int service();
         void waitForCanceledIo();
         HANDLE getWaitEvent();
+        bool ioPending() { return m_pending; }
     protected:
         NamedPipe *m_namedPipe;
         bool m_pending;
@@ -77,7 +78,11 @@ private:
     };
 
 public:
-    bool connectToServer(LPCWSTR pipeName);
+    const std::wstring &name() { return m_name; }
+    bool connectToServer(const std::wstring &name);
+    void connectToClient();
+    void writeImmediately(const void *data, int size);
+    void adoptHandle(HANDLE handle, bool write, const std::wstring &name);
     int bytesToSend();
     void write(const void *data, int size);
     void write(const char *text);
@@ -86,12 +91,14 @@ public:
     int bytesAvailable();
     int peek(void *data, int size);
     std::string read(int size);
+    std::vector<char> readAsVector(int size);
     std::string readAll();
     void closePipe();
     bool isClosed();
 
 private:
     // Input/output buffers
+    std::wstring m_name;
     int m_readBufferSize;
     std::string m_inQueue;
     std::string m_outQueue;

@@ -43,18 +43,27 @@ NamedPipe::~NamedPipe()
 // Returns true if anything happens (data received, data sent, pipe error).
 bool NamedPipe::serviceIo(std::vector<HANDLE> *waitHandles)
 {
-    if (m_handle == NULL)
+    if (m_handle == NULL) {
         return false;
-    int readBytes = m_inputWorker->service();
-    int writeBytes = m_outputWorker->service();
+    }
+    int readBytes = 0;
+    int writeBytes = 0;
+    HANDLE readHandle = NULL;
+    HANDLE writeHandle = NULL;
+    if (m_inputWorker != NULL) {
+        readBytes = m_inputWorker->service();
+        readHandle = m_inputWorker->getWaitEvent();
+    }
+    if (m_outputWorker != NULL) {
+        writeBytes = m_outputWorker->service();
+        writeHandle = m_outputWorker->getWaitEvent();
+    }
     if (readBytes == -1 || writeBytes == -1) {
         closePipe();
         return true;
     }
-    if (m_inputWorker->getWaitEvent() != NULL)
-        waitHandles->push_back(m_inputWorker->getWaitEvent());
-    if (m_outputWorker->getWaitEvent() != NULL)
-        waitHandles->push_back(m_outputWorker->getWaitEvent());
+    if (readHandle != NULL) { waitHandles->push_back(readHandle); }
+    if (writeHandle != NULL) { waitHandles->push_back(writeHandle); }
     return readBytes > 0 || writeBytes > 0;
 }
 
@@ -180,23 +189,79 @@ int NamedPipe::OutputWorker::getPendingIoSize()
     return m_pending ? m_currentIoSize : 0;
 }
 
-bool NamedPipe::connectToServer(LPCWSTR pipeName)
+// Connect to an existing named pipe.
+bool NamedPipe::connectToServer(const std::wstring &name)
 {
     ASSERT(isClosed());
-    HANDLE handle = CreateFileW(pipeName,
+    m_name = name;
+    HANDLE handle = CreateFileW(name.c_str(),
                                 GENERIC_READ | GENERIC_WRITE,
                                 0,
                                 NULL,
                                 OPEN_EXISTING,
                                 FILE_FLAG_OVERLAPPED,
                                 NULL);
-    trace("connection to [%ls], handle == 0x%x", pipeName, handle);
+    trace("connection to [%ls], handle == 0x%x", name.c_str(), handle);
     if (handle == INVALID_HANDLE_VALUE)
         return false;
     m_handle = handle;
     m_inputWorker = new InputWorker(this);
     m_outputWorker = new OutputWorker(this);
     return true;
+}
+
+// Block until the server pipe is connected to a client, or kill the agent
+// process if the connect times out.
+void NamedPipe::connectToClient()
+{
+    ASSERT(!isClosed());
+    OVERLAPPED over = {};
+    over.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    ASSERT(over.hEvent != NULL);
+    BOOL success = ConnectNamedPipe(m_handle, &over);
+    if (!success && GetLastError() == ERROR_IO_PENDING) {
+        WaitForSingleObject(over.hEvent, 30000);
+        DWORD actual = 0;
+        success = GetOverlappedResult(m_handle, &over, &actual, FALSE);
+    }
+    if (!success && GetLastError() == ERROR_PIPE_CONNECTED) {
+        success = true;
+    }
+    ASSERT(success && "error connecting data I/O pipe");
+    CloseHandle(over.hEvent);
+}
+
+// Bypass the output queue and event loop.  Block until the data is written,
+// or kill the agent process if the write times out.
+void NamedPipe::writeImmediately(const void *data, int size)
+{
+    ASSERT(m_outputWorker != NULL);
+    ASSERT(!m_outputWorker->ioPending());
+    OVERLAPPED over = {};
+    over.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+    ASSERT(over.hEvent != NULL);
+    DWORD actual = 0;
+    BOOL success = WriteFile(m_handle, data, size, &actual, &over);
+    if (!success && GetLastError() == ERROR_IO_PENDING) {
+        WaitForSingleObject(over.hEvent, 30000);
+        success = GetOverlappedResult(m_handle, &over, &actual, FALSE);
+    }
+    ASSERT(success && actual == static_cast<DWORD>(size) &&
+        "error writing data to pipe");
+    CloseHandle(over.hEvent);
+}
+
+// Adopt a handle for an already-open named pipe instance.
+void NamedPipe::adoptHandle(HANDLE handle, bool write, const std::wstring &name)
+{
+    ASSERT(isClosed());
+    m_name = name;
+    m_handle = handle;
+    if (write) {
+        m_outputWorker = new OutputWorker(this);
+    } else {
+        m_inputWorker = new InputWorker(this);
+    }
 }
 
 int NamedPipe::bytesToSend()
@@ -247,6 +312,18 @@ std::string NamedPipe::read(int size)
     return ret;
 }
 
+std::vector<char> NamedPipe::readAsVector(int size)
+{
+    const auto retSize = std::min<size_t>(size, m_inQueue.size());
+    std::vector<char> ret(retSize);
+    if (retSize > 0) {
+        const char *const p = &m_inQueue[0];
+        std::copy(p, p + retSize, ret.begin());
+        m_inQueue.erase(0, retSize);
+    }
+    return ret;
+}
+
 std::string NamedPipe::readAll()
 {
     std::string ret = m_inQueue;
@@ -256,11 +333,16 @@ std::string NamedPipe::readAll()
 
 void NamedPipe::closePipe()
 {
-    if (m_handle == NULL)
+    if (m_handle == NULL) {
         return;
+    }
     CancelIo(m_handle);
-    m_inputWorker->waitForCanceledIo();
-    m_outputWorker->waitForCanceledIo();
+    if (m_inputWorker != NULL) {
+        m_inputWorker->waitForCanceledIo();
+    }
+    if (m_outputWorker != NULL) {
+        m_outputWorker->waitForCanceledIo();
+    }
     delete m_inputWorker;
     delete m_outputWorker;
     CloseHandle(m_handle);

@@ -27,7 +27,7 @@
 #include "../shared/WinptyVersion.h"
 
 const char USAGE[] =
-"Usage: %s controlPipeName dataPipeName cols rows\n"
+"Usage: %s controlPipeName flags cols rows\n"
 "\n"
 "Ordinarily, this program is launched by winpty.dll and is not directly\n"
 "useful to winpty users.  However, it also has options intended for\n"
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
     }
 
     Agent agent(heapMbsToWcs(argv[1]),
-                heapMbsToWcs(argv[2]),
+                atoi(argv[2]),
                 atoi(argv[3]),
                 atoi(argv[4]));
     agent.run();

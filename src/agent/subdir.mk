@@ -36,6 +36,7 @@ AGENT_OBJECTS = \
 	build/mingw/agent/Terminal.o \
 	build/mingw/agent/Win32Console.o \
 	build/mingw/agent/main.o \
+	build/mingw/shared/Buffer.o \
 	build/mingw/shared/DebugClient.o \
 	build/mingw/shared/WinptyAssert.o \
 	build/mingw/shared/WinptyVersion.o \

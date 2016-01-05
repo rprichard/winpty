@@ -45,9 +45,8 @@ UNIX_CXXFLAGS += \
 
 MINGW_CXXFLAGS += \
 	$(COMMON_CXXFLAGS) \
-	-fno-exceptions \
-	-fno-rtti \
-	-O2
+	-O2 \
+	-std=c++11
 
 MINGW_LDFLAGS += -static -static-libgcc -static-libstdc++
 UNIX_LDFLAGS += $(UNIX_LDFLAGS_STATIC)

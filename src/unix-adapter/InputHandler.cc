@@ -34,8 +34,8 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
-InputHandler::InputHandler(HANDLE winpty, WakeupFd &completionWakeup) :
-    m_winpty(winpty),
+InputHandler::InputHandler(HANDLE conin, WakeupFd &completionWakeup) :
+    m_conin(conin),
     m_completionWakeup(completionWakeup),
     m_threadHasBeenJoined(false),
     m_shouldShutdown(0),
@@ -55,7 +55,6 @@ void InputHandler::shutdown() {
 }
 
 void InputHandler::threadProc() {
-    Event ioEvent;
     std::vector<char> buffer(4096);
     fd_set readfds;
     FD_ZERO(&readfds);
@@ -91,30 +90,10 @@ void InputHandler::threadProc() {
             break;
         }
 
-        DWORD written;
-        OVERLAPPED over = {0};
-        over.hEvent = ioEvent.handle();
-        BOOL ret = WriteFile(m_winpty,
+        DWORD written = 0;
+        BOOL ret = WriteFile(m_conin,
                              &buffer[0], numRead,
-                             &written,
-                             &over);
-        if (!ret && GetLastError() == ERROR_IO_PENDING) {
-            const HANDLE handles[] = {
-                ioEvent.handle(),
-                m_wakeup.handle(),
-            };
-            const DWORD waitRet =
-                WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-            if (waitRet == WAIT_OBJECT_0 + 1) {
-                trace("InputHandler: shutting down, canceling I/O");
-                assert(m_shouldShutdown);
-                CancelIo(m_winpty);
-                GetOverlappedResult(m_winpty, &over, &written, TRUE);
-                break;
-            }
-            assert(waitRet == WAIT_OBJECT_0);
-            ret = GetOverlappedResult(m_winpty, &over, &written, TRUE);
-        }
+                             &written, NULL);
         if (!ret || written != static_cast<DWORD>(numRead)) {
             if (!ret && GetLastError() == ERROR_BROKEN_PIPE) {
                 trace("InputHandler: pipe closed: written=%u",

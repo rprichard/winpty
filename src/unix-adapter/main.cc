@@ -349,29 +349,55 @@ int main(int argc, char *argv[])
     winsize sz;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
 
-    winpty_t *winpty = winpty_open(sz.ws_col, sz.ws_row);
-    if (winpty == NULL) {
+    winpty_config_t *agentCfg = winpty_config_new(0, NULL);
+    assert(agentCfg != NULL);
+    winpty_config_set_initial_size(agentCfg, sz.ws_col, sz.ws_row, NULL);
+
+    winpty_t *wp = winpty_open(agentCfg, NULL);
+    if (wp == NULL) {
         fprintf(stderr, "Error creating winpty.\n");
         exit(1);
     }
+    winpty_config_free(agentCfg);
+
+    const wchar_t *coninName = winpty_conin_name(wp);
+    const wchar_t *conoutName = winpty_conout_name(wp);
+    HANDLE conin =
+        CreateFileW(coninName, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE conout =
+        CreateFileW(conoutName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    assert(conin != INVALID_HANDLE_VALUE);
+    assert(conout != INVALID_HANDLE_VALUE);
+
+    HANDLE childHandle = NULL;
 
     {
         // Start the child process under the console.
         args.childArgv[0] = convertPosixPathToWin(args.childArgv[0]);
         std::string cmdLine = argvToCommandLine(args.childArgv);
         wchar_t *cmdLineW = heapMbsToWcs(cmdLine.c_str());
-        const int ret = winpty_start_process(winpty,
-                                             NULL,
-                                             cmdLineW,
-                                             NULL,
-                                             NULL);
-        if (ret != 0) {
+
+        winpty_spawn_config_t *spawnCfg = winpty_spawn_config_new(
+                WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN,
+                NULL, cmdLineW, NULL, NULL, NULL);
+        assert(spawnCfg != NULL);
+
+        winpty_error_ptr_t spawnErr = NULL;
+        DWORD lastError = 0;
+        BOOL spawnRet = winpty_spawn(wp, spawnCfg, &childHandle, NULL,
+            &lastError, &spawnErr);
+        winpty_spawn_config_free(spawnCfg);
+
+        if (!spawnRet) {
+            winpty_result_t spawnCode = winpty_error_code(spawnErr);
+            assert(spawnCode == WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED);
             fprintf(stderr,
                     "Error %#x starting %s\n",
-                    (unsigned int)ret,
+                    static_cast<unsigned int>(lastError),
                     cmdLine.c_str());
             exit(1);
         }
+        winpty_error_free(spawnErr);
         delete [] cmdLineW;
     }
 
@@ -399,8 +425,8 @@ int main(int argc, char *argv[])
             CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
     }
 
-    OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
-    InputHandler inputHandler(winpty_get_data_pipe(winpty), mainWakeup());
+    InputHandler inputHandler(conin, mainWakeup());
+    OutputHandler outputHandler(conout, mainWakeup());
 
     while (true) {
         fd_set readfds;
@@ -415,21 +441,26 @@ int main(int argc, char *argv[])
             ioctl(STDIN_FILENO, TIOCGWINSZ, &sz2);
             if (memcmp(&sz, &sz2, sizeof(sz)) != 0) {
                 sz = sz2;
-                winpty_set_size(winpty, sz.ws_col, sz.ws_row);
+                winpty_set_size(wp, sz.ws_col, sz.ws_row, NULL);
             }
         }
 
         // Check for an I/O handler shutting down (possibly indicating that the
         // child process has exited).
-        if (outputHandler.isComplete() || inputHandler.isComplete()) {
+        if (inputHandler.isComplete() || outputHandler.isComplete()) {
             break;
         }
     }
 
-    outputHandler.shutdown();
-    inputHandler.shutdown();
+    // Kill the agent connection.  This will kill the agent, closing the CONIN
+    // and CONOUT pipes on the agent pipe, prompting our I/O handler to shut
+    // down.
+    winpty_free(wp);
 
-    const int exitCode = winpty_get_exit_code(winpty);
+    inputHandler.shutdown();
+    outputHandler.shutdown();
+    CloseHandle(conin);
+    CloseHandle(conout);
 
     if (args.mouseInput) {
         // Reseting both encoding modes (1006 and 1015) is necessary, but
@@ -440,7 +471,11 @@ int main(int argc, char *argv[])
     }
 
     restoreTerminalMode(mode);
-    winpty_close(winpty);
 
+    DWORD exitCode = 0;
+    if (!GetExitCodeProcess(childHandle, &exitCode)) {
+        exitCode = 1;
+    }
+    CloseHandle(childHandle);
     return exitCode;
 }

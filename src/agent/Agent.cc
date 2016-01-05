@@ -19,27 +19,39 @@
 // IN THE SOFTWARE.
 
 #include "Agent.h"
-#include "Win32Console.h"
-#include "ConsoleInput.h"
-#include "Terminal.h"
-#include "NamedPipe.h"
-#include "ConsoleFont.h"
-#include "../shared/DebugClient.h"
-#include "../shared/AgentMsg.h"
-#include "../shared/Buffer.h"
-#include "../shared/c99_snprintf.h"
-#include "../shared/WinptyAssert.h"
+
+#include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <windows.h>
-#include <vector>
+
+#include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
+
+#include "../shared/AgentMsg.h"
+#include "../shared/Buffer.h"
+#include "../shared/DebugClient.h"
+#include "../shared/WinptyAssert.h"
+#include "../shared/c99_snprintf.h"
+#include "ConsoleFont.h"
+#include "ConsoleInput.h"
+#include "NamedPipe.h"
+#include "Terminal.h"
+#include "Win32Console.h"
+
+// Work around a bug with mingw-gcc-g++.  mingw-w64 is unaffected.  See
+// GitHub issue 27.
+#ifndef FILE_FLAG_FIRST_PIPE_INSTANCE
+#define FILE_FLAG_FIRST_PIPE_INSTANCE 0x00080000
+#endif
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
+
+static volatile LONG g_pipeCounter;
 
 #define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -113,12 +125,13 @@ static bool detectWhetherMarkMovesCursor(Win32Console &console)
 
 } // anonymous namespace
 
-Agent::Agent(LPCWSTR controlPipeName,
-             LPCWSTR dataPipeName,
+Agent::Agent(const std::wstring &controlPipeName,
+             DWORD agentStartupFlags,
              int initialCols,
              int initialRows) :
+    m_agentStartupFlags(agentStartupFlags),
     m_useMark(false),
-    m_closingDataSocket(false),
+    m_closingConoutPipe(false),
     m_terminal(NULL),
     m_childProcess(NULL),
     m_childExitCode(-1),
@@ -146,9 +159,31 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_console->setTextAttribute(7);
     m_console->clearAllLines(m_console->bufferInfo());
 
-    m_controlSocket = makeSocket(controlPipeName);
-    m_dataSocket = makeSocket(dataPipeName);
-    m_terminal = new Terminal(m_dataSocket);
+    m_controlSocket = connectToNamedPipe(controlPipeName);
+    m_coninPipe = makeDataPipe(false);
+    m_conoutPipe = makeDataPipe(true);
+
+    {
+        // Send an initial response packet to winpty.dll containing pipe names.
+        WriteBuffer packet;
+        packet.putRawInt32(0); // payload size
+        packet.putWString(m_coninPipe->name());
+        packet.putWString(m_conoutPipe->name());
+        packet.replaceRawInt32(0, packet.buf().size() - sizeof(int));
+        const auto bytes = packet.buf();
+        m_controlSocket->writeImmediately(bytes.data(), bytes.size());
+
+        // Wait until our I/O pipes have been connected.  We can't enter the main
+        // I/O loop until we've connected them, because we can't do normal reads
+        // and writes until then.
+        trace("Agent startup: waiting for client to connect to "
+              "CONIN/CONOUT pipes...");
+        m_coninPipe->connectToClient();
+        m_conoutPipe->connectToClient();
+        trace("Agent startup: CONIN/CONOUT pipes connected");
+    }
+
+    m_terminal = new Terminal(m_conoutPipe);
     m_consoleInput = new ConsoleInput(this);
 
     resetConsoleTracking(Terminal::OmitClear, m_console->windowRect());
@@ -194,16 +229,48 @@ Agent::~Agent()
 // bytes before it are complete keypresses.
 void Agent::sendDsr()
 {
-    m_dataSocket->write("\x1B[6n");
+    m_conoutPipe->write("\x1B[6n");
 }
 
-NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
+// Connect to the existing named pipe.
+NamedPipe *Agent::connectToNamedPipe(const std::wstring &pipeName)
 {
     NamedPipe *pipe = createNamedPipe();
     if (!pipe->connectToServer(pipeName)) {
-        trace("error: could not connect to %ls", pipeName);
-        ::exit(1);
+        trace("error: could not connect to %ls", pipeName.c_str());
+        abort();
     }
+    pipe->setReadBufferSize(64 * 1024);
+    return pipe;
+}
+
+// Returns a new server named pipe.  It has not yet been connected.
+NamedPipe *Agent::makeDataPipe(bool write)
+{
+    std::wstringstream nameSS;
+    nameSS << L"\\\\.\\pipe\\winpty-data-"
+           << (write ? L"out-" : L"in-")
+           << GetCurrentProcessId() << L"-"
+           << InterlockedIncrement(&g_pipeCounter);
+    const auto name = nameSS.str();
+    const DWORD openMode =
+        (write ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND)
+            | FILE_FLAG_FIRST_PIPE_INSTANCE
+            | FILE_FLAG_OVERLAPPED;
+    HANDLE ret = CreateNamedPipeW(name.c_str(),
+                                  /*dwOpenMode=*/openMode,
+                                  /*dwPipeMode=*/0,
+                                  /*nMaxInstances=*/1,
+                                  /*nOutBufferSize=*/(write ? 8192 : 0),
+                                  /*nInBufferSize=*/(write ? 0 : 256),
+                                  /*nDefaultTimeOut=*/30000,
+                                  nullptr);
+    if (ret == INVALID_HANDLE_VALUE) {
+        trace("error: could not open data pipe %ls", name.c_str());
+        abort();
+    }
+    NamedPipe *pipe = createNamedPipe();
+    pipe->adoptHandle(ret, write, name);
     pipe->setReadBufferSize(64 * 1024);
     return pipe;
 }
@@ -228,10 +295,13 @@ void Agent::resetConsoleTracking(
 
 void Agent::onPipeIo(NamedPipe *namedPipe)
 {
-    if (namedPipe == m_controlSocket)
+    if (namedPipe == m_conoutPipe) {
+        pollConoutPipe();
+    } else if (namedPipe == m_coninPipe) {
+        pollConinPipe();
+    } else if (namedPipe == m_controlSocket) {
         pollControlSocket();
-    else if (namedPipe == m_dataSocket)
-        pollDataSocket();
+    }
 }
 
 void Agent::pollControlSocket()
@@ -253,24 +323,20 @@ void Agent::pollControlSocket()
                 m_controlSocket->setReadBufferSize(totalSize);
             break;
         }
-        std::string packetData = m_controlSocket->read(totalSize);
-        ASSERT((int)packetData.size() == totalSize);
-        ReadBuffer buffer(packetData);
-        buffer.getInt(); // Discard the size.
+        auto packetData = m_controlSocket->readAsVector(totalSize);
+        ASSERT(packetData.size() == static_cast<size_t>(totalSize));
+        ReadBuffer buffer(std::move(packetData), ReadBuffer::NoThrow);
+        buffer.getRawInt32(); // Discard the size.
         handlePacket(buffer);
     }
 }
 
 void Agent::handlePacket(ReadBuffer &packet)
 {
-    int type = packet.getInt();
-    int32_t result = -1;
+    int type = packet.getInt32();
     switch (type) {
-    case AgentMsg::Ping:
-        result = 0;
-        break;
     case AgentMsg::StartProcess:
-        result = handleStartProcessPacket(packet);
+        handleStartProcessPacket(packet);
         break;
     case AgentMsg::SetSize:
         // TODO: I think it might make sense to collapse consecutive SetSize
@@ -278,42 +344,53 @@ void Agent::handlePacket(ReadBuffer &packet)
         // messages faster than they can be processed, and some GUIs might
         // generate a flood of them, so if we can read multiple SetSize packets
         // at once, we can ignore the early ones.
-        result = handleSetSizePacket(packet);
-        break;
-    case AgentMsg::GetExitCode:
-        ASSERT(packet.eof());
-        result = m_childExitCode;
-        break;
-    case AgentMsg::GetProcessId:
-        ASSERT(packet.eof());
-        if (m_childProcess == NULL)
-            result = -1;
-        else
-            result = GetProcessId(m_childProcess);
-        break;
-    case AgentMsg::SetConsoleMode:
-        m_terminal->setConsoleMode(packet.getInt());
-        result = 0;
+        handleSetSizePacket(packet);
         break;
     default:
         trace("Unrecognized message, id:%d", type);
+        abort();
     }
-    m_controlSocket->write((char*)&result, sizeof(result));
 }
 
-int Agent::handleStartProcessPacket(ReadBuffer &packet)
+void Agent::writePacket(WriteBuffer &packet)
 {
-    BOOL success;
+    const auto &bytes = packet.buf();
+    packet.replaceRawInt32(0, bytes.size() - sizeof(int));
+    m_controlSocket->write(bytes.data(), bytes.size());
+}
+
+static HANDLE duplicateHandle(HANDLE h) {
+    HANDLE ret = nullptr;
+    if (!DuplicateHandle(
+            GetCurrentProcess(), h,
+            GetCurrentProcess(), &ret,
+            0, FALSE, DUPLICATE_SAME_ACCESS)) {
+        ASSERT(false && "DuplicateHandle failed!");
+    }
+    return ret;
+}
+
+static int64_t int64FromHandle(HANDLE h) {
+    return static_cast<int64_t>(reinterpret_cast<uintptr_t>(h));
+}
+
+void Agent::handleStartProcessPacket(ReadBuffer &packet)
+{
     ASSERT(m_childProcess == NULL);
 
-    std::wstring program = packet.getWString();
-    std::wstring cmdline = packet.getWString();
-    std::wstring cwd = packet.getWString();
-    std::wstring env = packet.getWString();
-    std::wstring desktop = packet.getWString();
-    ASSERT(packet.eof());
+    const DWORD winptyFlags = packet.getInt32();
+    const bool wantProcessHandle = packet.getInt32();
+    const bool wantThreadHandle = packet.getInt32();
+    const std::wstring program = packet.getWString();
+    const std::wstring cmdline = packet.getWString();
+    const std::wstring cwd = packet.getWString();
+    const std::wstring env = packet.getWString();
+    const std::wstring desktop = packet.getWString();
+    packet.assertEof();
 
     LPCWSTR programArg = program.empty() ? NULL : program.c_str();
+    // TODO: libwinpty has a modifiableWString Util function that does this.
+    // Factor out...
     std::vector<wchar_t> cmdlineCopy;
     LPWSTR cmdlineArg = NULL;
     if (!cmdline.empty()) {
@@ -325,44 +402,64 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
     LPCWSTR envArg = env.empty() ? NULL : env.data();
 
-    STARTUPINFOW sui;
-    PROCESS_INFORMATION pi;
-    memset(&sui, 0, sizeof(sui));
-    memset(&pi, 0, sizeof(pi));
+    STARTUPINFOW sui = {};
+    PROCESS_INFORMATION pi = {};
     sui.cb = sizeof(sui);
     sui.lpDesktop = desktop.empty() ? NULL : (LPWSTR)desktop.c_str();
 
-    success = CreateProcessW(programArg, cmdlineArg, NULL, NULL,
+    const BOOL success = CreateProcessW(programArg, cmdlineArg, NULL, NULL,
                              /*bInheritHandles=*/FALSE,
-                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
-                             /*CREATE_NEW_PROCESS_GROUP*/0,
+                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT,
                              (LPVOID)envArg, cwdArg, &sui, &pi);
-    int ret = success ? 0 : GetLastError();
+    const int lastError = success ? 0 : GetLastError();
 
     trace("CreateProcess: %s %d",
           (success ? "success" : "fail"),
           (int)pi.dwProcessId);
 
+    int64_t replyProcess = 0;
+    int64_t replyThread = 0;
+
     if (success) {
+        if (wantProcessHandle) {
+            replyProcess = int64FromHandle(duplicateHandle(pi.hProcess));
+        }
+        if (wantThreadHandle) {
+            replyThread = int64FromHandle(duplicateHandle(pi.hThread));
+        }
         CloseHandle(pi.hThread);
+        // TODO: Respect the WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN flag.  Keep a
+        // list of process handles where the flag was set; if any die, then
+        // shutdown and close all the handles.
         m_childProcess = pi.hProcess;
     }
 
-    return ret;
+    // Write reply.
+    WriteBuffer reply;
+    reply.putRawInt32(0); // payload size
+    reply.putInt(!success);
+    reply.putInt(lastError);
+    reply.putInt64(replyProcess);
+    reply.putInt64(replyThread);
+    writePacket(reply);
 }
 
-int Agent::handleSetSizePacket(ReadBuffer &packet)
+void Agent::handleSetSizePacket(ReadBuffer &packet)
 {
     int cols = packet.getInt();
     int rows = packet.getInt();
-    ASSERT(packet.eof());
+    packet.assertEof();
+
     resizeWindow(cols, rows);
-    return 0;
+
+    WriteBuffer reply;
+    reply.putRawInt32(0); // payload size
+    writePacket(reply);
 }
 
-void Agent::pollDataSocket()
+void Agent::pollConinPipe()
 {
-    const std::string newData = m_dataSocket->readAll();
+    const std::string newData = m_coninPipe->readAll();
     if (hasDebugFlag("input_separated_bytes")) {
         // This debug flag is intended to help with testing incomplete escape
         // sequences and multibyte UTF-8 encodings.  (I wonder if the normal
@@ -373,14 +470,17 @@ void Agent::pollDataSocket()
     } else {
         m_consoleInput->writeInput(newData);
     }
+}
 
+void Agent::pollConoutPipe()
+{
     // If the child process had exited, then close the data socket if we've
     // finished sending all of the collected output.
-    if (m_closingDataSocket &&
-            !m_dataSocket->isClosed() &&
-            m_dataSocket->bytesToSend() == 0) {
-        trace("Closing data pipe after data is sent");
-        m_dataSocket->closePipe();
+    if (m_closingConoutPipe &&
+            !m_conoutPipe->isClosed() &&
+            m_conoutPipe->bytesToSend() == 0) {
+        trace("Closing CONOUT pipe after data is sent");
+        m_conoutPipe->closePipe();
     }
 }
 
@@ -412,6 +512,9 @@ void Agent::onPollTimeout()
     m_consoleInput->flushIncompleteEscapeCode();
 
     // Check if the child process has exited.
+    // TODO: We're potentially calling WaitForSingleObject on a NULL m_childProcess, I think.
+    // TODO: More importantly, we're *polling* for process exit.  We have a HANDLE that we
+    // could wait on!  It would improve responsiveness.
     if (WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
         DWORD exitCode;
         if (GetExitCodeProcess(m_childProcess, &exitCode))
@@ -422,20 +525,20 @@ void Agent::onPollTimeout()
         // Close the data socket to signal to the client that the child
         // process has exited.  If there's any data left to send, send it
         // before closing the socket.
-        m_closingDataSocket = true;
+        m_closingConoutPipe = true;
     }
 
     // Scrape for output *after* the above exit-check to ensure that we collect
     // the child process's final output.
-    if (!m_dataSocket->isClosed()) {
+    if (!m_conoutPipe->isClosed()) {
         syncConsoleContentAndSize(false);
     }
 
-    if (m_closingDataSocket &&
-            !m_dataSocket->isClosed() &&
-            m_dataSocket->bytesToSend() == 0) {
-        trace("Closing data pipe after child exit");
-        m_dataSocket->closePipe();
+    if (m_closingConoutPipe &&
+            !m_conoutPipe->isClosed() &&
+            m_conoutPipe->bytesToSend() == 0) {
+        trace("Closing CONOUT pipe after child exit");
+        m_conoutPipe->closePipe();
     }
 }
 
@@ -649,7 +752,7 @@ void Agent::syncConsoleTitle()
     if (newTitle != m_currentTitle) {
         std::string command = std::string("\x1b]0;") +
                 wstringToUtf8String(newTitle) + "\x07";
-        m_dataSocket->write(command.c_str());
+        m_conoutPipe->write(command.c_str());
         m_currentTitle = newTitle;
     }
 }

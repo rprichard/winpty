@@ -31,9 +31,6 @@
         {
             'target_name' : 'winpty-agent',
             'type' : 'executable',
-            'include_dirs' : [
-                'include',
-            ],
             'libraries' : [
                 '-luser32',
             ],
@@ -72,6 +69,7 @@
                 'agent/main.cc',
                 'shared/AgentMsg.h',
                 'shared/Buffer.h',
+                'shared/Buffer.cc',
                 'shared/DebugClient.h',
                 'shared/DebugClient.cc',
                 'shared/OsModule.h',
@@ -88,20 +86,27 @@
         {
             'target_name' : 'winpty',
             'type' : 'shared_library',
-            'include_dirs' : [
-                'include',
-            ],
             'libraries' : [
                 '-luser32',
             ],
             'sources' : [
                 'include/winpty.h',
+                'libwinpty/BackgroundDesktop.h',
+                'libwinpty/BackgroundDesktop.cc',
+                'libwinpty/Util.h',
+                'libwinpty/Util.cc',
+                'libwinpty/WinptyException.h',
+                'libwinpty/WinptyException.cc',
+                'libwinpty/WinptyInternal.h',
                 'libwinpty/winpty.cc',
                 'shared/AgentMsg.h',
                 'shared/Buffer.h',
+                'shared/Buffer.cc',
                 'shared/DebugClient.h',
                 'shared/DebugClient.cc',
                 'shared/c99_snprintf.h',
+                'shared/cxx11_mutex.h',
+                'shared/cxx11_noexcept.h',
             ],
         },
         {

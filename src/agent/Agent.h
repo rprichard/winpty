@@ -38,6 +38,7 @@
 class Win32Console;
 class ConsoleInput;
 class ReadBuffer;
+class WriteBuffer;
 class NamedPipe;
 struct ConsoleScreenBufferInfo;
 
@@ -51,24 +52,27 @@ const int SYNC_MARKER_LEN = 16;
 class Agent : public EventLoop, public DsrSender
 {
 public:
-    Agent(LPCWSTR controlPipeName,
-          LPCWSTR dataPipeName,
+    Agent(const std::wstring &controlPipeName,
+          DWORD agentStartupFlags,
           int initialCols,
           int initialRows);
     virtual ~Agent();
     void sendDsr();
 
 private:
-    NamedPipe *makeSocket(LPCWSTR pipeName);
+    NamedPipe *connectToNamedPipe(const std::wstring &pipeName);
+    NamedPipe *makeDataPipe(bool write);
     void resetConsoleTracking(
         Terminal::SendClearFlag sendClear, const SmallRect &windowRect);
 
 private:
     void pollControlSocket();
     void handlePacket(ReadBuffer &packet);
-    int handleStartProcessPacket(ReadBuffer &packet);
-    int handleSetSizePacket(ReadBuffer &packet);
-    void pollDataSocket();
+    void writePacket(WriteBuffer &packet);
+    void handleStartProcessPacket(ReadBuffer &packet);
+    void handleSetSizePacket(ReadBuffer &packet);
+    void pollConinPipe();
+    void pollConoutPipe();
     void updateMouseInputFlags(bool forceTrace=false);
 
 protected:
@@ -93,13 +97,15 @@ private:
     void createSyncMarker(int row);
 
 private:
+    DWORD m_agentStartupFlags;
     bool m_useMark;
     Win32Console *m_console;
     bool m_consoleMouseInputEnabled;
     bool m_consoleQuickEditEnabled;
     NamedPipe *m_controlSocket;
-    NamedPipe *m_dataSocket;
-    bool m_closingDataSocket;
+    bool m_closingConoutPipe;
+    NamedPipe *m_coninPipe;
+    NamedPipe *m_conoutPipe;
     Terminal *m_terminal;
     ConsoleInput *m_consoleInput;
     HANDLE m_childProcess;
