@@ -59,7 +59,7 @@ std::string MouseRecord::toString() const {
     return ss.str();
 }
 
-const int kIncompleteEscapeTimeoutMs = 1000u;
+const unsigned int kIncompleteEscapeTimeoutMs = 1000u;
 
 #define CHECK(cond)                                 \
         do {                                        \
