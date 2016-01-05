@@ -156,26 +156,6 @@ const Font kFonts[] = {
     { 0, L"Lucida Console", 6 },
 };
 
-class OsModule {
-    HMODULE m_module;
-public:
-    OsModule(const wchar_t *fileName) {
-        m_module = LoadLibraryW(fileName);
-        ASSERT(m_module != NULL);
-    }
-    ~OsModule() {
-        FreeLibrary(m_module);
-    }
-    HMODULE handle() const { return m_module; }
-    FARPROC proc(const char *funcName) {
-        FARPROC ret = GetProcAddress(m_module, funcName);
-        if (ret == NULL) {
-            trace("GetProcAddress: %s is missing", funcName);
-        }
-        return ret;
-    }
-};
-
 // Some of these types and functions are missing from the MinGW headers.
 // Others are undocumented.
 
