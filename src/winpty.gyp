@@ -32,6 +32,7 @@
             'target_name' : 'winpty-agent',
             'type' : 'executable',
             'libraries' : [
+                '-ladvapi32',
                 '-luser32',
             ],
             'sources' : [
@@ -72,6 +73,8 @@
                 'shared/Buffer.cc',
                 'shared/DebugClient.h',
                 'shared/DebugClient.cc',
+                'shared/GenRandom.h',
+                'shared/GenRandom.cc',
                 'shared/OsModule.h',
                 'shared/UnixCtrlChars.h',
                 'shared/WinptyAssert.h',
@@ -87,6 +90,7 @@
             'target_name' : 'winpty',
             'type' : 'shared_library',
             'libraries' : [
+                '-ladvapi32',
                 '-luser32',
             ],
             'sources' : [
@@ -104,6 +108,8 @@
                 'shared/Buffer.cc',
                 'shared/DebugClient.h',
                 'shared/DebugClient.cc',
+                'shared/GenRandom.h',
+                'shared/GenRandom.cc',
                 'shared/c99_snprintf.h',
                 'shared/cxx11_mutex.h',
                 'shared/cxx11_noexcept.h',

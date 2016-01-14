@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 
+#include "../shared/GenRandom.h"
 #include "EventLoop.h"
 #include "DsrSender.h"
 #include "Coord.h"
@@ -125,6 +126,8 @@ private:
     int m_dirtyLineCount;
 
     std::wstring m_currentTitle;
+
+    winpty_shared::GenRandom m_genRandom;
 };
 
 #endif // AGENT_H

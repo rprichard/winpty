@@ -38,6 +38,7 @@
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 #include "../shared/DebugClient.h"
+#include "../shared/GenRandom.h"
 #include "BackgroundDesktop.h"
 #include "Util.h"
 #include "WinptyException.h"
@@ -52,8 +53,6 @@ using namespace libwinpty;
 #endif
 
 #define AGENT_EXE L"winpty-agent.exe"
-
-static volatile LONG g_consoleCounter;
 
 
 
@@ -398,10 +397,9 @@ winpty_open(const winpty_config_t *cfg,
         wp->ioEvent = createEvent();
 
         // Create control server pipe.
-        std::wstringstream pipeNameSS;
-        pipeNameSS << L"\\\\.\\pipe\\winpty-control-" << GetCurrentProcessId()
-                   << L"-" << InterlockedIncrement(&g_consoleCounter);
-        const auto pipeName = pipeNameSS.str();
+        winpty_shared::GenRandom genRandom;
+        const auto pipeName =
+            L"\\\\.\\pipe\\winpty-control-" + genRandom.uniqueName();
         wp->controlPipe = createControlPipe(pipeName);
 
         // Create a background desktop.

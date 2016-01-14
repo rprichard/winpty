@@ -51,8 +51,6 @@
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 
-static volatile LONG g_pipeCounter;
-
 #define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
 
 namespace {
@@ -249,9 +247,8 @@ NamedPipe *Agent::makeDataPipe(bool write)
 {
     std::wstringstream nameSS;
     nameSS << L"\\\\.\\pipe\\winpty-data-"
-           << (write ? L"out-" : L"in-")
-           << GetCurrentProcessId() << L"-"
-           << InterlockedIncrement(&g_pipeCounter);
+           << (write ? L"conout-" : L"conin-")
+           << m_genRandom.uniqueName();
     const auto name = nameSS.str();
     const DWORD openMode =
         (write ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND)
