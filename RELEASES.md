@@ -1,3 +1,8 @@
+# Next version
+
+ * Fix a bug that could have generated spurious mouse input records when an
+   incomplete mouse escape sequence was seen.
+
 # Version 0.2.1 (2015-12-19)
 
  * The main project source was moved into a `src` directory for better code

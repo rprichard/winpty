@@ -167,6 +167,10 @@ static int matchMouse1015(const char *input, int inputSize, MouseRecord &out)
     return pch - input + 1;
 }
 
+// Match a mouse input escape sequence of any kind.
+// 0   no match
+// >0  match, returns length of match
+// -1  incomplete match
 static int matchMouseRecord(const char *input, int inputSize, MouseRecord &out)
 {
     memset(&out, 0, sizeof(out));
@@ -379,9 +383,9 @@ int ConsoleInput::scanMouseInput(std::vector<INPUT_RECORD> &records,
                                  int inputSize)
 {
     MouseRecord record;
-    int len = matchMouseRecord(input, inputSize, record);
-    if (len == 0) {
-        return 0;
+    const int len = matchMouseRecord(input, inputSize, record);
+    if (len <= 0) {
+        return len;
     }
 
     if (isTracingEnabled()) {
