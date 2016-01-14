@@ -362,7 +362,17 @@ int Agent::handleSetSizePacket(ReadBuffer &packet)
 
 void Agent::pollDataSocket()
 {
-    m_consoleInput->writeInput(m_dataSocket->readAll());
+    const std::string newData = m_dataSocket->readAll();
+    if (hasDebugFlag("input_separated_bytes")) {
+        // This debug flag is intended to help with testing incomplete escape
+        // sequences and multibyte UTF-8 encodings.  (I wonder if the normal
+        // code path ought to advance a state machine one byte at a time.)
+        for (size_t i = 0; i < newData.size(); ++i) {
+            m_consoleInput->writeInput(newData.substr(i, 1));
+        }
+    } else {
+        m_consoleInput->writeInput(newData);
+    }
 
     // If the child process had exited, then close the data socket if we've
     // finished sending all of the collected output.
