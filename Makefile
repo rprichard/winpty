@@ -85,3 +85,6 @@ build/unix/%.o : src/%.cc VERSION.txt
 	@echo Compiling $<
 	@mkdir -p $$(dirname $@)
 	@$(UNIX_CXX) $(UNIX_CXXFLAGS) -I src/include -c -o $@ $<
+
+src/%.h :
+	@echo "Missing header file $@ (stale dependency file?)"
