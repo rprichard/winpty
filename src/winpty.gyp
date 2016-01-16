@@ -98,6 +98,7 @@
             ],
             'sources' : [
                 'include/winpty.h',
+                'include/winpty_constants.h',
                 'libwinpty/BackgroundDesktop.h',
                 'libwinpty/BackgroundDesktop.cc',
                 'libwinpty/Util.h',
