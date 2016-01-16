@@ -23,6 +23,13 @@
 
 bool isTracingEnabled();
 bool hasDebugFlag(const char *flag);
+
+#if defined(__CYGWIN__) || defined(__MSYS__)
+void trace(const char *format, ...) __attribute__((format(printf, 1, 2)));
+#elif defined(__GNUC__)
+void trace(const char *format, ...) __attribute__((format(ms_printf, 1, 2)));
+#else
 void trace(const char *format, ...);
+#endif
 
 #endif // DEBUGCLIENT_H

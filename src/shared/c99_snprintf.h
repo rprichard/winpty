@@ -73,6 +73,14 @@ static inline int c99_vsnprintf(
 
 #endif /* _MSC_VER */
 
+#if defined(__CYGWIN__) || defined(__MSYS__)
+static inline int c99_snprintf(char* str, size_t size, const char* format, ...)
+    __attribute__((format(printf, 3, 4)));
+#elif defined(__GNUC__)
+static inline int c99_snprintf(char* str, size_t size, const char* format, ...)
+    __attribute__((format(ms_printf, 3, 4)));
+#endif
+
 static inline int c99_snprintf(
         char* str,
         size_t size,

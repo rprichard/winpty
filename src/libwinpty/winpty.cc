@@ -107,7 +107,8 @@ static void translateException(winpty_error_ptr_t *&err) {
     } catch (...) {
         ret = const_cast<winpty_error_ptr_t>(&kUncaughtException);
     }
-    trace("libwinpty error: code=%d msg='%ls'", ret->code, ret->msg);
+    trace("libwinpty error: code=%u msg='%ls'",
+        static_cast<unsigned>(ret->code), ret->msg);
     if (err != nullptr) {
         *err = ret;
     } else {

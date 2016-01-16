@@ -201,7 +201,7 @@ bool NamedPipe::connectToServer(const std::wstring &name)
                                 OPEN_EXISTING,
                                 FILE_FLAG_OVERLAPPED,
                                 NULL);
-    trace("connection to [%ls], handle == 0x%x", name.c_str(), handle);
+    trace("connection to [%ls], handle == %p", name.c_str(), handle);
     if (handle == INVALID_HANDLE_VALUE)
         return false;
     m_handle = handle;
