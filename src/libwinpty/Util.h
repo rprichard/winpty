@@ -21,8 +21,6 @@
 #ifndef LIBWINPTY_UTIL_H
 #define LIBWINPTY_UTIL_H
 
-#include <assert.h>
-
 #include <string>
 #include <utility>
 #include <vector>

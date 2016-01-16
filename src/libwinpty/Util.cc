@@ -23,7 +23,6 @@
 #include "Util.h"
 
 #include <windows.h>
-#include <assert.h>
 #include <string.h>
 
 #include <string>
