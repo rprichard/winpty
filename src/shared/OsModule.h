@@ -21,24 +21,36 @@
 #ifndef OS_MODULE_H
 #define OS_MODULE_H
 
+#include <string>
+
 #include "DebugClient.h"
-#include "WinptyAssert.h"
 
 class OsModule {
+    std::wstring m_fileName;
     HMODULE m_module;
 public:
-    OsModule(const wchar_t *fileName) {
+    OsModule(const wchar_t *fileName) : m_fileName(fileName) {
         m_module = LoadLibraryW(fileName);
-        ASSERT(m_module != NULL);
+        if (m_module == nullptr) {
+            trace("Could not load %ls: error %u",
+                fileName, static_cast<unsigned>(GetLastError()));
+        }
     }
     ~OsModule() {
-        FreeLibrary(m_module);
+        if (m_module != nullptr) {
+            FreeLibrary(m_module);
+        }
     }
+    operator bool() const { return m_module != nullptr; }
     HMODULE handle() const { return m_module; }
     FARPROC proc(const char *funcName) {
-        FARPROC ret = GetProcAddress(m_module, funcName);
-        if (ret == NULL) {
-            trace("GetProcAddress: %s is missing", funcName);
+        FARPROC ret = nullptr;
+        if (m_module != nullptr) {
+            ret = GetProcAddress(m_module, funcName);
+            if (ret == NULL) {
+                trace("GetProcAddress: %s is missing from %ls",
+                    funcName, m_fileName.c_str());
+            }
         }
         return ret;
     }
