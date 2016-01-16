@@ -125,6 +125,13 @@
             'type' : 'executable',
             'sources' : [
                 'debugserver/DebugServer.cc',
+                'shared/DebugClient.h',
+                'shared/DebugClient.cc',
+                'shared/WindowsSecurity.h',
+                'shared/WindowsSecurity.cc',
+            ],
+            'libraries' : [
+                '-ladvapi32',
             ],
         }
     ],

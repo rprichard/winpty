@@ -23,31 +23,86 @@
 
 #include <windows.h>
 
+#include "../shared/WindowsSecurity.h"
+
+const wchar_t *kPipeName = L"\\\\.\\pipe\\DebugServer";
+
+using namespace winpty_shared;
+
 // A message may not be larger than this size.
 const int MSG_SIZE = 4096;
 
-int main() {
+static void usage(const char *program, int code) {
+    printf("Usage: %s [--everyone]\n"
+           "\n"
+           "Creates the named pipe %ls and reads messages.  Prints each\n"
+           "message to stdout.  By default, only the current user can send messages.\n"
+           "Pass --everyone to let anyone send a message.\n"
+           "\n"
+           "Use the WINPTY_DEBUG environment variable to enable winpty trace output.\n"
+           "(e.g. WINPTY_DEBUG=trace for the default trace output.)  Set WINPTYDBG=1\n"
+           "to enable trace with older winpty versions.\n",
+           program, kPipeName);
+    exit(code);
+}
+
+int main(int argc, char *argv[]) {
+    bool everyone = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--everyone") {
+            everyone = true;
+        } else if (arg == "-h" || arg == "--help") {
+            usage(argv[0], 0);
+        } else {
+            usage(argv[0], 1);
+        }
+    }
+
+    SecurityDescriptorDynamic sd;
+    PSECURITY_ATTRIBUTES psa = nullptr;
+    SECURITY_ATTRIBUTES sa = {};
+    if (everyone) {
+        sd = createPipeSecurityDescriptorOwnerFullControlEveryoneWrite();
+        if (!sd) {
+            fprintf(stderr,
+                "error: could not create security descriptor\n"
+                "  Use a second debugserver instance to see logged error.\n");
+            exit(1);
+        }
+        sa.nLength = sizeof(sa);
+        sa.lpSecurityDescriptor = sd.get();
+        psa = &sa;
+    }
+
     HANDLE serverPipe = CreateNamedPipeW(
-        L"\\\\.\\pipe\\DebugServer",
-        PIPE_ACCESS_DUPLEX,
-        PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE,
-        PIPE_UNLIMITED_INSTANCES,
-        MSG_SIZE,
-        MSG_SIZE,
-        10 * 1000,
-        NULL);
+        kPipeName,
+        /*dwOpenMode=*/PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+        /*dwPipeMode=*/PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE |
+            rejectRemoteClientsPipeFlag(),
+        /*nMaxInstances=*/1,
+        /*nOutBufferSize=*/MSG_SIZE,
+        /*nInBufferSize=*/MSG_SIZE,
+        /*nDefaultTimeOut=*/10 * 1000,
+        psa);
+
+    if (serverPipe == INVALID_HANDLE_VALUE) {
+        fprintf(stderr, "error: could not create %ls pipe: error %u\n",
+            kPipeName, static_cast<unsigned>(GetLastError()));
+        exit(1);
+    }
 
     char msgBuffer[MSG_SIZE + 1];
 
     while (true) {
-        if (!ConnectNamedPipe(serverPipe, NULL)) {
-            fprintf(stderr, "Error: ConnectNamedPipe failed\n");
+        if (!ConnectNamedPipe(serverPipe, nullptr)) {
+            fprintf(stderr, "error: ConnectNamedPipe failed\n");
             fflush(stderr);
             exit(1);
         }
         DWORD bytesRead = 0;
-        if (!ReadFile(serverPipe, msgBuffer, MSG_SIZE, &bytesRead, NULL)) {
-            fprintf(stderr, "Error: ReadFile on pipe failed\n");
+        if (!ReadFile(serverPipe, msgBuffer, MSG_SIZE, &bytesRead, nullptr)) {
+            fprintf(stderr, "error: ReadFile on pipe failed\n");
             fflush(stderr);
             DisconnectNamedPipe(serverPipe);
             continue;
@@ -57,7 +112,7 @@ int main() {
         fflush(stdout);
 
         DWORD bytesWritten = 0;
-        WriteFile(serverPipe, "OK", 2, &bytesWritten, NULL);
+        WriteFile(serverPipe, "OK", 2, &bytesWritten, nullptr);
         DisconnectNamedPipe(serverPipe);
     }
 }
