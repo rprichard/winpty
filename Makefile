@@ -71,10 +71,16 @@ install : all
 clean :
 	rm -fr build
 
+clean-msvs :
+	rm -fr src/Default
+	rm -f src/*.vcxproj
+	rm -f src/*.vcxproj.filters
+	rm -f src/*.sln
+
 distclean : clean
 	rm -f config.mk
 
-.PHONY : default all tests install clean distclean
+.PHONY : default all tests install clean clean-msvs distclean
 
 build/mingw/%.o : src/%.cc VERSION.txt
 	@echo Compiling $<
