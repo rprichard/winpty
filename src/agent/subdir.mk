@@ -39,6 +39,7 @@ AGENT_OBJECTS = \
 	build/mingw/shared/Buffer.o \
 	build/mingw/shared/DebugClient.o \
 	build/mingw/shared/GenRandom.o \
+	build/mingw/shared/WindowsSecurity.o \
 	build/mingw/shared/WinptyAssert.o \
 	build/mingw/shared/WinptyVersion.o \
 	build/mingw/shared/winpty_wcsnlen.o

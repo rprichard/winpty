@@ -27,7 +27,8 @@ LIBWINPTY_OBJECTS = \
 	build/mingw/libwinpty/winpty.o \
 	build/mingw/shared/Buffer.o \
 	build/mingw/shared/DebugClient.o \
-	build/mingw/shared/GenRandom.o
+	build/mingw/shared/GenRandom.o \
+	build/mingw/shared/WindowsSecurity.o
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)
 	@echo Linking $@

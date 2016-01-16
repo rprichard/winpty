@@ -34,6 +34,7 @@
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 #include "../shared/DebugClient.h"
+#include "../shared/WindowsSecurity.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/c99_snprintf.h"
 #include "ConsoleFont.h"
@@ -52,6 +53,8 @@ const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 
 #define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
+
+using namespace winpty_shared;
 
 namespace {
 
@@ -254,14 +257,19 @@ NamedPipe *Agent::makeDataPipe(bool write)
         (write ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND)
             | FILE_FLAG_FIRST_PIPE_INSTANCE
             | FILE_FLAG_OVERLAPPED;
+    const auto sd = createPipeSecurityDescriptorOwnerFullControl();
+    ASSERT(sd && "error creating data pipe SECURITY_DESCRIPTOR");
+    SECURITY_ATTRIBUTES sa = {};
+    sa.nLength = sizeof(sa);
+    sa.lpSecurityDescriptor = sd.get();
     HANDLE ret = CreateNamedPipeW(name.c_str(),
                                   /*dwOpenMode=*/openMode,
-                                  /*dwPipeMode=*/0,
+                                  /*dwPipeMode=*/rejectRemoteClientsPipeFlag(),
                                   /*nMaxInstances=*/1,
                                   /*nOutBufferSize=*/(write ? 8192 : 0),
                                   /*nInBufferSize=*/(write ? 0 : 256),
                                   /*nDefaultTimeOut=*/30000,
-                                  nullptr);
+                                  &sa);
     if (ret == INVALID_HANDLE_VALUE) {
         trace("error: could not open data pipe %ls", name.c_str());
         abort();

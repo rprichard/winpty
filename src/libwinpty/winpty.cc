@@ -39,12 +39,14 @@
 #include "../shared/Buffer.h"
 #include "../shared/DebugClient.h"
 #include "../shared/GenRandom.h"
+#include "../shared/WindowsSecurity.h"
 #include "BackgroundDesktop.h"
 #include "Util.h"
 #include "WinptyException.h"
 #include "WinptyInternal.h"
 
 using namespace libwinpty;
+using namespace winpty_shared;
 
 // Work around a bug with mingw-gcc-g++.  mingw-w64 is unaffected.  See
 // GitHub issue 27.
@@ -314,19 +316,25 @@ static ReadBuffer readPacket(winpty_t *wp) {
 }
 
 static OwnedHandle createControlPipe(const std::wstring &name) {
-    // TODO: Set a DACL.
-    // TODO: Set the reject remote clients flag.
+    const auto sd = createPipeSecurityDescriptorOwnerFullControl();
+    if (!sd) {
+        throwWinptyException(WINPTY_ERROR_INTERNAL_ERROR,
+            L"could not create the control pipe's SECURITY_DESCRIPTOR");
+    }
+    SECURITY_ATTRIBUTES sa = {};
+    sa.nLength = sizeof(sa);
+    sa.lpSecurityDescriptor = sd.get();
     HANDLE ret = CreateNamedPipeW(name.c_str(),
                             /*dwOpenMode=*/
                             PIPE_ACCESS_DUPLEX |
                                 FILE_FLAG_FIRST_PIPE_INSTANCE |
                                 FILE_FLAG_OVERLAPPED,
-                            /*dwPipeMode=*/0,
+                            /*dwPipeMode=*/rejectRemoteClientsPipeFlag(),
                             /*nMaxInstances=*/1,
                             /*nOutBufferSize=*/8192,
                             /*nInBufferSize=*/256,
                             /*nDefaultTimeOut=*/30000,
-                            nullptr);
+                            &sa);
     if (ret == INVALID_HANDLE_VALUE) {
         throwLastWindowsError(L"CreateNamedPipeW failed");
     }
