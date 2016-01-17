@@ -47,12 +47,6 @@
 using namespace libwinpty;
 using namespace winpty_shared;
 
-// Work around a bug with mingw-gcc-g++.  mingw-w64 is unaffected.  See
-// GitHub issue 27.
-#ifndef FILE_FLAG_FIRST_PIPE_INSTANCE
-#define FILE_FLAG_FIRST_PIPE_INSTANCE 0x00080000
-#endif
-
 #define AGENT_EXE L"winpty-agent.exe"
 
 
@@ -327,7 +321,7 @@ static OwnedHandle createControlPipe(const std::wstring &name) {
     HANDLE ret = CreateNamedPipeW(name.c_str(),
                             /*dwOpenMode=*/
                             PIPE_ACCESS_DUPLEX |
-                                FILE_FLAG_FIRST_PIPE_INSTANCE |
+                                kFILE_FLAG_FIRST_PIPE_INSTANCE |
                                 FILE_FLAG_OVERLAPPED,
                             /*dwPipeMode=*/rejectRemoteClientsPipeFlag(),
                             /*nMaxInstances=*/1,

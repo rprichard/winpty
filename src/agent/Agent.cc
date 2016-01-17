@@ -43,12 +43,6 @@
 #include "Terminal.h"
 #include "Win32Console.h"
 
-// Work around a bug with mingw-gcc-g++.  mingw-w64 is unaffected.  See
-// GitHub issue 27.
-#ifndef FILE_FLAG_FIRST_PIPE_INSTANCE
-#define FILE_FLAG_FIRST_PIPE_INSTANCE 0x00080000
-#endif
-
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
 
@@ -255,7 +249,7 @@ NamedPipe *Agent::makeDataPipe(bool write)
             << m_genRandom.uniqueName()).str_moved();
     const DWORD openMode =
         (write ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND)
-            | FILE_FLAG_FIRST_PIPE_INSTANCE
+            | kFILE_FLAG_FIRST_PIPE_INSTANCE
             | FILE_FLAG_OVERLAPPED;
     const auto sd = createPipeSecurityDescriptorOwnerFullControl();
     ASSERT(sd && "error creating data pipe SECURITY_DESCRIPTOR");

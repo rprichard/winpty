@@ -31,6 +31,13 @@
 
 namespace winpty_shared {
 
+// Work around a bug with mingw-gcc-g++.  mingw-w64 is unaffected.  See
+// GitHub issue 27.  There was a typo in the MinGW's headers that was fixed
+// on 2013-09-18 [1].  As of January 2016, the fix has *still* not made it
+// into Cygwin's MinGW toolchain.
+// [1] http://sourceforge.net/p/mingw/bugs/2050/
+const DWORD kFILE_FLAG_FIRST_PIPE_INSTANCE = 0x00080000;
+
 struct LocalFreer {
     void operator()(void *ptr) {
         if (ptr != nullptr) {

@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
 
     HANDLE serverPipe = CreateNamedPipeW(
         kPipeName,
-        /*dwOpenMode=*/PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+        /*dwOpenMode=*/PIPE_ACCESS_DUPLEX | kFILE_FLAG_FIRST_PIPE_INSTANCE,
         /*dwPipeMode=*/PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE |
             rejectRemoteClientsPipeFlag(),
         /*nMaxInstances=*/1,

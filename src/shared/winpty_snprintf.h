@@ -54,7 +54,9 @@
 #define WINPTY_SNPRINTF_H
 
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <wchar.h>
 
 // 64-bit format strings.
 
