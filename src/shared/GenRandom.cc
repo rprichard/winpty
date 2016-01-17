@@ -23,9 +23,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <sstream>
-
 #include "DebugClient.h"
+#include "StringBuilder.h"
 
 namespace winpty_shared {
 
@@ -120,19 +119,18 @@ std::wstring GenRandom::uniqueName() {
     GetSystemTimeAsFileTime(&monotonicTime);
     uint64_t monotonicTime64;
     memcpy(&monotonicTime64, &monotonicTime, sizeof(uint64_t));
-    std::wstringstream ss;
-    ss << GetCurrentProcessId()
+    WStringBuilder sb(64);
+    sb << GetCurrentProcessId()
        << L'-' << InterlockedIncrement(&g_pipeCounter)
-       << std::hex
-       << L'-' << monotonicTime64;
+       << L'-' << whexOfInt(monotonicTime64);
     // It isn't clear to me how the crypto APIs would fail.  It *probably*
     // doesn't matter that much anyway?  In principle, a predictable pipe name
     // is subject to a local denial-of-service attack.
     auto random = randomHexString(12);
     if (!random.empty()) {
-        ss << '-' << random;
+        sb << L'-' << random;
     }
-    return ss.str();
+    return sb.str_moved();
 }
 
 } // winpty_shared namespace

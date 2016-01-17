@@ -24,7 +24,6 @@
 #include <string.h>
 
 #include <algorithm>
-#include <sstream>
 #include <string>
 
 #include "DebugShowInput.h"
@@ -32,11 +31,14 @@
 #include "DsrSender.h"
 #include "Win32Console.h"
 #include "../shared/DebugClient.h"
+#include "../shared/StringBuilder.h"
 #include "../shared/UnixCtrlChars.h"
 
 #ifndef MAPVK_VK_TO_VSC
 #define MAPVK_VK_TO_VSC 0
 #endif
+
+using namespace winpty_shared;
 
 namespace {
 
@@ -49,14 +51,13 @@ struct MouseRecord {
 };
 
 std::string MouseRecord::toString() const {
-    std::stringstream ss;
-    ss << "pos=" << std::dec << coord.X << "," << coord.Y
-       << " flags=0x"
-       << std::hex << flags;
+    StringBuilder sb(40);
+    sb << "pos=" << coord.X << ',' << coord.Y
+       << " flags=0x" << hexOfInt(flags);
     if (release) {
-        ss << " release";
+        sb << " release";
     }
-    return ss.str();
+    return sb.str_moved();
 }
 
 const unsigned int kIncompleteEscapeTimeoutMs = 1000u;

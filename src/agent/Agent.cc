@@ -26,7 +26,6 @@
 #include <string.h>
 #include <stdint.h>
 
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -34,6 +33,7 @@
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 #include "../shared/DebugClient.h"
+#include "../shared/StringBuilder.h"
 #include "../shared/WindowsSecurity.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/c99_snprintf.h"
@@ -248,11 +248,11 @@ NamedPipe *Agent::connectToNamedPipe(const std::wstring &pipeName)
 // Returns a new server named pipe.  It has not yet been connected.
 NamedPipe *Agent::makeDataPipe(bool write)
 {
-    std::wstringstream nameSS;
-    nameSS << L"\\\\.\\pipe\\winpty-data-"
-           << (write ? L"conout-" : L"conin-")
-           << m_genRandom.uniqueName();
-    const auto name = nameSS.str();
+    const auto name =
+        (WStringBuilder(128)
+            << L"\\\\.\\pipe\\winpty-data-"
+            << (write ? L"conout-" : L"conin-")
+            << m_genRandom.uniqueName()).str_moved();
     const DWORD openMode =
         (write ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND)
             | FILE_FLAG_FIRST_PIPE_INSTANCE

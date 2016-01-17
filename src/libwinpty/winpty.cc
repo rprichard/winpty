@@ -29,7 +29,6 @@
 
 #include <memory>
 #include <new>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -38,6 +37,7 @@
 #include "../shared/Buffer.h"
 #include "../shared/DebugClient.h"
 #include "../shared/GenRandom.h"
+#include "../shared/StringBuilder.h"
 #include "../shared/WindowsSecurity.h"
 #include "BackgroundDesktop.h"
 #include "Util.h"
@@ -351,12 +351,12 @@ static bool shouldShowConsoleWindow() {
 static OwnedHandle startAgentProcess(const std::wstring &desktopName,
                                      const std::wstring &controlPipeName,
                                      DWORD flags, int cols, int rows) {
-    std::wstring exePath = findAgentProgram();
-    std::wstringstream cmdlineStream;
-    cmdlineStream << L"\"" << exePath << L"\" "
-                  << controlPipeName << " "
-                  << flags << " " << cols << " " << rows;
-    std::wstring cmdline = cmdlineStream.str();
+    const std::wstring exePath = findAgentProgram();
+    const std::wstring cmdline =
+        (WStringBuilder(256)
+            << L"\"" << exePath << L"\" "
+            << controlPipeName << L' '
+            << flags << L' ' << cols << L' ' << rows).str_moved();
 
     // Start the agent.
     auto desktopNameM = modifiableWString(desktopName);
@@ -381,10 +381,10 @@ static OwnedHandle startAgentProcess(const std::wstring &desktopName,
                        &sui, &pi);
     if (!success) {
         const DWORD lastError = GetLastError();
-        std::wstringstream ss;
-        ss << "winpty-agent CreateProcess failed: cmdline='" << cmdline
-           << "' err=0x" << std::hex << lastError;
-        auto errStr = ss.str();
+        const auto errStr =
+            (WStringBuilder(256)
+                << L"winpty-agent CreateProcess failed: cmdline='" << cmdline
+                << L"' err=0x" << whexOfInt(lastError)).str_moved();
         trace("%ls", errStr.c_str());
         throwWinptyException(WINPTY_ERROR_AGENT_CREATION_FAILED, errStr);
     }
