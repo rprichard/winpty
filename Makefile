@@ -34,8 +34,10 @@ MINGW_OPTIMIZATION_FLAGS ?= -O2
 
 include config.mk
 
+VERSION := $(shell cat VERSION.txt | tr -d '\r\n')
+
 COMMON_CXXFLAGS += \
-	-DWINPTY_VERSION=$$(cat VERSION.txt | tr -d '\r\n') \
+	-DWINPTY_VERSION=$(VERSION) \
 	-DWINPTY_VERSION_SUFFIX=$(VERSION_SUFFIX) \
 	-DWINPTY_COMMIT_HASH=$(COMMIT_HASH) \
 	-MMD -Wall \
