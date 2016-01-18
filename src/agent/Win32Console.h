@@ -51,7 +51,6 @@ public:
     HANDLE conin();
     HANDLE conout();
     HWND hwnd();
-    void postCloseMessage();
     void clearLines(int row, int count, const ConsoleScreenBufferInfo &info);
     void clearAllLines(const ConsoleScreenBufferInfo &info);
 

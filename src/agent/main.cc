@@ -76,4 +76,8 @@ int main(int argc, char *argv[])
                 atoi(argv[3]),
                 atoi(argv[4]));
     agent.run();
+
+    // The Agent destructor shouldn't return, but if it does, exit
+    // unsuccessfully.
+    return 1;
 }

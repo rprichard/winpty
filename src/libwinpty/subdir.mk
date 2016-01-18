@@ -31,6 +31,7 @@ LIBWINPTY_OBJECTS = \
 	build/libwinpty/shared/DebugClient.o \
 	build/libwinpty/shared/GenRandom.o \
 	build/libwinpty/shared/WindowsSecurity.o \
+	build/libwinpty/shared/WinptyAssert.o \
 	build/libwinpty/shared/winpty_snprintf.o
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)

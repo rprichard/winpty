@@ -32,6 +32,9 @@
         {
             'target_name' : 'winpty-agent',
             'type' : 'executable',
+            'defines' : [
+                'WINPTY_AGENT_ASSERT',
+            ],
             'libraries' : [
                 '-ladvapi32',
                 '-luser32',
@@ -120,6 +123,8 @@
                 'shared/StringBuilder.h',
                 'shared/WindowsSecurity.h',
                 'shared/WindowsSecurity.cc',
+                'shared/WinptyAssert.h',
+                'shared/WinptyAssert.cc',
                 'shared/cxx11_mutex.h',
                 'shared/cxx11_noexcept.h',
                 'shared/winpty_snprintf.h',
@@ -135,6 +140,8 @@
                 'shared/DebugClient.cc',
                 'shared/WindowsSecurity.h',
                 'shared/WindowsSecurity.cc',
+                'shared/WinptyAssert.h',
+                'shared/WinptyAssert.cc',
                 'shared/winpty_snprintf.h',
                 'shared/winpty_snprintf.cc',
             ],

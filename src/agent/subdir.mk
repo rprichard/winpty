@@ -20,7 +20,7 @@
 
 ALL_TARGETS += build/winpty-agent.exe
 
-$(eval $(call def_mingw_target,agent,))
+$(eval $(call def_mingw_target,agent,-DWINPTY_AGENT_ASSERT))
 
 AGENT_OBJECTS = \
 	build/agent/agent/Agent.o \

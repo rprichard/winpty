@@ -26,6 +26,7 @@ DEBUGSERVER_OBJECTS = \
 	build/debugserver/debugserver/DebugServer.o \
 	build/debugserver/shared/DebugClient.o \
 	build/debugserver/shared/WindowsSecurity.o \
+	build/debugserver/shared/WinptyAssert.o \
 	build/debugserver/shared/winpty_snprintf.o
 
 build/winpty-debugserver.exe : $(DEBUGSERVER_OBJECTS)

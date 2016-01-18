@@ -29,6 +29,7 @@ UNIX_ADAPTER_OBJECTS = \
 	build/unix-adapter/unix-adapter/WakeupFd.o \
 	build/unix-adapter/unix-adapter/main.o \
 	build/unix-adapter/shared/DebugClient.o \
+	build/unix-adapter/shared/WinptyAssert.o \
 	build/unix-adapter/shared/WinptyVersion.o \
 	build/unix-adapter/shared/winpty_snprintf.o
 

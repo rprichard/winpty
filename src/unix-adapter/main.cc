@@ -42,6 +42,7 @@
 #include <winpty.h>
 #include "../shared/DebugClient.h"
 #include "../shared/UnixCtrlChars.h"
+#include "../shared/WinptyAssert.h"
 #include "../shared/WinptyVersion.h"
 #include "InputHandler.h"
 #include "OutputHandler.h"
