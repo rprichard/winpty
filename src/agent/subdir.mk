@@ -20,30 +20,32 @@
 
 ALL_TARGETS += build/winpty-agent.exe
 
+$(eval $(call def_mingw_target,agent,))
+
 AGENT_OBJECTS = \
-	build/mingw/agent/Agent.o \
-	build/mingw/agent/ConsoleFont.o \
-	build/mingw/agent/ConsoleInput.o \
-	build/mingw/agent/ConsoleLine.o \
-	build/mingw/agent/Coord.o \
-	build/mingw/agent/DebugShowInput.o \
-	build/mingw/agent/DefaultInputMap.o \
-	build/mingw/agent/EventLoop.o \
-	build/mingw/agent/InputMap.o \
-	build/mingw/agent/LargeConsoleRead.o \
-	build/mingw/agent/NamedPipe.o \
-	build/mingw/agent/SmallRect.o \
-	build/mingw/agent/Terminal.o \
-	build/mingw/agent/Win32Console.o \
-	build/mingw/agent/main.o \
-	build/mingw/shared/Buffer.o \
-	build/mingw/shared/DebugClient.o \
-	build/mingw/shared/GenRandom.o \
-	build/mingw/shared/WindowsSecurity.o \
-	build/mingw/shared/WinptyAssert.o \
-	build/mingw/shared/WinptyVersion.o \
-	build/mingw/shared/winpty_snprintf.o \
-	build/mingw/shared/winpty_wcsnlen.o
+	build/agent/agent/Agent.o \
+	build/agent/agent/ConsoleFont.o \
+	build/agent/agent/ConsoleInput.o \
+	build/agent/agent/ConsoleLine.o \
+	build/agent/agent/Coord.o \
+	build/agent/agent/DebugShowInput.o \
+	build/agent/agent/DefaultInputMap.o \
+	build/agent/agent/EventLoop.o \
+	build/agent/agent/InputMap.o \
+	build/agent/agent/LargeConsoleRead.o \
+	build/agent/agent/NamedPipe.o \
+	build/agent/agent/SmallRect.o \
+	build/agent/agent/Terminal.o \
+	build/agent/agent/Win32Console.o \
+	build/agent/agent/main.o \
+	build/agent/shared/Buffer.o \
+	build/agent/shared/DebugClient.o \
+	build/agent/shared/GenRandom.o \
+	build/agent/shared/WindowsSecurity.o \
+	build/agent/shared/WinptyAssert.o \
+	build/agent/shared/WinptyVersion.o \
+	build/agent/shared/winpty_snprintf.o \
+	build/agent/shared/winpty_wcsnlen.o
 
 build/winpty-agent.exe : $(AGENT_OBJECTS)
 	@echo Linking $@

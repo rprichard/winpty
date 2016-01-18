@@ -55,6 +55,20 @@ MINGW_CXXFLAGS += \
 MINGW_LDFLAGS += -static -static-libgcc -static-libstdc++
 UNIX_LDFLAGS += $(UNIX_LDFLAGS_STATIC)
 
+define def_unix_target
+build/$1/%.o : src/%.cc VERSION.txt
+	@echo Compiling $$<
+	@mkdir -p $$$$(dirname $$@)
+	@$$(UNIX_CXX) $$(UNIX_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
+endef
+
+define def_mingw_target
+build/$1/%.o : src/%.cc VERSION.txt
+	@echo Compiling $$<
+	@mkdir -p $$$$(dirname $$@)
+	@$$(MINGW_CXX) $$(MINGW_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
+endef
+
 include src/subdir.mk
 
 all : $(ALL_TARGETS)
@@ -81,16 +95,6 @@ distclean : clean
 	rm -f config.mk
 
 .PHONY : default all tests install clean clean-msvs distclean
-
-build/mingw/%.o : src/%.cc VERSION.txt
-	@echo Compiling $<
-	@mkdir -p $$(dirname $@)
-	@$(MINGW_CXX) $(MINGW_CXXFLAGS) -I src/include -c -o $@ $<
-
-build/unix/%.o : src/%.cc VERSION.txt
-	@echo Compiling $<
-	@mkdir -p $$(dirname $@)
-	@$(UNIX_CXX) $(UNIX_CXXFLAGS) -I src/include -c -o $@ $<
 
 src/%.h :
 	@echo "Missing header file $@ (stale dependency file?)"

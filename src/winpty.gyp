@@ -94,6 +94,9 @@
         {
             'target_name' : 'winpty',
             'type' : 'shared_library',
+            'defines' : [
+                'COMPILING_WINPTY_DLL',
+            ],
             'libraries' : [
                 '-ladvapi32',
                 '-luser32',

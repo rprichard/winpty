@@ -20,16 +20,18 @@
 
 ALL_TARGETS += build/winpty.dll
 
+$(eval $(call def_mingw_target,libwinpty,-DCOMPILING_WINPTY_DLL))
+
 LIBWINPTY_OBJECTS = \
-	build/mingw/libwinpty/BackgroundDesktop.o \
-	build/mingw/libwinpty/Util.o \
-	build/mingw/libwinpty/WinptyException.o \
-	build/mingw/libwinpty/winpty.o \
-	build/mingw/shared/Buffer.o \
-	build/mingw/shared/DebugClient.o \
-	build/mingw/shared/GenRandom.o \
-	build/mingw/shared/WindowsSecurity.o \
-	build/mingw/shared/winpty_snprintf.o
+	build/libwinpty/libwinpty/BackgroundDesktop.o \
+	build/libwinpty/libwinpty/Util.o \
+	build/libwinpty/libwinpty/WinptyException.o \
+	build/libwinpty/libwinpty/winpty.o \
+	build/libwinpty/shared/Buffer.o \
+	build/libwinpty/shared/DebugClient.o \
+	build/libwinpty/shared/GenRandom.o \
+	build/libwinpty/shared/WindowsSecurity.o \
+	build/libwinpty/shared/winpty_snprintf.o
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)
 	@echo Linking $@
