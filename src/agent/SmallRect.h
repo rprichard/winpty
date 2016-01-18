@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <string>
 
+#include "../shared/winpty_snprintf.h"
 #include "Coord.h"
 
 struct SmallRect : SMALL_RECT
@@ -122,7 +123,13 @@ struct SmallRect : SMALL_RECT
         return !(*this == other);
     }
 
-    std::string toString() const;
+    std::string toString() const
+    {
+        char ret[64];
+        winpty_snprintf(ret, "(x=%d,y=%d,w=%d,h=%d)",
+                        Left, Top, width(), height());
+        return std::string(ret);
+    }
 };
 
 #endif // SMALLRECT_H

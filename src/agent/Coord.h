@@ -22,7 +22,10 @@
 #define COORD_H
 
 #include <windows.h>
+
 #include <string>
+
+#include "../shared/winpty_snprintf.h"
 
 struct Coord : COORD {
     Coord()
@@ -73,7 +76,12 @@ struct Coord : COORD {
         return X <= 0 || Y <= 0;
     }
 
-    std::string toString() const;
+    std::string toString() const
+    {
+        char ret[32];
+        winpty_snprintf(ret, "(%d,%d)", X, Y);
+        return std::string(ret);
+    }
 };
 
 #endif // COORD_H
