@@ -34,10 +34,8 @@ MINGW_ENABLE_CXX11_FLAG ?= -std=c++11
 
 include config.mk
 
-VERSION := $(shell cat VERSION.txt | tr -d '\r\n')
-
-COMMON_CXXFLAGS += \
-	-DWINPTY_VERSION=$(VERSION) \
+COMMON_CXXFLAGS := $(COMMON_CXXFLAGS) \
+	-DWINPTY_VERSION=$(shell cat VERSION.txt | tr -d '\r\n') \
 	-DWINPTY_VERSION_SUFFIX=$(VERSION_SUFFIX) \
 	-DWINPTY_COMMIT_HASH=$(COMMIT_HASH) \
 	-MMD -Wall \
@@ -46,10 +44,10 @@ COMMON_CXXFLAGS += \
 	-DWINVER=0x0501 \
 	-D_WIN32_WINNT=0x0501
 
-UNIX_CXXFLAGS += \
+UNIX_CXXFLAGS := $(UNIX_CXXFLAGS) \
 	$(COMMON_CXXFLAGS)
 
-MINGW_CXXFLAGS += \
+MINGW_CXXFLAGS := $(MINGW_CXXFLAGS) \
 	$(COMMON_CXXFLAGS) \
 	-O2 \
 	$(MINGW_ENABLE_CXX11_FLAG)
@@ -60,14 +58,14 @@ UNIX_LDFLAGS += $(UNIX_LDFLAGS_STATIC)
 define def_unix_target
 build/$1/%.o : src/%.cc VERSION.txt
 	@echo Compiling $$<
-	@mkdir -p $$$$(dirname $$@)
+	@mkdir -p $$(dir $$@)
 	@$$(UNIX_CXX) $$(UNIX_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
 endef
 
 define def_mingw_target
 build/$1/%.o : src/%.cc VERSION.txt
 	@echo Compiling $$<
-	@mkdir -p $$$$(dirname $$@)
+	@mkdir -p $$(dir $$@)
 	@$$(MINGW_CXX) $$(MINGW_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
 endef
 
