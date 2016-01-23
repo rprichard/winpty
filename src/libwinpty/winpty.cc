@@ -37,6 +37,7 @@
 #include "../shared/GenRandom.h"
 #include "../shared/StringBuilder.h"
 #include "../shared/WindowsSecurity.h"
+#include "../shared/WinptyAssert.h"
 #include "BackgroundDesktop.h"
 #include "Util.h"
 #include "WinptyException.h"
@@ -54,13 +55,11 @@ using namespace winpty_shared;
  * output and log the result. */
 
 WINPTY_API winpty_result_t winpty_error_code(winpty_error_ptr_t err) {
-    return err != nullptr ? err->code
-                          : WINPTY_ERROR_INVALID_ARGUMENT;
+    return err == nullptr ? WINPTY_ERROR_SUCCESS : err->code;
 }
 
 WINPTY_API LPCWSTR winpty_error_msg(winpty_error_ptr_t err) {
-    return err != nullptr ? err->msg
-                          : L"winpty_error_str argument is NULL";
+    return err == nullptr ? L"Success" : err->msg;
 }
 
 WINPTY_API void winpty_error_free(winpty_error_ptr_t err) {
@@ -69,11 +68,6 @@ WINPTY_API void winpty_error_free(winpty_error_ptr_t err) {
         delete err;
     }
 }
-
-STATIC_ERROR(kInvalidArgument,
-    WINPTY_ERROR_INVALID_ARGUMENT,
-    L"invalid argument"
-);
 
 STATIC_ERROR(kBadRpcPacket,
     WINPTY_ERROR_INTERNAL_ERROR,
@@ -107,16 +101,6 @@ static void translateException(winpty_error_ptr_t *&err) {
     }
 }
 
-static void throwInvalidArgument() {
-    throwStaticError(kInvalidArgument);
-}
-
-static inline void require_arg(bool cond) {
-    if (!cond) {
-        throwInvalidArgument();
-    }
-}
-
 #define API_TRY \
     if (err != nullptr) { *err = nullptr; } \
     try
@@ -132,7 +116,7 @@ static inline void require_arg(bool cond) {
 WINPTY_API winpty_config_t *
 winpty_config_new(DWORD flags, winpty_error_ptr_t *err /*OPTIONAL*/) {
     API_TRY {
-        require_arg((flags & WINPTY_FLAG_MASK) == flags);
+        ASSERT((flags & WINPTY_FLAG_MASK) == flags);
         std::unique_ptr<winpty_config_t> ret(new winpty_config_t);
         ret->flags = flags;
         return ret.release();
@@ -147,7 +131,7 @@ WINPTY_API BOOL
 winpty_config_set_initial_size(winpty_config_t *cfg, int cols, int rows,
                                winpty_error_ptr_t *err /*OPTIONAL*/) {
     API_TRY {
-        require_arg(cfg != nullptr && cols > 0 && rows > 0);
+        ASSERT(cfg != nullptr && cols > 0 && rows > 0);
         cfg->cols = cols;
         cfg->rows = rows;
         return TRUE;
@@ -158,7 +142,7 @@ WINPTY_API BOOL
 winpty_config_set_agent_timeout(winpty_config_t *cfg, DWORD timeoutMs,
                                 winpty_error_ptr_t *err /*OPTIONAL*/) {
     API_TRY {
-        require_arg(cfg != nullptr && timeoutMs > 0);
+        ASSERT(cfg != nullptr && timeoutMs > 0);
         cfg->timeoutMs = timeoutMs;
         return TRUE;
     } API_CATCH(FALSE)
@@ -202,8 +186,8 @@ static void handlePendingIo(winpty_t *wp, OVERLAPPED &over, BOOL &success,
             } else if (waitRet == WAIT_FAILED) {
                 throwLastWindowsError(L"WaitForMultipleObjects failed");
             } else {
-                throwWinptyException(WINPTY_ERROR_INTERNAL_ERROR,
-                    L"unexpected WaitForMultipleObjects return value");
+                ASSERT(false &&
+                    "unexpected WaitForMultipleObjects return value");
             }
         }
         success = io.waitForCompletion(actual);
@@ -257,13 +241,10 @@ static void writeData(winpty_t *wp, const void *data, size_t amount) {
     if (!success) {
         handlePendingIo(wp, over, success, actual);
         handleReadWriteErrors(wp, success, L"WriteFile failed");
+        ASSERT(success);
     }
-    if (actual != amount) {
-        // TODO: We failed during the write.  We *probably* should permanently
-        // shut things down, disconnect at least the control pipe.
-        throwWinptyException(WINPTY_ERROR_INTERNAL_ERROR,
-            L"WriteFile wrote fewer bytes than requested");
-    }
+    // TODO: Can a partial write actually happen somehow?
+    ASSERT(actual == amount && "WriteFile wrote fewer bytes than requested");
 }
 
 static void writePacket(winpty_t *wp, WriteBuffer &packet) {
@@ -390,7 +371,7 @@ WINPTY_API winpty_t *
 winpty_open(const winpty_config_t *cfg,
             winpty_error_ptr_t *err /*OPTIONAL*/) {
     API_TRY {
-        require_arg(cfg != nullptr);
+        ASSERT(cfg != nullptr);
 
         std::unique_ptr<winpty_t> wp(new winpty_t);
         wp->agentTimeoutMs = cfg->timeoutMs;
@@ -432,7 +413,8 @@ winpty_open(const winpty_config_t *cfg,
 }
 
 WINPTY_API HANDLE winpty_agent_process(winpty_t *wp) {
-    return wp == nullptr ? nullptr : wp->agentProcess.get();
+    ASSERT(wp != nullptr);
+    return wp->agentProcess.get();
 }
 
 
@@ -441,10 +423,12 @@ WINPTY_API HANDLE winpty_agent_process(winpty_t *wp) {
  * I/O pipes. */
 
 WINPTY_API LPCWSTR winpty_conin_name(winpty_t *wp) {
-    return wp == nullptr ? nullptr : cstrFromWStringOrNull(wp->coninPipeName);
+    ASSERT(wp != nullptr);
+    return cstrFromWStringOrNull(wp->coninPipeName);
 }
 WINPTY_API LPCWSTR winpty_conout_name(winpty_t *wp) {
-    return wp == nullptr ? nullptr : cstrFromWStringOrNull(wp->conoutPipeName);
+    ASSERT(wp != nullptr);
+    return cstrFromWStringOrNull(wp->conoutPipeName);
 }
 
 
@@ -460,7 +444,7 @@ winpty_spawn_config_new(DWORD winptyFlags,
                         LPCWSTR env /*OPTIONAL*/,
                         winpty_error_ptr_t *err /*OPTIONAL*/) {
     API_TRY {
-        require_arg((winptyFlags & WINPTY_SPAWN_FLAG_MASK) == winptyFlags);
+        ASSERT((winptyFlags & WINPTY_SPAWN_FLAG_MASK) == winptyFlags);
         std::unique_ptr<winpty_spawn_config_t> cfg(new winpty_spawn_config_t);
         cfg->winptyFlags = winptyFlags;
         if (appname != nullptr) { cfg->appname = appname; }
@@ -510,7 +494,7 @@ winpty_spawn(winpty_t *wp,
     if (thread_handle != nullptr) { *thread_handle = nullptr; }
     if (create_process_error != nullptr) { *create_process_error = 0; }
     API_TRY {
-        require_arg(wp != nullptr && cfg != nullptr);
+        ASSERT(wp != nullptr && cfg != nullptr);
         winpty_cxx11::lock_guard<winpty_cxx11::mutex> lock(wp->mutex);
 
         // Send spawn request.
@@ -580,7 +564,7 @@ WINPTY_API BOOL
 winpty_set_size(winpty_t *wp, int cols, int rows,
                 winpty_error_ptr_t *err /*OPTIONAL*/) {
     API_TRY {
-        require_arg(wp != nullptr && cols > 0 && rows > 0);
+        ASSERT(wp != nullptr && cols > 0 && rows > 0);
         winpty_cxx11::lock_guard<winpty_cxx11::mutex> lock(wp->mutex);
         WriteBuffer packet;
         packet.putRawInt32(0); // payload size

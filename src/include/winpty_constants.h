@@ -37,16 +37,16 @@
 /*****************************************************************************
  * Error codes. */
 
+#define WINPTY_ERROR_SUCCESS                        0
 #define WINPTY_ERROR_OUT_OF_MEMORY                  1
 #define WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED    2
-#define WINPTY_ERROR_INVALID_ARGUMENT               3
-#define WINPTY_ERROR_LOST_CONNECTION                4
-#define WINPTY_ERROR_AGENT_EXE_MISSING              5
-#define WINPTY_ERROR_WINDOWS_ERROR                  6
-#define WINPTY_ERROR_INTERNAL_ERROR                 7
-#define WINPTY_ERROR_AGENT_DIED                     8
-#define WINPTY_ERROR_AGENT_TIMEOUT                  9
-#define WINPTY_ERROR_AGENT_CREATION_FAILED          10
+#define WINPTY_ERROR_LOST_CONNECTION                3
+#define WINPTY_ERROR_AGENT_EXE_MISSING              4
+#define WINPTY_ERROR_WINDOWS_ERROR                  5
+#define WINPTY_ERROR_INTERNAL_ERROR                 6
+#define WINPTY_ERROR_AGENT_DIED                     7
+#define WINPTY_ERROR_AGENT_TIMEOUT                  8
+#define WINPTY_ERROR_AGENT_CREATION_FAILED          9
 
 
 
