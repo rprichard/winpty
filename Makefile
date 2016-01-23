@@ -30,7 +30,7 @@ ifeq "$(wildcard config.mk)" ""
     $(error config.mk does not exist.  Please run ./configure)
 endif
 
-MINGW_OPTIMIZATION_FLAGS ?= -O2
+MINGW_ENABLE_CXX11_FLAG ?= -std=c++11
 
 include config.mk
 
@@ -51,8 +51,8 @@ UNIX_CXXFLAGS += \
 
 MINGW_CXXFLAGS += \
 	$(COMMON_CXXFLAGS) \
-	$(MINGW_OPTIMIZATION_FLAGS) \
-	-std=c++11
+	-O2 \
+	$(MINGW_ENABLE_CXX11_FLAG)
 
 MINGW_LDFLAGS += -static -static-libgcc -static-libstdc++
 UNIX_LDFLAGS += $(UNIX_LDFLAGS_STATIC)

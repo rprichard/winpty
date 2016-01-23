@@ -149,10 +149,11 @@ echo MINGW_CXX=$MINGW_CXX >> config.mk
 if test $IS_MSYS1 = 1; then
     echo UNIX_CXXFLAGS += -DWINPTY_TARGET_MSYS1 >> config.mk
     # The MSYS1 MinGW compiler has a bug that prevents inclusion of algorithm
-    # and math.h in C++11 mode.  The workaround is to disable optimizations.
-    # It was fixed on 2015-07-31, but as of 2016-01-05, the fix hasn't been
-    # released.  See http://ehc.ac/p/mingw/bugs/2250/.
-    echo MINGW_OPTIMIZATION_FLAGS = >> config.mk
+    # and math.h in normal C++11 mode.  The workaround is to enable the g++11
+    # mode instead.  The bug was fixed on 2015-07-31, but as of 2016-01-05, the
+    # fix apparently hasn't been released.  See
+    # http://ehc.ac/p/mingw/bugs/2250/.
+    echo MINGW_ENABLE_CXX11_FLAG = -std=gnu++11 >> config.mk
 fi
 
 # Figure out how to embed build info (e.g. git commit) into the binary.
