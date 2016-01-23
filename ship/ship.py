@@ -97,7 +97,7 @@ def buildTarget(target):
     os.environ["PATH"] = target["path"] + ";" + oldPath
     subprocess.check_call(["sh.exe", "configure"])
     subprocess.check_call(["make.exe", "clean"])
-    buildArgs = ["make.exe", "all", "tests"]
+    buildArgs = ["make.exe", "USE_PCH=0", "all", "tests"]
     if target.get("allow_parallel_make", True):
         buildArgs += ["-j8"]
     subprocess.check_call(buildArgs)

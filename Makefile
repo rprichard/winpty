@@ -22,6 +22,7 @@
 
 default : all
 
+USE_PCH ?= 1
 PREFIX ?= /usr/local
 UNIX_ADAPTER_EXE ?= console.exe
 
@@ -62,11 +63,32 @@ build/$1/%.o : src/%.cc VERSION.txt
 	@$$(UNIX_CXX) $$(UNIX_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
 endef
 
+ifeq "$(USE_PCH)" "1"
+PCH_INCLUDE := -include
+else
+PCH_INCLUDE :=
+endif
+
 define def_mingw_target
-build/$1/%.o : src/%.cc VERSION.txt
+ifeq "$$(USE_PCH)" "1"
+H_$(1)     := build/$1/PrecompiledHeader.h
+H_GCH_$(1) := build/$1/PrecompiledHeader.h.gch
+
+$$(H_$(1)) : src/shared/PrecompiledHeader.h
+	@echo Copying $$< to $$@
+	@mkdir -p $$(dir $$@)
+	@cp $$< $$@
+
+$$(H_GCH_$(1)) : $$(H_$(1))
 	@echo Compiling $$<
 	@mkdir -p $$(dir $$@)
-	@$$(MINGW_CXX) $$(MINGW_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
+	@$$(MINGW_CXX) $$(MINGW_CXXFLAGS) $2 -c -o $$@ $$<
+endif
+
+build/$1/%.o : src/%.cc VERSION.txt $$(H_GCH_$(1))
+	@echo Compiling $$<
+	@mkdir -p $$(dir $$@)
+	@$$(MINGW_CXX) $$(MINGW_CXXFLAGS) $2 $$(PCH_INCLUDE) $$(H_$(1)) -I src/include -c -o $$@ $$<
 endef
 
 include src/subdir.mk
