@@ -250,7 +250,7 @@ NamedPipe *Agent::makeDataPipe(bool write)
             << m_genRandom.uniqueName()).str_moved();
     const DWORD openMode =
         (write ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND)
-            | kFILE_FLAG_FIRST_PIPE_INSTANCE
+            | FILE_FLAG_FIRST_PIPE_INSTANCE
             | FILE_FLAG_OVERLAPPED;
     const auto sd = createPipeSecurityDescriptorOwnerFullControl();
     ASSERT(sd && "error creating data pipe SECURITY_DESCRIPTOR");

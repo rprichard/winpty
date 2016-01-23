@@ -30,7 +30,7 @@ namespace winpty_shared {
 
 static volatile LONG g_pipeCounter;
 
-GenRandom::GenRandom() : m_advapi32(L"advapi32.dll"), m_rtlGenRandom(nullptr) {
+GenRandom::GenRandom() : m_advapi32(L"advapi32.dll") {
     // First try to use the pseudo-documented RtlGenRandom function from
     // advapi32.dll.  Creating a CryptoAPI context is slow, and RtlGenRandom
     // avoids the overhead.  It's documented in this blog post[1] and on

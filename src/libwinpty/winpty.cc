@@ -300,7 +300,7 @@ static OwnedHandle createControlPipe(const std::wstring &name) {
     HANDLE ret = CreateNamedPipeW(name.c_str(),
                             /*dwOpenMode=*/
                             PIPE_ACCESS_DUPLEX |
-                                kFILE_FLAG_FIRST_PIPE_INSTANCE |
+                                FILE_FLAG_FIRST_PIPE_INSTANCE |
                                 FILE_FLAG_OVERLAPPED,
                             /*dwPipeMode=*/rejectRemoteClientsPipeFlag(),
                             /*nMaxInstances=*/1,

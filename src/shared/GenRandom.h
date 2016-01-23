@@ -35,13 +35,8 @@ namespace winpty_shared {
 class GenRandom {
     typedef BOOLEAN WINAPI RtlGenRandom_t(PVOID, ULONG);
 
-    // The m_rtlGenRandom field is not initialized here, because doing so
-    // hits a bug in G++ 4.7, which Cygwin/MinGW is still using.  Namely, that
-    // gcc version confuses the field with a pure virtual method.  It complains
-    // that only "= 0" syntax is valid, and if you use that syntax, then g++
-    // segfaults.
     OsModule m_advapi32;
-    RtlGenRandom_t *m_rtlGenRandom; // = nullptr;
+    RtlGenRandom_t *m_rtlGenRandom = nullptr;
     bool m_cryptProvIsValid = false;
     HCRYPTPROV m_cryptProv = 0;
 
