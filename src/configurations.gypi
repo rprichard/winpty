@@ -26,9 +26,19 @@
         'configurations': {
             'Release_Win32': {
                 'msvs_configuration_platform': 'Win32',
+                'msvs_settings': {
+                    'VCCLCompilerTool': {
+                        'RuntimeLibrary': 0, # MultiThreaded (/MT)
+                    },
+                },
             },
             'Release_x64': {
                 'msvs_configuration_platform': 'x64',
+                'msvs_settings': {
+                    'VCCLCompilerTool': {
+                        'RuntimeLibrary': 0, # MultiThreaded (/MT)
+                    },
+                },
             },
         },
         'msvs_configuration_attributes': {
