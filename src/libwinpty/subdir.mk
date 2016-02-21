@@ -26,6 +26,6 @@ LIBWINPTY_OBJECTS = \
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)
 	@echo Linking $@
-	@$(MINGW_CXX) $(MINGW_LDFLAGS) -shared -o $@ $^
+	@$(MINGW_CXX) $(MINGW_LDFLAGS) -shared -o $@ $^ -Wl,--out-implib,build/winpty.lib
 
 -include $(LIBWINPTY_OBJECTS:.o=.d)
