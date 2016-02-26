@@ -24,6 +24,7 @@ default : all
 
 PREFIX ?= /usr/local
 UNIX_ADAPTER_EXE ?= console.exe
+MINGW_ENABLE_CXX11_FLAG ?= -std=c++11
 
 # Include config.mk but complain if it hasn't been created yet.
 ifeq "$(wildcard config.mk)" ""
@@ -45,9 +46,8 @@ UNIX_CXXFLAGS += \
 
 MINGW_CXXFLAGS += \
 	$(COMMON_CXXFLAGS) \
-	-fno-exceptions \
-	-fno-rtti \
-	-O2
+	-O2 \
+	$(MINGW_ENABLE_CXX11_FLAG)
 
 MINGW_LDFLAGS += -static -static-libgcc -static-libstdc++
 UNIX_LDFLAGS += $(UNIX_LDFLAGS_STATIC)
