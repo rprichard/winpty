@@ -19,7 +19,7 @@
 # IN THE SOFTWARE.
 
 build/%.exe : src/tests/%.cc build/winpty.dll
-	@echo Building $@
+	$(info Building $@)
 	@$(MINGW_CXX) $(MINGW_CXXFLAGS) $(MINGW_LDFLAGS) -std=c++11 -o $@ $^
 
 TEST_PROGRAMS = \

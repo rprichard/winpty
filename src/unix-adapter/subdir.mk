@@ -30,7 +30,7 @@ UNIX_ADAPTER_OBJECTS = \
 	build/unix/shared/WinptyVersion.o
 
 build/$(UNIX_ADAPTER_EXE) : $(UNIX_ADAPTER_OBJECTS) build/winpty.dll
-	@echo Linking $@
+	$(info Linking $@)
 	@$(UNIX_CXX) $(UNIX_LDFLAGS) -o $@ $^
 
 -include $(UNIX_ADAPTER_OBJECTS:.o=.d)

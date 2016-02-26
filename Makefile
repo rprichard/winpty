@@ -20,11 +20,20 @@
 
 # Use make -n to see the actual command-lines make would run.
 
+# The default "make install" prefix is /usr/local.  Pass PREFIX=<path> on the
+# command-line to override the default.
+
 default : all
 
-PREFIX ?= /usr/local
-UNIX_ADAPTER_EXE ?= console.exe
-MINGW_ENABLE_CXX11_FLAG ?= -std=c++11
+PREFIX := /usr/local
+UNIX_ADAPTER_EXE := console.exe
+MINGW_ENABLE_CXX11_FLAG := -std=c++11
+
+COMMON_CXXFLAGS :=
+UNIX_CXXFLAGS :=
+MINGW_CXXFLAGS :=
+MINGW_LDFLAGS :=
+UNIX_LDFLAGS :=
 
 # Include config.mk but complain if it hasn't been created yet.
 ifeq "$(wildcard config.mk)" ""
@@ -32,8 +41,9 @@ ifeq "$(wildcard config.mk)" ""
 endif
 include config.mk
 
+VERSION_TXT_CONTENT := $(shell cat VERSION.txt | tr -d '\r\n')
 COMMON_CXXFLAGS += \
-	-DWINPTY_VERSION=$$(cat VERSION.txt | tr -d '\r\n') \
+	-DWINPTY_VERSION=$(VERSION_TXT_CONTENT) \
 	-DWINPTY_VERSION_SUFFIX=$(VERSION_SUFFIX) \
 	-DWINPTY_COMMIT_HASH=$(COMMIT_HASH) \
 	-MMD -Wall \
@@ -72,13 +82,17 @@ distclean : clean
 	rm -f config.mk
 
 .PHONY : default all tests install clean distclean
+.SECONDEXPANSION :
 
-build/mingw/%.o : src/%.cc VERSION.txt
-	@echo Compiling $<
-	@mkdir -p $$(dirname $@)
+build/mingw/%.o : src/%.cc VERSION.txt | $$(@D)/.mkdir
+	$(info Compiling $<)
 	@$(MINGW_CXX) $(MINGW_CXXFLAGS) -I src/include -c -o $@ $<
 
-build/unix/%.o : src/%.cc VERSION.txt
-	@echo Compiling $<
-	@mkdir -p $$(dirname $@)
+build/unix/%.o : src/%.cc VERSION.txt | $$(@D)/.mkdir
+	$(info Compiling $<)
 	@$(UNIX_CXX) $(UNIX_CXXFLAGS) -I src/include -c -o $@ $<
+
+.PRECIOUS : %.mkdir
+%.mkdir :
+	@mkdir -p $(dir $@)
+	@touch $@

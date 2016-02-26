@@ -24,7 +24,7 @@ DEBUGSERVER_OBJECTS = \
 	build/mingw/debugserver/DebugServer.o
 
 build/winpty-debugserver.exe : $(DEBUGSERVER_OBJECTS)
-	@echo Linking $@
+	$(info Linking $@)
 	@$(MINGW_CXX) $(MINGW_LDFLAGS) -o $@ $^
 
 -include $(DEBUGSERVER_OBJECTS:.o=.d)

@@ -42,7 +42,7 @@ AGENT_OBJECTS = \
 	build/mingw/shared/winpty_wcsnlen.o
 
 build/winpty-agent.exe : $(AGENT_OBJECTS)
-	@echo Linking $@
+	$(info Linking $@)
 	@$(MINGW_CXX) $(MINGW_LDFLAGS) -o $@ $^
 
 -include $(AGENT_OBJECTS:.o=.d)
