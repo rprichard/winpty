@@ -1,7 +1,16 @@
-# Next version
+# Version 0.2.2 (2016-02-25)
 
- * Fix a bug that could have generated spurious mouse input records when an
-   incomplete mouse escape sequence was seen.
+Minor bug fixes and enhancements:
+
+ * Fix a bug that generated spurious mouse input records when an incomplete
+   mouse escape sequence was seen.
+ * Fix a buffer overflow bug in `winpty-debugserver.exe` affecting messages of
+   exactly 4096 bytes.
+ * For MSVC builds, add a `src/configurations.gypi` file that can be included
+   on the gyp command-line to enable 32-bit and 64-bit builds.
+ * `winpty-agent --show-input` mode: Flush stdout after each line.
+ * Makefile builds: generate a `build/winpty.lib` import library to accompany
+   `build/winpty.dll`.
 
 # Version 0.2.1 (2015-12-19)
 
