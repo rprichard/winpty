@@ -25,33 +25,34 @@ You need the following to build winpty:
 
 * A Cygwin or MSYS installation
 * GNU make
-* A MinGW g++ toolchain, v4 or later, to build ``winpty.dll`` and
-  ``winpty-agent.exe``
-* A g++ toolchain targeting Cygwin or MSYS, v3 or later, to build
-  ``console.exe``
+* A MinGW g++ toolchain capable of compiling C++11 code to build ``winpty.dll``
+  and ``winpty-agent.exe``
+* A g++ toolchain targeting Cygwin or MSYS to build ``console.exe``
 
 Winpty requires two g++ toolchains as it is split into two parts. The
-binaries winpty.dll and winpty-agent.exe interface with the native Windows
-command prompt window so they are compiled with the native MinGW toolchain.
-The console.exe binary interfaces with the MSYS/Cygwin terminal so it is
-compiled with the MSYS/Cygwin toolchain.
+``winpty.dll`` and ``winpty-agent.exe`` binaries interface with the native
+Windows command prompt window so they are compiled with the native MinGW
+toolchain.  The console.exe binary interfaces with the MSYS/Cygwin terminal so
+it is compiled with the MSYS/Cygwin toolchain.
 
 MinGW appears to be split into two distributions -- MinGW (creates 32-bit
 binaries) and MinGW-w64 (creates both 32-bit and 64-bit binaries).  Either
-one is acceptable, but the compiler must be v4 or later.
+one is generally acceptable.
 
 Cygwin packages
 ---------------
 
 The default g++ compiler for Cygwin targets Cygwin itself, but Cygwin also
-packages MinGW compilers from both the MinGW and MinGW-w64 projects.  As of
-this writing, the necessary packages are:
+packages MinGW-w64 compilers.  As of this writing, the necessary packages are:
 
-* Either ``mingw-gcc-g++``, ``mingw64-i686-gcc-g++`` or
-  ``mingw64-x86_64-gcc-g++``.  Select the appropriate compiler for your
-  CPU architecture.
+* Either ``mingw64-i686-gcc-g++`` or ``mingw64-x86_64-gcc-g++``.  Select the
+  appropriate compiler for your CPU architecture.
 * ``gcc-g++``
 * ``make``
+
+As of this writing (2016-01-23), only the MinGW-w64 compiler is acceptable.
+The MinGW compiler (e.g. from the ``mingw-gcc-g++`` package) is no longer
+maintained and is too buggy.
 
 MSYS packages
 -------------

@@ -64,7 +64,7 @@ case $(uname -s) in
             i686)
                 echo 'uname -m identifies an i686 environment.'
                 UNIX_CXX=i686-pc-cygwin-g++
-                MINGW_CXX="i686-w64-mingw32-g++ i686-pc-mingw32-g++"
+                MINGW_CXX=i686-w64-mingw32-g++
                 ;;
             x86_64)
                 echo 'uname -m identifies an x86_64 environment.'
