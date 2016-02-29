@@ -78,10 +78,14 @@ install : all
 clean :
 	rm -fr build
 
+clean-msvs :
+	rm -fr src/Default src/Release src/.vs
+	rm -f src/*.vcxproj src/*.vcxproj.filters src/*.sln src/*.sdf
+
 distclean : clean
 	rm -f config.mk
 
-.PHONY : default all tests install clean distclean
+.PHONY : default all tests install clean clean-msvs distclean
 .SECONDEXPANSION :
 
 build/mingw/%.o : src/%.cc VERSION.txt | $$(@D)/.mkdir
