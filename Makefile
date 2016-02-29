@@ -30,6 +30,7 @@ default : all
 PREFIX := /usr/local
 UNIX_ADAPTER_EXE := console.exe
 MINGW_ENABLE_CXX11_FLAG := -std=c++11
+USE_PCH := 1
 
 COMMON_CXXFLAGS :=
 UNIX_CXXFLAGS :=
@@ -64,6 +65,23 @@ MINGW_CXXFLAGS += \
 MINGW_LDFLAGS += -static -static-libgcc -static-libstdc++
 UNIX_LDFLAGS += $(UNIX_LDFLAGS_STATIC)
 
+ifeq "$(USE_PCH)" "1"
+MINGW_CXXFLAGS += -include build/mingw/PrecompiledHeader.h
+PCH_DEP := build/mingw/PrecompiledHeader.h.gch
+else
+PCH_DEP :=
+endif
+
+build/mingw/PrecompiledHeader.h : src/shared/PrecompiledHeader.h | $$(@D)/.mkdir
+	$(info Copying $< to $@)
+	@cp $< $@
+
+build/mingw/PrecompiledHeader.h.gch : build/mingw/PrecompiledHeader.h | $$(@D)/.mkdir
+	$(info Compiling $<)
+	@$(MINGW_CXX) $(MINGW_CXXFLAGS) -c -o $@ $<
+
+-include build/mingw/PrecompiledHeader.h.d
+
 define def_unix_target
 build/$1/%.o : src/%.cc VERSION.txt | $$$$(@D)/.mkdir
 	$$(info Compiling $$<)
@@ -71,7 +89,7 @@ build/$1/%.o : src/%.cc VERSION.txt | $$$$(@D)/.mkdir
 endef
 
 define def_mingw_target
-build/$1/%.o : src/%.cc VERSION.txt | $$$$(@D)/.mkdir
+build/$1/%.o : src/%.cc VERSION.txt $$(PCH_DEP) | $$$$(@D)/.mkdir
 	$$(info Compiling $$<)
 	@$$(MINGW_CXX) $$(MINGW_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
 endef
