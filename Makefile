@@ -96,3 +96,6 @@ build/unix/%.o : src/%.cc VERSION.txt | $$(@D)/.mkdir
 %.mkdir :
 	@mkdir -p $(dir $@)
 	@touch $@
+
+src/%.h :
+	@echo "Missing header file $@ (stale dependency file?)"
