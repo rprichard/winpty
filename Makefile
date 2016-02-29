@@ -23,6 +23,8 @@
 # The default "make install" prefix is /usr/local.  Pass PREFIX=<path> on the
 # command-line to override the default.
 
+.SECONDEXPANSION :
+
 default : all
 
 PREFIX := /usr/local
@@ -62,6 +64,18 @@ MINGW_CXXFLAGS += \
 MINGW_LDFLAGS += -static -static-libgcc -static-libstdc++
 UNIX_LDFLAGS += $(UNIX_LDFLAGS_STATIC)
 
+define def_unix_target
+build/$1/%.o : src/%.cc VERSION.txt | $$$$(@D)/.mkdir
+	$$(info Compiling $$<)
+	@$$(UNIX_CXX) $$(UNIX_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
+endef
+
+define def_mingw_target
+build/$1/%.o : src/%.cc VERSION.txt | $$$$(@D)/.mkdir
+	$$(info Compiling $$<)
+	@$$(MINGW_CXX) $$(MINGW_CXXFLAGS) $2 -I src/include -c -o $$@ $$<
+endef
+
 include src/subdir.mk
 
 all : $(ALL_TARGETS)
@@ -86,15 +100,6 @@ distclean : clean
 	rm -f config.mk
 
 .PHONY : default all tests install clean clean-msvs distclean
-.SECONDEXPANSION :
-
-build/mingw/%.o : src/%.cc VERSION.txt | $$(@D)/.mkdir
-	$(info Compiling $<)
-	@$(MINGW_CXX) $(MINGW_CXXFLAGS) -I src/include -c -o $@ $<
-
-build/unix/%.o : src/%.cc VERSION.txt | $$(@D)/.mkdir
-	$(info Compiling $<)
-	@$(UNIX_CXX) $(UNIX_CXXFLAGS) -I src/include -c -o $@ $<
 
 .PRECIOUS : %.mkdir
 %.mkdir :

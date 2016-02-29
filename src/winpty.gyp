@@ -91,6 +91,9 @@
             'include_dirs' : [
                 'include',
             ],
+            'defines' : [
+                'COMPILING_WINPTY_DLL',
+            ],
             'libraries' : [
                 '-luser32',
             ],

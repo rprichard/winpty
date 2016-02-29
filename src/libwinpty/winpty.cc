@@ -18,8 +18,6 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#define COMPILING_WINPTY_DLL
-
 #include <winpty.h>
 #include <windows.h>
 #include <assert.h>

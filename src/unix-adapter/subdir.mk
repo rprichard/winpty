@@ -20,14 +20,16 @@
 
 ALL_TARGETS += build/$(UNIX_ADAPTER_EXE)
 
+$(eval $(call def_unix_target,unix-adapter,))
+
 UNIX_ADAPTER_OBJECTS = \
-	build/unix/unix-adapter/InputHandler.o \
-	build/unix/unix-adapter/OutputHandler.o \
-	build/unix/unix-adapter/Util.o \
-	build/unix/unix-adapter/WakeupFd.o \
-	build/unix/unix-adapter/main.o \
-	build/unix/shared/DebugClient.o \
-	build/unix/shared/WinptyVersion.o
+	build/unix-adapter/unix-adapter/InputHandler.o \
+	build/unix-adapter/unix-adapter/OutputHandler.o \
+	build/unix-adapter/unix-adapter/Util.o \
+	build/unix-adapter/unix-adapter/WakeupFd.o \
+	build/unix-adapter/unix-adapter/main.o \
+	build/unix-adapter/shared/DebugClient.o \
+	build/unix-adapter/shared/WinptyVersion.o
 
 build/$(UNIX_ADAPTER_EXE) : $(UNIX_ADAPTER_OBJECTS) build/winpty.dll
 	$(info Linking $@)

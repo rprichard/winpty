@@ -20,8 +20,10 @@
 
 ALL_TARGETS += build/winpty-debugserver.exe
 
+$(eval $(call def_mingw_target,debugserver,))
+
 DEBUGSERVER_OBJECTS = \
-	build/mingw/debugserver/DebugServer.o
+	build/debugserver/debugserver/DebugServer.o
 
 build/winpty-debugserver.exe : $(DEBUGSERVER_OBJECTS)
 	$(info Linking $@)
