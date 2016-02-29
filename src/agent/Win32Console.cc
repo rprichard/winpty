@@ -58,13 +58,6 @@ HWND Win32Console::hwnd()
     return GetConsoleWindow();
 }
 
-void Win32Console::postCloseMessage()
-{
-    HWND h = hwnd();
-    if (h != NULL)
-        PostMessage(h, WM_CLOSE, 0, 0);
-}
-
 void Win32Console::clearLines(
     int row,
     int count,

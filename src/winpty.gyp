@@ -34,6 +34,9 @@
             'include_dirs' : [
                 'include',
             ],
+            'defines' : [
+                'WINPTY_AGENT_ASSERT',
+            ],
             'libraries' : [
                 '-luser32',
             ],

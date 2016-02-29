@@ -180,9 +180,10 @@ Agent::Agent(LPCWSTR controlPipeName,
 Agent::~Agent()
 {
     trace("Agent exiting...");
-    m_console->postCloseMessage();
-    if (m_childProcess != NULL)
+    agentShutdown();
+    if (m_childProcess != NULL) {
         CloseHandle(m_childProcess);
+    }
     delete m_console;
     delete m_terminal;
     delete m_consoleInput;
