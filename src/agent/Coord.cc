@@ -19,11 +19,14 @@
 // IN THE SOFTWARE.
 
 #include "Coord.h"
+
 #include <stdio.h>
+
+#include "../shared/winpty_snprintf.h"
 
 std::string Coord::toString() const
 {
     char ret[32];
-    sprintf(ret, "(%d,%d)", X, Y);
+    winpty_snprintf(ret, "(%d,%d)", X, Y);
     return std::string(ret);
 }

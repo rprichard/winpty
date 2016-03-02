@@ -27,7 +27,7 @@
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
-#include "../shared/c99_snprintf.h"
+#include "../shared/winpty_snprintf.h"
 #include "../shared/WinptyAssert.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,8 +40,6 @@
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
-
-#define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
 
 namespace {
 
@@ -836,7 +834,7 @@ void Agent::syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN])
     // XXX: The marker text generated here could easily collide with ordinary
     // console output.  Does it make sense to try to avoid the collision?
     char str[SYNC_MARKER_LEN];
-    c99_snprintf(str, COUNT_OF(str), "S*Y*N*C*%08x", m_syncCounter);
+    winpty_snprintf(str, "S*Y*N*C*%08x", m_syncCounter);
     for (int i = 0; i < SYNC_MARKER_LEN; ++i) {
         output[i].Char.UnicodeChar = str[i];
         output[i].Attributes = 7;

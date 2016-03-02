@@ -190,7 +190,7 @@ bool NamedPipe::connectToServer(LPCWSTR pipeName)
                                 OPEN_EXISTING,
                                 FILE_FLAG_OVERLAPPED,
                                 NULL);
-    trace("connection to [%ls], handle == 0x%x", pipeName, handle);
+    trace("connection to [%ls], handle == %p", pipeName, handle);
     if (handle == INVALID_HANDLE_VALUE)
         return false;
     m_handle = handle;

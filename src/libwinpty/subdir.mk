@@ -24,7 +24,8 @@ $(eval $(call def_mingw_target,libwinpty,-DCOMPILING_WINPTY_DLL))
 
 LIBWINPTY_OBJECTS = \
 	build/libwinpty/libwinpty/winpty.o \
-	build/libwinpty/shared/DebugClient.o
+	build/libwinpty/shared/DebugClient.o \
+	build/libwinpty/shared/WinptyAssert.o
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)
 	$(info Linking $@)

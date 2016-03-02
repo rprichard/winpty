@@ -19,12 +19,15 @@
 // IN THE SOFTWARE.
 
 #include "SmallRect.h"
+
 #include <stdio.h>
+
+#include "../shared/winpty_snprintf.h"
 
 std::string SmallRect::toString() const
 {
     char ret[64];
-    sprintf(ret, "(x=%d,y=%d,w=%d,h=%d)",
+    winpty_snprintf(ret, "(x=%d,y=%d,w=%d,h=%d)",
             Left, Top, width(), height());
     return std::string(ret);
 }

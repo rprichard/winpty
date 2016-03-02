@@ -30,6 +30,7 @@
 #include "UnicodeEncoding.h"
 #include "../shared/DebugClient.h"
 #include "../shared/WinptyAssert.h"
+#include "../shared/winpty_snprintf.h"
 
 #define CSI "\x1b["
 
@@ -369,7 +370,7 @@ void Terminal::finishOutput(const std::pair<int, int64_t> &newCursorPos)
     if (m_cursorHidden) {
         moveTerminalToLine(newCursorPos.second);
         char buffer[32];
-        sprintf(buffer, CSI"%dG" CSI"?25h", newCursorPos.first + 1);
+        winpty_snprintf(buffer, CSI"%dG" CSI"?25h", newCursorPos.first + 1);
         if (!m_consoleMode)
             m_output->write(buffer);
         m_cursorHidden = false;
@@ -396,7 +397,8 @@ void Terminal::moveTerminalToLine(int64_t line)
     if (line < m_remoteLine) {
         // CUrsor Up (CUU)
         char buffer[32];
-        sprintf(buffer, "\r" CSI"%dA", static_cast<int>(m_remoteLine - line));
+        winpty_snprintf(buffer, "\r" CSI"%dA",
+            static_cast<int>(m_remoteLine - line));
         if (!m_consoleMode)
             m_output->write(buffer);
         m_remoteLine = line;

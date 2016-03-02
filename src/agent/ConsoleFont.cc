@@ -32,6 +32,7 @@
 #include "../shared/DebugClient.h"
 #include "../shared/OsModule.h"
 #include "../shared/WinptyAssert.h"
+#include "../shared/winpty_snprintf.h"
 #include "../shared/winpty_wcsnlen.h"
 
 namespace {
@@ -298,14 +299,15 @@ static void dumpFontTable(HANDLE conout, const char *prefix) {
     size_t first = 0;
     while (first < table.size()) {
         size_t last = std::min(table.size() - 1, first + 10 - 1);
-        sprintf(tmp, "%sfonts %02u-%02u:",
+        winpty_snprintf(tmp, "%sfonts %02u-%02u:",
             prefix, static_cast<unsigned>(first), static_cast<unsigned>(last));
         line = tmp;
         for (size_t i = first; i <= last; ++i) {
             if (i % 10 == 5) {
                 line += "  - ";
             }
-            sprintf(tmp, " %2dx%-2d", table[i].second.X, table[i].second.Y);
+            winpty_snprintf(tmp, " %2dx%-2d",
+                table[i].second.X, table[i].second.Y);
             line += tmp;
         }
         trace("%s", line.c_str());
@@ -336,7 +338,7 @@ static std::string stringToCodePoints(const std::wstring &str) {
     std::string ret = "(";
     for (size_t i = 0; i < str.size(); ++i) {
         char tmp[32];
-        sprintf(tmp, "%X", str[i]);
+        winpty_snprintf(tmp, "%X", str[i]);
         if (ret.size() > 1) {
             ret.push_back(' ');
         }

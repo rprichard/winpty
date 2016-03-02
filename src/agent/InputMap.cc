@@ -30,6 +30,7 @@
 #include "../shared/DebugClient.h"
 #include "../shared/UnixCtrlChars.h"
 #include "../shared/WinptyAssert.h"
+#include "../shared/winpty_snprintf.h"
 
 namespace {
 
@@ -122,13 +123,13 @@ std::string InputMap::Key::toString() const {
                (virtualKey >= '0' && virtualKey <= '9')) {
         ret += static_cast<char>(virtualKey);
     } else {
-        sprintf(buf, "0x%x", virtualKey);
+        winpty_snprintf(buf, "0x%x", virtualKey);
         ret += buf;
     }
     if (unicodeChar >= 32 && unicodeChar <= 126) {
-        sprintf(buf, " ch='%c'", unicodeChar);
+        winpty_snprintf(buf, " ch='%c'", unicodeChar);
     } else {
-        sprintf(buf, " ch=%#x", unicodeChar);
+        winpty_snprintf(buf, " ch=%#x", unicodeChar);
     }
     ret += buf;
     return ret;

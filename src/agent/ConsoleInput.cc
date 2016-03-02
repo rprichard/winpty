@@ -256,7 +256,7 @@ void ConsoleInput::writeInput(const std::string &input)
                 }
                 const unsigned char uch = input[i];
                 char buf[32];
-                sprintf(buf, "%02X", uch);
+                winpty_snprintf(buf, "%02X", uch);
                 dumpString += buf;
             }
             dumpString += ')';

@@ -26,7 +26,7 @@
 
 #include <string>
 
-#include "c99_snprintf.h"
+#include "winpty_snprintf.h"
 
 void *volatile g_debugConfig;
 
@@ -111,7 +111,7 @@ void trace(const char *format, ...)
 
     va_list ap;
     va_start(ap, format);
-    c99_vsnprintf(message, sizeof(message), format, ap);
+    winpty_vsnprintf(message, format, ap);
     message[sizeof(message) - 1] = '\0';
     va_end(ap);
 
@@ -124,7 +124,7 @@ void trace(const char *format, ...)
     baseName = (baseName != NULL) ? baseName + 1 : moduleName;
 
     char fullMessage[1024];
-    c99_snprintf(fullMessage, sizeof(fullMessage),
+    winpty_snprintf(fullMessage,
              "[%05d.%03d %s,p%04d,t%04d]: %s",
              currentTime / 1000, currentTime % 1000,
              baseName, (int)GetCurrentProcessId(), (int)GetCurrentThreadId(),
