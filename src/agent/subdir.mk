@@ -27,14 +27,12 @@ AGENT_OBJECTS = \
 	build/agent/agent/ConsoleFont.o \
 	build/agent/agent/ConsoleInput.o \
 	build/agent/agent/ConsoleLine.o \
-	build/agent/agent/Coord.o \
 	build/agent/agent/DebugShowInput.o \
 	build/agent/agent/DefaultInputMap.o \
 	build/agent/agent/EventLoop.o \
 	build/agent/agent/InputMap.o \
 	build/agent/agent/LargeConsoleRead.o \
 	build/agent/agent/NamedPipe.o \
-	build/agent/agent/SmallRect.o \
 	build/agent/agent/Terminal.o \
 	build/agent/agent/Win32Console.o \
 	build/agent/agent/main.o \
