@@ -26,11 +26,11 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
-#include <sstream>
 #include <limits>
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
+#include "../shared/StringBuilder.h"
 
 // TODO: Error handling, handle out-of-memory.
 
@@ -241,34 +241,38 @@ static std::wstring getDesktopFullName()
     return getObjectName(station) + L"\\" + getObjectName(desktop);
 }
 
+static inline std::vector<wchar_t> modifiableWString(const std::wstring &str) {
+    std::vector<wchar_t> ret(str.size() + 1);
+    str.copy(ret.data(), str.size());
+    ret[str.size()] = L'\0';
+    return ret;
+}
+
 static void startAgentProcess(const BackgroundDesktop &desktop,
-                              std::wstring &controlPipeName,
-                              std::wstring &dataPipeName,
+                              const std::wstring &controlPipeName,
+                              const std::wstring &dataPipeName,
                               int cols, int rows)
 {
     bool success;
 
-    std::wstring agentProgram = findAgentProgram();
-    std::wstringstream agentCmdLineStream;
-    agentCmdLineStream << L"\"" << agentProgram << L"\" "
-                       << controlPipeName << " " << dataPipeName << " "
-                       << cols << " " << rows;
-    std::wstring agentCmdLine = agentCmdLineStream.str();
+    const std::wstring exePath = findAgentProgram();
+    const std::wstring cmdline =
+        (WStringBuilder(256)
+            << L"\"" << exePath << L"\" "
+            << controlPipeName << L' ' << dataPipeName << L' '
+            << cols << L' ' << rows).str_moved();
+    auto cmdlineM = modifiableWString(cmdline);
 
     // Start the agent.
-    STARTUPINFOW sui;
-    memset(&sui, 0, sizeof(sui));
+    STARTUPINFOW sui = {};
     sui.cb = sizeof(sui);
+    auto desktopNameM = modifiableWString(desktop.desktopName);
     if (desktop.station != NULL) {
-        sui.lpDesktop = (LPWSTR)desktop.desktopName.c_str();
+        sui.lpDesktop = desktopNameM.data();
     }
-    PROCESS_INFORMATION pi;
-    memset(&pi, 0, sizeof(pi));
-    std::vector<wchar_t> cmdline(agentCmdLine.size() + 1);
-    agentCmdLine.copy(&cmdline[0], agentCmdLine.size());
-    cmdline[agentCmdLine.size()] = L'\0';
-    success = CreateProcessW(agentProgram.c_str(),
-                             &cmdline[0],
+    PROCESS_INFORMATION pi = {};
+    success = CreateProcessW(exePath.c_str(),
+                             &cmdlineM[0],
                              NULL, NULL,
                              /*bInheritHandles=*/FALSE,
                              /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
@@ -276,12 +280,12 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
                              &sui, &pi);
     if (success) {
         trace("Created agent successfully, pid=%ld, cmdline=%ls",
-              (long)pi.dwProcessId, agentCmdLine.c_str());
+              static_cast<long>(pi.dwProcessId), cmdline.c_str());
     } else {
         unsigned int err = GetLastError();
         trace("Error creating agent, err=%#x, cmdline=%ls",
-              err, agentCmdLine.c_str());
-        fprintf(stderr, "Error %#x starting %ls\n", err, agentCmdLine.c_str());
+              err, cmdline.c_str());
+        fprintf(stderr, "Error %#x starting %ls\n", err, cmdline.c_str());
         exit(1);
     }
 
@@ -294,11 +298,12 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     winpty_t *pc = new winpty_t;
 
     // Start pipes.
-    std::wstringstream pipeName;
-    pipeName << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
-             << L"-" << InterlockedIncrement(&consoleCounter);
-    std::wstring controlPipeName = pipeName.str() + L"-control";
-    std::wstring dataPipeName = pipeName.str() + L"-data";
+    const auto basePipeName =
+        (WStringBuilder(40)
+            << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
+            << L'-' << InterlockedIncrement(&consoleCounter)).str_moved();
+    const std::wstring controlPipeName = basePipeName + L"-control";
+    const std::wstring dataPipeName = basePipeName + L"-data";
     pc->controlPipe = createNamedPipe(controlPipeName, false);
     if (pc->controlPipe == INVALID_HANDLE_VALUE) {
         delete pc;
