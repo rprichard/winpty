@@ -31,6 +31,7 @@
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 #include "../shared/StringBuilder.h"
+#include "../shared/StringUtil.h"
 
 // TODO: Error handling, handle out-of-memory.
 
@@ -279,13 +280,15 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
                              NULL, NULL,
                              &sui, &pi);
     if (success) {
-        trace("Created agent successfully, pid=%ld, cmdline=%ls",
-              static_cast<long>(pi.dwProcessId), cmdline.c_str());
+        trace("Created agent successfully, pid=%u, cmdline=%s",
+              static_cast<unsigned int>(pi.dwProcessId),
+              utf8FromWide(cmdline).c_str());
     } else {
         unsigned int err = GetLastError();
-        trace("Error creating agent, err=%#x, cmdline=%ls",
-              err, cmdline.c_str());
-        fprintf(stderr, "Error %#x starting %ls\n", err, cmdline.c_str());
+        trace("Error creating agent, err=%#x, cmdline=%s",
+              err, utf8FromWide(cmdline).c_str());
+        fprintf(stderr, "Error %#x starting %s\n", err,
+            utf8FromWide(cmdline).c_str());
         exit(1);
     }
 

@@ -18,18 +18,14 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#include "winpty_wcsnlen.h"
+#ifndef STRING_UTIL_H
+#define STRING_UTIL_H
 
-#include "WinptyAssert.h"
+#include <stdlib.h>
 
-// Workaround.  MinGW (from mingw.org) does not have wcsnlen.  MinGW-w64 *does*
-// have wcsnlen, but use this function for consistency.
-size_t winpty_wcsnlen(const wchar_t *s, size_t maxlen) {
-    ASSERT(s != NULL);
-    for (size_t i = 0; i < maxlen; ++i) {
-        if (s[i] == L'\0') {
-            return i;
-        }
-    }
-    return maxlen;
-}
+#include <string>
+
+size_t winpty_wcsnlen(const wchar_t *s, size_t maxlen);
+std::string utf8FromWide(const std::wstring &input);
+
+#endif // STRING_UTIL_H

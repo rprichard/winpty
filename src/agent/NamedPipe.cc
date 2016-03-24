@@ -25,6 +25,7 @@
 #include "EventLoop.h"
 #include "NamedPipe.h"
 #include "../shared/DebugClient.h"
+#include "../shared/StringUtil.h"
 #include "../shared/WinptyAssert.h"
 
 NamedPipe::NamedPipe() :
@@ -196,7 +197,8 @@ bool NamedPipe::connectToServer(LPCWSTR pipeName)
                                 OPEN_EXISTING,
                                 FILE_FLAG_OVERLAPPED,
                                 NULL);
-    trace("connection to [%ls], handle == %p", pipeName, handle);
+    trace("connection to [%s], handle == %p",
+        utf8FromWide(pipeName).c_str(), handle);
     if (handle == INVALID_HANDLE_VALUE)
         return false;
     m_handle = handle;

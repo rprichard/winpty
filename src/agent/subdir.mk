@@ -38,9 +38,9 @@ AGENT_OBJECTS = \
 	build/agent/agent/main.o \
 	build/agent/shared/Buffer.o \
 	build/agent/shared/DebugClient.o \
+	build/agent/shared/StringUtil.o \
 	build/agent/shared/WinptyAssert.o \
-	build/agent/shared/WinptyVersion.o \
-	build/agent/shared/winpty_wcsnlen.o
+	build/agent/shared/WinptyVersion.o
 
 build/winpty-agent.exe : $(AGENT_OBJECTS)
 	$(info Linking $@)

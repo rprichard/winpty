@@ -18,12 +18,40 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef WINPTY_WCSNLEN_H
-#define WINPTY_WCSNLEN_H
+#include "StringUtil.h"
 
-#include <stdlib.h>
-#include <wchar.h>
+#include <windows.h>
 
-size_t winpty_wcsnlen(const wchar_t *s, size_t maxlen);
+#include <vector>
 
-#endif // WINPTY_WCSNLEN_H
+#include "WinptyAssert.h"
+
+// Workaround.  MinGW (from mingw.org) does not have wcsnlen.  MinGW-w64 *does*
+// have wcsnlen, but use this function for consistency.
+size_t winpty_wcsnlen(const wchar_t *s, size_t maxlen) {
+    ASSERT(s != NULL);
+    for (size_t i = 0; i < maxlen; ++i) {
+        if (s[i] == L'\0') {
+            return i;
+        }
+    }
+    return maxlen;
+}
+
+std::string utf8FromWide(const std::wstring &input) {
+    int mblen = WideCharToMultiByte(
+        CP_UTF8, 0,
+        input.data(), input.size(),
+        NULL, 0, NULL, NULL);
+    if (mblen <= 0) {
+        return std::string();
+    }
+    std::vector<char> tmp(mblen);
+    int mblen2 = WideCharToMultiByte(
+        CP_UTF8, 0,
+        input.data(), input.size(),
+        tmp.data(), tmp.size(),
+        NULL, NULL);
+    ASSERT(mblen2 == mblen);
+    return std::string(tmp.data(), tmp.size());
+}

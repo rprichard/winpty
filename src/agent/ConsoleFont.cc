@@ -31,9 +31,9 @@
 
 #include "../shared/DebugClient.h"
 #include "../shared/OsModule.h"
+#include "../shared/StringUtil.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/winpty_snprintf.h"
-#include "../shared/winpty_wcsnlen.h"
 
 namespace {
 
@@ -315,25 +315,6 @@ static void dumpFontTable(HANDLE conout, const char *prefix) {
     }
 }
 
-static std::string narrowString(const std::wstring &input)
-{
-    int mblen = WideCharToMultiByte(
-        CP_UTF8, 0,
-        input.data(), input.size(),
-        NULL, 0, NULL, NULL);
-    if (mblen <= 0) {
-        return std::string();
-    }
-    std::vector<char> tmp(mblen);
-    int mblen2 = WideCharToMultiByte(
-        CP_UTF8, 0,
-        input.data(), input.size(),
-        tmp.data(), tmp.size(),
-        NULL, NULL);
-    ASSERT(mblen2 == mblen);
-    return std::string(tmp.data(), tmp.size());
-}
-
 static std::string stringToCodePoints(const std::wstring &str) {
     std::string ret = "(";
     for (size_t i = 0; i < str.size(); ++i) {
@@ -361,7 +342,7 @@ static void dumpFontInfoEx(
         prefix,
         static_cast<unsigned>(infoex.nFont),
         infoex.dwFontSize.X, infoex.dwFontSize.Y,
-        infoex.FontFamily, infoex.FontWeight, narrowString(faceName).c_str(),
+        infoex.FontFamily, infoex.FontWeight, utf8FromWide(faceName).c_str(),
         stringToCodePoints(faceName).c_str());
 }
 

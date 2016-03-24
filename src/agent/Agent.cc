@@ -29,6 +29,7 @@
 #include "../shared/Buffer.h"
 #include "../shared/winpty_snprintf.h"
 #include "../shared/WinptyAssert.h"
+#include "../shared/StringUtil.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -200,7 +201,8 @@ NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
 {
     NamedPipe *pipe = createNamedPipe();
     if (!pipe->connectToServer(pipeName)) {
-        trace("error: could not connect to %ls", pipeName);
+        trace("error: could not connect to %s",
+            utf8FromWide(pipeName).c_str());
         ::exit(1);
     }
     pipe->setReadBufferSize(64 * 1024);
