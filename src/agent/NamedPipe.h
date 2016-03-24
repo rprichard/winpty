@@ -36,25 +36,27 @@ private:
     ~NamedPipe();
     bool serviceIo(std::vector<HANDLE> *waitHandles);
 
+    enum class ServiceResult { NoProgress, Error, Progress };
+
 private:
     class IoWorker
     {
     public:
         IoWorker(NamedPipe *namedPipe);
         virtual ~IoWorker();
-        int service();
+        ServiceResult service();
         void waitForCanceledIo();
         HANDLE getWaitEvent();
     protected:
         NamedPipe *m_namedPipe;
         bool m_pending;
-        int m_currentIoSize;
+        DWORD m_currentIoSize;
         HANDLE m_event;
         OVERLAPPED m_over;
         enum { kIoSize = 64 * 1024 };
         char m_buffer[kIoSize];
-        virtual void completeIo(int size) = 0;
-        virtual bool shouldIssueIo(int *size, bool *isRead) = 0;
+        virtual void completeIo(DWORD size) = 0;
+        virtual bool shouldIssueIo(DWORD *size, bool *isRead) = 0;
     };
 
     class InputWorker : public IoWorker
@@ -62,37 +64,38 @@ private:
     public:
         InputWorker(NamedPipe *namedPipe) : IoWorker(namedPipe) {}
     protected:
-        virtual void completeIo(int size);
-        virtual bool shouldIssueIo(int *size, bool *isRead);
+        virtual void completeIo(DWORD size);
+        virtual bool shouldIssueIo(DWORD *size, bool *isRead);
     };
 
     class OutputWorker : public IoWorker
     {
     public:
         OutputWorker(NamedPipe *namedPipe) : IoWorker(namedPipe) {}
-        int getPendingIoSize();
+        DWORD getPendingIoSize();
     protected:
-        virtual void completeIo(int size);
-        virtual bool shouldIssueIo(int *size, bool *isRead);
+        virtual void completeIo(DWORD size);
+        virtual bool shouldIssueIo(DWORD *size, bool *isRead);
     };
 
 public:
     bool connectToServer(LPCWSTR pipeName);
-    int bytesToSend();
-    void write(const void *data, int size);
+    size_t bytesToSend();
+    void write(const void *data, size_t size);
     void write(const char *text);
-    int readBufferSize();
-    void setReadBufferSize(int size);
-    int bytesAvailable();
-    int peek(void *data, int size);
-    std::string read(int size);
-    std::string readAll();
+    size_t readBufferSize();
+    void setReadBufferSize(size_t size);
+    size_t bytesAvailable();
+    size_t peek(void *data, size_t size);
+    size_t read(void *data, size_t size);
+    std::string readToString(size_t size);
+    std::string readAllToString();
     void closePipe();
     bool isClosed();
 
 private:
     // Input/output buffers
-    int m_readBufferSize;
+    size_t m_readBufferSize;
     std::string m_inQueue;
     std::string m_outQueue;
     HANDLE m_handle;

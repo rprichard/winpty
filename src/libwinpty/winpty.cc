@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <limits>
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
@@ -114,15 +115,22 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
     return success;
 }
 
-static void writePacket(winpty_t *pc, const WriteBuffer &packet)
+static inline WriteBuffer newPacket()
 {
-    std::string payload = packet.str();
-    int32_t payloadSize = payload.size();
-    DWORD actual;
-    BOOL success = WriteFile(pc->controlPipe, &payloadSize, sizeof(int32_t), &actual, NULL);
-    assert(success && actual == sizeof(int32_t));
-    success = WriteFile(pc->controlPipe, payload.c_str(), payloadSize, &actual, NULL);
-    assert(success && (int32_t)actual == payloadSize);
+    WriteBuffer packet;
+    packet.putRawValue<uint64_t>(0); // Reserve space for size.
+    return packet;
+}
+
+static void writePacket(winpty_t *pc, WriteBuffer &packet)
+{
+    packet.replaceRawValue<uint64_t>(0, packet.buf().size());
+    const auto &buf = packet.buf();
+    DWORD actual = 0;
+    ASSERT(buf.size() <= std::numeric_limits<DWORD>::max());
+    const BOOL success = WriteFile(pc->controlPipe, buf.data(), buf.size(),
+        &actual, nullptr);
+    ASSERT(success && actual == buf.size());
 }
 
 static int32_t readInt32(winpty_t *pc)
@@ -338,8 +346,8 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     // a dummy message on the control pipe, we should confirm that something
     // trusted (i.e. the agent we just started) successfully connected and wrote
     // to one of our pipes.
-    WriteBuffer packet;
-    packet.putInt(AgentMsg::Ping);
+    auto packet = newPacket();
+    packet.putInt32(AgentMsg::Ping);
     writePacket(pc, packet);
     if (readInt32(pc) != 0) {
         delete pc;
@@ -387,8 +395,8 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
                                     const wchar_t *cwd,
                                     const wchar_t *env)
 {
-    WriteBuffer packet;
-    packet.putInt(AgentMsg::StartProcess);
+    auto packet = newPacket();
+    packet.putInt32(AgentMsg::StartProcess);
     packet.putWString(appname ? appname : L"");
     packet.putWString(cmdline ? cmdline : L"");
     packet.putWString(cwd ? cwd : L"");
@@ -413,16 +421,16 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
 
 WINPTY_API int winpty_get_exit_code(winpty_t *pc)
 {
-    WriteBuffer packet;
-    packet.putInt(AgentMsg::GetExitCode);
+    auto packet = newPacket();
+    packet.putInt32(AgentMsg::GetExitCode);
     writePacket(pc, packet);
     return readInt32(pc);
 }
 
 WINPTY_API int winpty_get_process_id(winpty_t *pc)
 {
-    WriteBuffer packet;
-    packet.putInt(AgentMsg::GetProcessId);
+    auto packet = newPacket();
+    packet.putInt32(AgentMsg::GetProcessId);
     writePacket(pc, packet);
     return readInt32(pc);
 }
@@ -434,10 +442,10 @@ WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc)
 
 WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows)
 {
-    WriteBuffer packet;
-    packet.putInt(AgentMsg::SetSize);
-    packet.putInt(cols);
-    packet.putInt(rows);
+    auto packet = newPacket();
+    packet.putInt32(AgentMsg::SetSize);
+    packet.putInt32(cols);
+    packet.putInt32(rows);
     writePacket(pc, packet);
     return readInt32(pc);
 }
@@ -451,9 +459,9 @@ WINPTY_API void winpty_close(winpty_t *pc)
 
 WINPTY_API int winpty_set_console_mode(winpty_t *pc, int mode)
 {
-    WriteBuffer packet;
-    packet.putInt(AgentMsg::SetConsoleMode);
-    packet.putInt(mode);
+    auto packet = newPacket();
+    packet.putInt32(AgentMsg::SetConsoleMode);
+    packet.putInt32(mode);
     writePacket(pc, packet);
     return readInt32(pc);
 }

@@ -43,25 +43,30 @@ NamedPipe::~NamedPipe()
 // Returns true if anything happens (data received, data sent, pipe error).
 bool NamedPipe::serviceIo(std::vector<HANDLE> *waitHandles)
 {
-    if (m_handle == NULL)
+    const auto kError = ServiceResult::Error;
+    const auto kProgress = ServiceResult::Progress;
+    if (m_handle == NULL) {
         return false;
-    int readBytes = m_inputWorker->service();
-    int writeBytes = m_outputWorker->service();
-    if (readBytes == -1 || writeBytes == -1) {
+    }
+    const auto readProgress = m_inputWorker->service();
+    const auto writeProgress = m_outputWorker->service();
+    if (readProgress == kError || writeProgress == kError) {
         closePipe();
         return true;
     }
-    if (m_inputWorker->getWaitEvent() != NULL)
+    if (m_inputWorker->getWaitEvent() != NULL) {
         waitHandles->push_back(m_inputWorker->getWaitEvent());
-    if (m_outputWorker->getWaitEvent() != NULL)
+    }
+    if (m_outputWorker->getWaitEvent() != NULL) {
         waitHandles->push_back(m_outputWorker->getWaitEvent());
-    return readBytes > 0 || writeBytes > 0;
+    }
+    return readProgress == kProgress || writeProgress == kProgress;
 }
 
 NamedPipe::IoWorker::IoWorker(NamedPipe *namedPipe) :
     m_namedPipe(namedPipe),
     m_pending(false),
-    m_currentIoSize(-1)
+    m_currentIoSize(0)
 {
     m_event = CreateEventW(NULL, TRUE, FALSE, NULL);
     ASSERT(m_event != NULL);
@@ -72,11 +77,11 @@ NamedPipe::IoWorker::~IoWorker()
     CloseHandle(m_event);
 }
 
-int NamedPipe::IoWorker::service()
+NamedPipe::ServiceResult NamedPipe::IoWorker::service()
 {
-    int progress = 0;
+    ServiceResult progress = ServiceResult::NoProgress;
     if (m_pending) {
-        DWORD actual;
+        DWORD actual = 0;
         BOOL ret = GetOverlappedResult(m_namedPipe->m_handle, &m_over, &actual, FALSE);
         if (!ret) {
             if (GetLastError() == ERROR_IO_INCOMPLETE) {
@@ -84,17 +89,17 @@ int NamedPipe::IoWorker::service()
                 return progress;
             } else {
                 // Pipe error.
-                return -1;
+                return ServiceResult::Error;
             }
         }
         ResetEvent(m_event);
         m_pending = false;
         completeIo(actual);
-        m_currentIoSize = -1;
-        progress += actual;
+        m_currentIoSize = 0;
+        progress = ServiceResult::Progress;
     }
-    int nextSize;
-    bool isRead;
+    DWORD nextSize = 0;
+    bool isRead = false;
     while (shouldIssueIo(&nextSize, &isRead)) {
         m_currentIoSize = nextSize;
         DWORD actual = 0;
@@ -110,13 +115,13 @@ int NamedPipe::IoWorker::service()
                 return progress;
             } else {
                 // Pipe error.
-                return -1;
+                return ServiceResult::Error;
             }
         }
         ResetEvent(m_event);
         completeIo(actual);
-        m_currentIoSize = -1;
-        progress += actual;
+        m_currentIoSize = 0;
+        progress = ServiceResult::Progress;
     }
     return progress;
 }
@@ -138,17 +143,17 @@ HANDLE NamedPipe::IoWorker::getWaitEvent()
     return m_pending ? m_event : NULL;
 }
 
-void NamedPipe::InputWorker::completeIo(int size)
+void NamedPipe::InputWorker::completeIo(DWORD size)
 {
     m_namedPipe->m_inQueue.append(m_buffer, size);
 }
 
-bool NamedPipe::InputWorker::shouldIssueIo(int *size, bool *isRead)
+bool NamedPipe::InputWorker::shouldIssueIo(DWORD *size, bool *isRead)
 {
     *isRead = true;
     if (m_namedPipe->isClosed()) {
         return false;
-    } else if ((int)m_namedPipe->m_inQueue.size() < m_namedPipe->readBufferSize()) {
+    } else if (m_namedPipe->m_inQueue.size() < m_namedPipe->readBufferSize()) {
         *size = kIoSize;
         return true;
     } else {
@@ -156,18 +161,19 @@ bool NamedPipe::InputWorker::shouldIssueIo(int *size, bool *isRead)
     }
 }
 
-void NamedPipe::OutputWorker::completeIo(int size)
+void NamedPipe::OutputWorker::completeIo(DWORD size)
 {
     ASSERT(size == m_currentIoSize);
 }
 
-bool NamedPipe::OutputWorker::shouldIssueIo(int *size, bool *isRead)
+bool NamedPipe::OutputWorker::shouldIssueIo(DWORD *size, bool *isRead)
 {
     *isRead = false;
     if (!m_namedPipe->m_outQueue.empty()) {
-        int writeSize = std::min((int)m_namedPipe->m_outQueue.size(), (int)kIoSize);
-        memcpy(m_buffer, m_namedPipe->m_outQueue.data(), writeSize);
-        m_namedPipe->m_outQueue.erase(0, writeSize);
+        auto &out = m_namedPipe->m_outQueue;
+        const DWORD writeSize = std::min<size_t>(out.size(), kIoSize);
+        std::copy(&out[0], &out[writeSize], m_buffer);
+        out.erase(0, writeSize);
         *size = writeSize;
         return true;
     } else {
@@ -175,7 +181,7 @@ bool NamedPipe::OutputWorker::shouldIssueIo(int *size, bool *isRead)
     }
 }
 
-int NamedPipe::OutputWorker::getPendingIoSize()
+DWORD NamedPipe::OutputWorker::getPendingIoSize()
 {
     return m_pending ? m_currentIoSize : 0;
 }
@@ -199,17 +205,18 @@ bool NamedPipe::connectToServer(LPCWSTR pipeName)
     return true;
 }
 
-int NamedPipe::bytesToSend()
+size_t NamedPipe::bytesToSend()
 {
-    int ret = m_outQueue.size();
-    if (m_outputWorker != NULL)
+    auto ret = m_outQueue.size();
+    if (m_outputWorker != NULL) {
         ret += m_outputWorker->getPendingIoSize();
+    }
     return ret;
 }
 
-void NamedPipe::write(const void *data, int size)
+void NamedPipe::write(const void *data, size_t size)
 {
-    m_outQueue.append((const char*)data, size);
+    m_outQueue.append(reinterpret_cast<const char*>(data), size);
 }
 
 void NamedPipe::write(const char *text)
@@ -217,37 +224,45 @@ void NamedPipe::write(const char *text)
     write(text, strlen(text));
 }
 
-int NamedPipe::readBufferSize()
+size_t NamedPipe::readBufferSize()
 {
     return m_readBufferSize;
 }
 
-void NamedPipe::setReadBufferSize(int size)
+void NamedPipe::setReadBufferSize(size_t size)
 {
     m_readBufferSize = size;
 }
 
-int NamedPipe::bytesAvailable()
+size_t NamedPipe::bytesAvailable()
 {
     return m_inQueue.size();
 }
 
-int NamedPipe::peek(void *data, int size)
+size_t NamedPipe::peek(void *data, size_t size)
 {
-    int ret = std::min(size, (int)m_inQueue.size());
-    memcpy(data, m_inQueue.data(), ret);
+    const auto out = reinterpret_cast<char*>(data);
+    const size_t ret = std::min(size, m_inQueue.size());
+    std::copy(&m_inQueue[0], &m_inQueue[size], out);
     return ret;
 }
 
-std::string NamedPipe::read(int size)
+size_t NamedPipe::read(void *data, size_t size)
 {
-    int retSize = std::min(size, (int)m_inQueue.size());
+    size_t ret = peek(data, size);
+    m_inQueue.erase(0, ret);
+    return ret;
+}
+
+std::string NamedPipe::readToString(size_t size)
+{
+    size_t retSize = std::min(size, m_inQueue.size());
     std::string ret = m_inQueue.substr(0, retSize);
     m_inQueue.erase(0, retSize);
     return ret;
 }
 
-std::string NamedPipe::readAll()
+std::string NamedPipe::readAllToString()
 {
     std::string ret = m_inQueue;
     m_inQueue.clear();

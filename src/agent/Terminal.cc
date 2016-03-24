@@ -313,7 +313,7 @@ void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width)
     moveTerminalToLine(line);
 
     m_termLine.clear();
-    int trimmedLineLength = 0;
+    size_t trimmedLineLength = 0;
     bool alreadyErasedLine = false;
 
     int cellCount = 1;

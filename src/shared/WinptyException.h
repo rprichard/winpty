@@ -18,24 +18,13 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef WINPTY_PRECOMPILED_HEADER_H
-#define WINPTY_PRECOMPILED_HEADER_H
+#ifndef WINPTY_EXCEPTION_H
+#define WINPTY_EXCEPTION_H
 
-#include <windows.h>
+class WinptyException {
+public:
+    virtual const wchar_t *what() = 0;
+    ~WinptyException() {}
+};
 
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-
-#include <array>
-#include <limits>
-#include <memory>
-#include <new>
-#include <string>
-#include <utility>
-#include <vector>
-
-#endif // WINPTY_PRECOMPILED_HEADER_H
+#endif // WINPTY_EXCEPTION_H

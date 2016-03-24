@@ -242,27 +242,36 @@ void Agent::pollControlSocket()
     }
 
     while (true) {
-        int32_t packetSize;
-        int size = m_controlSocket->peek((char*)&packetSize, sizeof(int32_t));
-        if (size < (int)sizeof(int32_t))
-            break;
-        int totalSize = sizeof(int32_t) + packetSize;
-        if (m_controlSocket->bytesAvailable() < totalSize) {
-            if (m_controlSocket->readBufferSize() < totalSize)
-                m_controlSocket->setReadBufferSize(totalSize);
+        uint64_t packetSize = 0;
+        const auto amt1 =
+            m_controlSocket->peek(&packetSize, sizeof(packetSize));
+        if (amt1 < sizeof(packetSize)) {
             break;
         }
-        std::string packetData = m_controlSocket->read(totalSize);
-        ASSERT((int)packetData.size() == totalSize);
-        ReadBuffer buffer(packetData);
-        buffer.getInt(); // Discard the size.
-        handlePacket(buffer);
+        ASSERT(packetSize >= sizeof(packetSize) && packetSize <= SIZE_MAX);
+        if (m_controlSocket->bytesAvailable() < packetSize) {
+            if (m_controlSocket->readBufferSize() < packetSize) {
+                m_controlSocket->setReadBufferSize(packetSize);
+            }
+            break;
+        }
+        std::vector<char> packetData;
+        packetData.resize(packetSize);
+        const auto amt2 = m_controlSocket->read(packetData.data(), packetSize);
+        ASSERT(amt2 == packetSize);
+        try {
+            ReadBuffer buffer(std::move(packetData));
+            buffer.getRawValue<uint64_t>(); // Discard the size.
+            handlePacket(buffer);
+        } catch (const ReadBuffer::DecodeError &error) {
+            ASSERT(false && "Decode error");
+        }
     }
 }
 
 void Agent::handlePacket(ReadBuffer &packet)
 {
-    int type = packet.getInt();
+    int type = packet.getInt32();
     int32_t result = -1;
     switch (type) {
     case AgentMsg::Ping:
@@ -280,24 +289,24 @@ void Agent::handlePacket(ReadBuffer &packet)
         result = handleSetSizePacket(packet);
         break;
     case AgentMsg::GetExitCode:
-        ASSERT(packet.eof());
+        packet.assertEof();
         result = m_childExitCode;
         break;
     case AgentMsg::GetProcessId:
-        ASSERT(packet.eof());
+        packet.assertEof();
         if (m_childProcess == NULL)
             result = -1;
         else
             result = GetProcessId(m_childProcess);
         break;
     case AgentMsg::SetConsoleMode:
-        m_terminal->setConsoleMode(packet.getInt());
+        m_terminal->setConsoleMode(packet.getInt32());
         result = 0;
         break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
-    m_controlSocket->write((char*)&result, sizeof(result));
+    m_controlSocket->write(&result, sizeof(result));
 }
 
 int Agent::handleStartProcessPacket(ReadBuffer &packet)
@@ -310,7 +319,7 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     std::wstring cwd = packet.getWString();
     std::wstring env = packet.getWString();
     std::wstring desktop = packet.getWString();
-    ASSERT(packet.eof());
+    packet.assertEof();
 
     LPCWSTR programArg = program.empty() ? NULL : program.c_str();
     std::vector<wchar_t> cmdlineCopy;
@@ -352,16 +361,16 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
 
 int Agent::handleSetSizePacket(ReadBuffer &packet)
 {
-    int cols = packet.getInt();
-    int rows = packet.getInt();
-    ASSERT(packet.eof());
+    int cols = packet.getInt32();
+    int rows = packet.getInt32();
+    packet.assertEof();
     resizeWindow(cols, rows);
     return 0;
 }
 
 void Agent::pollDataSocket()
 {
-    const std::string newData = m_dataSocket->readAll();
+    const std::string newData = m_dataSocket->readAllToString();
     if (hasDebugFlag("input_separated_bytes")) {
         // This debug flag is intended to help with testing incomplete escape
         // sequences and multibyte UTF-8 encodings.  (I wonder if the normal

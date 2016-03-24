@@ -36,6 +36,7 @@ AGENT_OBJECTS = \
 	build/agent/agent/Terminal.o \
 	build/agent/agent/Win32Console.o \
 	build/agent/agent/main.o \
+	build/agent/shared/Buffer.o \
 	build/agent/shared/DebugClient.o \
 	build/agent/shared/WinptyAssert.o \
 	build/agent/shared/WinptyVersion.o \
