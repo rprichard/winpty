@@ -338,12 +338,13 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
 
 int main(int argc, char *argv[])
 {
+    setlocale(LC_ALL, "");
+
     g_mainWakeup = new WakeupFd();
 
     Arguments args;
     parseArguments(argc, argv, args);
 
-    setlocale(LC_ALL, "");
     setupWin32Environment();
 
     winsize sz;
