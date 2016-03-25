@@ -40,6 +40,7 @@
 
 #include <array>
 #include <string>
+#include <type_traits>
 
 #ifdef STRING_BUILDER_TESTING
 #include <assert.h>
@@ -47,6 +48,8 @@
 #else
 #define STRING_BUILDER_CHECK(cond)
 #endif // STRING_BUILDER_TESTING
+
+#include "WinptyAssert.h"
 
 template <typename C, size_t sz>
 struct ValueString {
@@ -164,6 +167,21 @@ public:
         return *this;
     }
 
+private:
+    // Forbid output of char/wchar_t for GStringBuilder if the type doesn't
+    // exactly match the builder element type.  The code still allows
+    // signed char and unsigned char, but I'm a little worried about what
+    // happens if a user tries to output int8_t or uint8_t.
+    template <typename P>
+    typename std::enable_if<
+        (std::is_same<P, char>::value || std::is_same<P, wchar_t>::value) &&
+        !std::is_same<C, P>::value, GStringBuilder&>::type
+    operator<<(P ch) {
+        ASSERT(false && "Method was not supposed to be reachable.");
+        return *this;
+    }
+
+public:
     GStringBuilder &operator<<(short i)              { return *this << gdecOfInt<C>(i); }
     GStringBuilder &operator<<(unsigned short i)     { return *this << gdecOfInt<C>(i); }
     GStringBuilder &operator<<(int i)                { return *this << gdecOfInt<C>(i); }
