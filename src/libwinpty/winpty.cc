@@ -30,14 +30,13 @@
 #include "../shared/DebugClient.h"
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
+#include "../shared/GenRandom.h"
 #include "../shared/StringBuilder.h"
 #include "../shared/StringUtil.h"
 
 // TODO: Error handling, handle out-of-memory.
 
 #define AGENT_EXE L"winpty-agent.exe"
-
-static volatile LONG consoleCounter;
 
 struct winpty_s {
     winpty_s();
@@ -293,9 +292,7 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
 
     // Start pipes.
     const auto basePipeName =
-        (WStringBuilder(40)
-            << L"\\\\.\\pipe\\winpty-" << GetCurrentProcessId()
-            << L'-' << InterlockedIncrement(&consoleCounter)).str_moved();
+        L"\\\\.\\pipe\\winpty-" + GenRandom().uniqueName();
     const std::wstring controlPipeName = basePipeName + L"-control";
     const std::wstring dataPipeName = basePipeName + L"-data";
     pc->controlPipe = createNamedPipe(controlPipeName, false);

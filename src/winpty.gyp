@@ -99,6 +99,7 @@
                 'COMPILING_WINPTY_DLL',
             ],
             'libraries' : [
+                '-ladvapi32',
                 '-luser32',
             ],
             'sources' : [
@@ -109,6 +110,8 @@
                 'shared/Buffer.cc',
                 'shared/DebugClient.h',
                 'shared/DebugClient.cc',
+                'shared/GenRandom.h',
+                'shared/GenRandom.cc',
                 'shared/StringBuilder.h',
                 'shared/StringUtil.cc',
                 'shared/StringUtil.h',
