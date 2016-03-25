@@ -313,45 +313,40 @@ void Agent::handlePacket(ReadBuffer &packet)
 
 int Agent::handleStartProcessPacket(ReadBuffer &packet)
 {
-    BOOL success;
     ASSERT(m_childProcess == NULL);
 
-    std::wstring program = packet.getWString();
-    std::wstring cmdline = packet.getWString();
-    std::wstring cwd = packet.getWString();
-    std::wstring env = packet.getWString();
-    std::wstring desktop = packet.getWString();
+    const auto program = packet.getWString();
+    const auto cmdline = packet.getWString();
+    const auto cwd = packet.getWString();
+    const auto env = packet.getWString();
+    const auto desktop = packet.getWString();
     packet.assertEof();
 
+    auto cmdlineV = vectorWithNulFromString(cmdline);
+    auto desktopV = vectorWithNulFromString(desktop);
+    auto envV = vectorFromString(env);
+
     LPCWSTR programArg = program.empty() ? NULL : program.c_str();
-    std::vector<wchar_t> cmdlineCopy;
-    LPWSTR cmdlineArg = NULL;
-    if (!cmdline.empty()) {
-        cmdlineCopy.resize(cmdline.size() + 1);
-        cmdline.copy(&cmdlineCopy[0], cmdline.size());
-        cmdlineCopy[cmdline.size()] = L'\0';
-        cmdlineArg = &cmdlineCopy[0];
-    }
+    LPWSTR cmdlineArg = cmdline.empty() ? NULL : cmdlineV.data();
     LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
-    LPCWSTR envArg = env.empty() ? NULL : env.data();
+    LPWSTR envArg = env.empty() ? NULL : envV.data();
 
-    STARTUPINFOW sui;
-    PROCESS_INFORMATION pi;
-    memset(&sui, 0, sizeof(sui));
-    memset(&pi, 0, sizeof(pi));
+    STARTUPINFOW sui = {};
+    PROCESS_INFORMATION pi = {};
     sui.cb = sizeof(sui);
-    sui.lpDesktop = desktop.empty() ? NULL : (LPWSTR)desktop.c_str();
+    sui.lpDesktop = desktop.empty() ? NULL : desktopV.data();
 
-    success = CreateProcessW(programArg, cmdlineArg, NULL, NULL,
-                             /*bInheritHandles=*/FALSE,
-                             /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
-                             /*CREATE_NEW_PROCESS_GROUP*/0,
-                             (LPVOID)envArg, cwdArg, &sui, &pi);
-    int ret = success ? 0 : GetLastError();
+    const BOOL success =
+        CreateProcessW(programArg, cmdlineArg, NULL, NULL,
+                       /*bInheritHandles=*/FALSE,
+                       /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
+                       /*CREATE_NEW_PROCESS_GROUP*/0,
+                       envArg, cwdArg, &sui, &pi);
+    const int ret = success ? 0 : GetLastError();
 
-    trace("CreateProcess: %s %d",
+    trace("CreateProcess: %s %u",
           (success ? "success" : "fail"),
-          (int)pi.dwProcessId);
+          static_cast<unsigned int>(pi.dwProcessId));
 
     if (success) {
         CloseHandle(pi.hThread);

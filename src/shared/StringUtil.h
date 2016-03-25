@@ -24,8 +24,26 @@
 #include <stdlib.h>
 
 #include <string>
+#include <vector>
 
 size_t winpty_wcsnlen(const wchar_t *s, size_t maxlen);
 std::string utf8FromWide(const std::wstring &input);
+
+// Return a vector containing each character in the string.
+template <typename T>
+std::vector<T> vectorFromString(const std::basic_string<T> &str) {
+    return std::vector<T>(str.begin(), str.end());
+}
+
+// Return a vector containing each character in the string, followed by a
+// NUL terminator.
+template <typename T>
+std::vector<T> vectorWithNulFromString(const std::basic_string<T> &str) {
+    std::vector<T> ret;
+    ret.reserve(str.size() + 1);
+    ret.insert(ret.begin(), str.begin(), str.end());
+    ret.push_back('\0');
+    return ret;
+}
 
 #endif // STRING_UTIL_H

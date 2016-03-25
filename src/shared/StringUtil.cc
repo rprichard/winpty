@@ -22,8 +22,6 @@
 
 #include <windows.h>
 
-#include <vector>
-
 #include "WinptyAssert.h"
 
 // Workaround.  MinGW (from mingw.org) does not have wcsnlen.  MinGW-w64 *does*

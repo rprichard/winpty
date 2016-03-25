@@ -242,43 +242,34 @@ static std::wstring getDesktopFullName()
     return getObjectName(station) + L"\\" + getObjectName(desktop);
 }
 
-static inline std::vector<wchar_t> modifiableWString(const std::wstring &str) {
-    std::vector<wchar_t> ret(str.size() + 1);
-    str.copy(ret.data(), str.size());
-    ret[str.size()] = L'\0';
-    return ret;
-}
-
 static void startAgentProcess(const BackgroundDesktop &desktop,
                               const std::wstring &controlPipeName,
                               const std::wstring &dataPipeName,
                               int cols, int rows)
 {
-    bool success;
-
     const std::wstring exePath = findAgentProgram();
     const std::wstring cmdline =
         (WStringBuilder(256)
             << L"\"" << exePath << L"\" "
             << controlPipeName << L' ' << dataPipeName << L' '
             << cols << L' ' << rows).str_moved();
-    auto cmdlineM = modifiableWString(cmdline);
+
+    auto cmdlineV = vectorWithNulFromString(cmdline);
+    auto desktopV = vectorWithNulFromString(desktop.desktopName);
 
     // Start the agent.
     STARTUPINFOW sui = {};
     sui.cb = sizeof(sui);
-    auto desktopNameM = modifiableWString(desktop.desktopName);
-    if (desktop.station != NULL) {
-        sui.lpDesktop = desktopNameM.data();
-    }
+    sui.lpDesktop = desktop.station == NULL ? NULL : desktopV.data();
     PROCESS_INFORMATION pi = {};
-    success = CreateProcessW(exePath.c_str(),
-                             &cmdlineM[0],
-                             NULL, NULL,
-                             /*bInheritHandles=*/FALSE,
-                             /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
-                             NULL, NULL,
-                             &sui, &pi);
+    const BOOL success =
+        CreateProcessW(exePath.c_str(),
+                       cmdlineV.data(),
+                       NULL, NULL,
+                       /*bInheritHandles=*/FALSE,
+                       /*dwCreationFlags=*/CREATE_NEW_CONSOLE,
+                       NULL, NULL,
+                       &sui, &pi);
     if (success) {
         trace("Created agent successfully, pid=%u, cmdline=%s",
               static_cast<unsigned int>(pi.dwProcessId),
@@ -397,6 +388,42 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     return pc;
 }
 
+// Return a std::wstring containing every character of the environment block.
+// Typically, the block is non-empty, so the std::wstring returned ends with
+// two NUL terminators.  (These two terminators are counted in size(), so
+// calling c_str() produces a triply-terminated string.)
+static std::wstring wstringFromEnvBlock(const wchar_t *env)
+{
+    std::wstring envStr;
+    if (env != NULL) {
+        const wchar_t *p = env;
+        while (*p != L'\0') {
+            p += wcslen(p) + 1;
+        }
+        p++;
+        envStr.assign(env, p);
+
+        // Assuming the environment was non-empty, envStr now ends with two NUL
+        // terminators.
+        //
+        // If the environment were empty, though, then envStr would only be
+        // singly terminated, but the MSDN documentation thinks an env block is
+        // always doubly-terminated, so add an extra NUL just in case it
+        // matters.
+        const auto envStrSz = envStr.size();
+        if (envStrSz == 1) {
+            ASSERT(envStr[0] == L'\0');
+            envStr.push_back(L'\0');
+        } else {
+            ASSERT(envStrSz >= 3);
+            ASSERT(envStr[envStrSz - 3] != L'\0');
+            ASSERT(envStr[envStrSz - 2] == L'\0');
+            ASSERT(envStr[envStrSz - 1] == L'\0');
+        }
+    }
+    return envStr;
+}
+
 WINPTY_API int winpty_start_process(winpty_t *pc,
                                     const wchar_t *appname,
                                     const wchar_t *cmdline,
@@ -408,20 +435,7 @@ WINPTY_API int winpty_start_process(winpty_t *pc,
     packet.putWString(appname ? appname : L"");
     packet.putWString(cmdline ? cmdline : L"");
     packet.putWString(cwd ? cwd : L"");
-    std::wstring envStr;
-    if (env != NULL) {
-        const wchar_t *p = env;
-        while (*p != L'\0') {
-            p += wcslen(p) + 1;
-        }
-        p++;
-        envStr.assign(env, p);
-
-        // Can a Win32 environment be empty?  If so, does it end with one NUL or
-        // two?  Add an extra NUL just in case it matters.
-        envStr.push_back(L'\0');
-    }
-    packet.putWString(envStr);
+    packet.putWString(wstringFromEnvBlock(env));
     packet.putWString(getDesktopFullName());
     writePacket(pc, packet);
     return readInt32(pc);
