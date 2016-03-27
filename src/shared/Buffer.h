@@ -84,7 +84,6 @@ public:
     }
 
     void getRawData(void *data, size_t len);
-    int32_t getRawInt32()                       { return getRawValue<int32_t>(); }
     int32_t getInt32();
     int64_t getInt64();
     std::wstring getWString();
