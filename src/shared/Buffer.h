@@ -65,7 +65,7 @@ public:
 class ReadBuffer {
 public:
     class DecodeError : public WinptyException {
-        virtual const wchar_t *what() {
+        virtual const wchar_t *what() const WINPTY_NOEXCEPT {
             return L"DecodeError: RPC message decoding error";
         }
     };

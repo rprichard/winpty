@@ -21,10 +21,18 @@
 #ifndef WINPTY_EXCEPTION_H
 #define WINPTY_EXCEPTION_H
 
+#if defined(__GNUC__)
+#define WINPTY_NOEXCEPT noexcept
+#elif defined(_MSC_VER) && _MSC_VER >= 1900
+#define WINPTY_NOEXCEPT noexcept
+#else
+#define WINPTY_NOEXCEPT
+#endif
+
 class WinptyException {
 public:
-    virtual const wchar_t *what() = 0;
-    ~WinptyException() {}
+    virtual const wchar_t *what() const WINPTY_NOEXCEPT = 0;
+    virtual ~WinptyException() {}
 };
 
 #endif // WINPTY_EXCEPTION_H
