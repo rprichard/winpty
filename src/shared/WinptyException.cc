@@ -18,26 +18,40 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef WINPTY_EXCEPTION_H
-#define WINPTY_EXCEPTION_H
+#include "WinptyException.h"
 
-#include <windows.h>
+#include <memory>
+#include <string>
 
-#if defined(__GNUC__)
-#define WINPTY_NOEXCEPT noexcept
-#elif defined(_MSC_VER) && _MSC_VER >= 1900
-#define WINPTY_NOEXCEPT noexcept
-#else
-#define WINPTY_NOEXCEPT
-#endif
+#include "StringBuilder.h"
 
-class WinptyException {
+namespace {
+
+class ExceptionImpl : public WinptyException {
 public:
-    virtual const wchar_t *what() const WINPTY_NOEXCEPT = 0;
-    virtual ~WinptyException() {}
+    ExceptionImpl(const wchar_t *what) :
+        m_what(std::make_shared<std::wstring>(what)) {}
+    virtual const wchar_t *what() const WINPTY_NOEXCEPT {
+        return m_what->c_str();
+    }
+private:
+    // Using a shared_ptr ensures that copying the object raises no exception.
+    std::shared_ptr<std::wstring> m_what;
 };
 
-void throwWinptyException(const wchar_t *what);
-void throwWindowsError(const wchar_t *prefix, DWORD error=GetLastError());
+} // anonymous namespace
 
-#endif // WINPTY_EXCEPTION_H
+void throwWinptyException(const wchar_t *what) {
+    throw ExceptionImpl(what);
+}
+
+void throwWindowsError(const wchar_t *prefix, DWORD errorCode) {
+    WStringBuilder sb(64);
+    if (prefix != nullptr) {
+        sb << prefix << L": ";
+    }
+    // It might make sense to use FormatMessage here, but IIRC, its API is hard
+    // to figure out.
+    sb << L"Windows error " << errorCode;
+    throwWinptyException(sb.c_str());
+}

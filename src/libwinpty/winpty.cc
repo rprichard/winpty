@@ -33,6 +33,8 @@
 #include "../shared/GenRandom.h"
 #include "../shared/StringBuilder.h"
 #include "../shared/StringUtil.h"
+#include "../shared/WindowsSecurity.h"
+#include "../shared/WinptyException.h"
 
 // TODO: Error handling, handle out-of-memory.
 
@@ -144,17 +146,28 @@ static int32_t readInt32(winpty_t *pc)
 
 static HANDLE createNamedPipe(const std::wstring &name, bool overlapped)
 {
-    return CreateNamedPipeW(name.c_str(),
-                            /*dwOpenMode=*/
-                            PIPE_ACCESS_DUPLEX |
-                            FILE_FLAG_FIRST_PIPE_INSTANCE |
-                            (overlapped ? FILE_FLAG_OVERLAPPED : 0),
-                            /*dwPipeMode=*/0,
-                            /*nMaxInstances=*/1,
-                            /*nOutBufferSize=*/0,
-                            /*nInBufferSize=*/0,
-                            /*nDefaultTimeOut=*/3000,
-                            NULL);
+    try {
+        const auto sd = createPipeSecurityDescriptorOwnerFullControl();
+        SECURITY_ATTRIBUTES sa = {};
+        sa.nLength = sizeof(sa);
+        sa.lpSecurityDescriptor = sd.get();
+        return CreateNamedPipeW(name.c_str(),
+                                /*dwOpenMode=*/
+                                    PIPE_ACCESS_DUPLEX |
+                                    FILE_FLAG_FIRST_PIPE_INSTANCE |
+                                    (overlapped ? FILE_FLAG_OVERLAPPED : 0),
+                                /*dwPipeMode=*/
+                                    rejectRemoteClientsPipeFlag(),
+                                /*nMaxInstances=*/1,
+                                /*nOutBufferSize=*/0,
+                                /*nInBufferSize=*/0,
+                                /*nDefaultTimeOut=*/3000,
+                                &sa);
+    } catch (const WinptyException &e) {
+        trace("createNamedPipe: exception thrown: %s",
+            utf8FromWide(e.what()).c_str());
+        return INVALID_HANDLE_VALUE;
+    }
 }
 
 struct BackgroundDesktop {
@@ -336,6 +349,9 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     // destroyed before the agent can connect with them.
     restoreOriginalDesktop(desktop);
 
+    // TODO: This comment is now out-of-date.  The named pipes now have a DACL
+    // that should prevent arbitrary users from connecting, even just to read.
+    //
     // The default security descriptor for a named pipe allows anyone to connect
     // to the pipe to read, but not to write.  Only the "creator owner" and
     // various system accounts can write to the pipe.  By sending and receiving

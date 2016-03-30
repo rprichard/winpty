@@ -28,7 +28,9 @@ LIBWINPTY_OBJECTS = \
 	build/libwinpty/shared/DebugClient.o \
 	build/libwinpty/shared/GenRandom.o \
 	build/libwinpty/shared/StringUtil.o \
-	build/libwinpty/shared/WinptyAssert.o
+	build/libwinpty/shared/WindowsSecurity.o \
+	build/libwinpty/shared/WinptyAssert.o \
+	build/libwinpty/shared/WinptyException.o
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)
 	$(info Linking $@)
