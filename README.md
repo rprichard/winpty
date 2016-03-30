@@ -16,7 +16,14 @@ properly-functioning input (e.g. arrow and function keys) and output (e.g. line
 buffering).  The library could be also useful for writing a non-Cygwin SSH
 server.
 
-## Prerequisites
+## Supported Windows versions
+
+winpty runs on Windows XP through Windows 10, including server versions.  It
+can be compiled into either 32-bit or 64-bit binaries.
+
+## Cygwin/MSYS adapter (`console.exe`)
+
+### Prerequisites
 
 You need the following to build winpty:
 
@@ -36,7 +43,7 @@ MinGW appears to be split into two distributions -- MinGW (creates 32-bit
 binaries) and MinGW-w64 (creates both 32-bit and 64-bit binaries).  Either
 one is generally acceptable.
 
-### Cygwin packages
+#### Cygwin packages
 
 The default g++ compiler for Cygwin targets Cygwin itself, but Cygwin also
 packages MinGW-w64 compilers.  As of this writing, the necessary packages are:
@@ -50,7 +57,7 @@ As of this writing (2016-01-23), only the MinGW-w64 compiler is acceptable.
 The MinGW compiler (e.g. from the `mingw-gcc-g++` package) is no longer
 maintained and is too buggy.
 
-### MSYS packages
+#### MSYS packages
 
 For the original MSYS, use the `mingw-get` tool (MinGW Installation Manager),
 and select at least these components:
@@ -64,7 +71,7 @@ and select at least these components:
 When running `./configure`, make sure that `mingw32-g++` is in your
 `PATH`.  It will be in the `C:\MinGW\bin` directory.
 
-### MSYS2 packages
+#### MSYS2 packages
 
 For MSYS2, use `pacman` and install at least these packages:
 
@@ -73,7 +80,7 @@ For MSYS2, use `pacman` and install at least these packages:
   the appropriate compiler for your CPU architecture.
 * `make`
 
-## Build
+### Building the Unix adapter
 
 In the project directory, run `./configure`, then `make`.
 
@@ -83,7 +90,7 @@ This will produce three binaries:
 * `build/winpty-agent.exe`
 * `build/console.exe`
 
-## Using the Unix adapter
+### Using the Unix adapter
 
 To run a Windows console program in `mintty` or Cygwin `sshd`, prepend
 `console.exe` to the command-line:
@@ -95,6 +102,20 @@ To run a Windows console program in `mintty` or Cygwin `sshd`, prepend
     30
     >>> exit()
     $
+
+## Embedding winpty / MSVC compilation
+
+See `src/include/winpty.h` for the prototypes of functions exported by
+`winpty.dll`.
+
+Only the `console.exe` binary uses Cygwin; all the other binaries work without
+it and can be compiled with either MinGW or MSVC.  To compile using MSVC,
+download gyp and run `gyp -I configurations.gypi` in the `src` subdirectory.
+This will generate a `winpty.sln` and associated project files.  See the
+`src/winpty.gyp` and `src/configurations.gypi` files for notes on dealing with
+MSVC versions and different architectures.
+
+Compiling winpty with MSVC currently requires MSVC 2013 or newer.
 
 ## Debugging winpty
 
