@@ -31,6 +31,7 @@
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
 #include "../shared/GenRandom.h"
+#include "../shared/OwnedHandle.h"
 #include "../shared/StringBuilder.h"
 #include "../shared/StringUtil.h"
 #include "../shared/WindowsSecurity.h"
@@ -257,7 +258,9 @@ static std::wstring getDesktopFullName()
 static void startAgentProcess(const BackgroundDesktop &desktop,
                               const std::wstring &controlPipeName,
                               const std::wstring &dataPipeName,
-                              int cols, int rows)
+                              int cols, int rows,
+                              HANDLE &agentProcess,
+                              DWORD &agentPid)
 {
     const std::wstring exePath = findAgentProgram();
     const std::wstring cmdline =
@@ -295,8 +298,36 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
         exit(1);
     }
 
-    CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
+
+    agentProcess = pi.hProcess;
+    agentPid = pi.dwProcessId;
+}
+
+static bool verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid)
+{
+    const auto client = getNamedPipeClientProcessId(serverPipe);
+    const auto err = GetLastError();
+    const auto success = std::get<0>(client);
+    if (success == GetNamedPipeClientProcessId_Result::Success) {
+        const auto clientPid = std::get<1>(client);
+        if (clientPid != agentPid) {
+            trace("Security check failed: pipe client pid (%u) does not "
+                "match agent pid (%u)",
+                static_cast<unsigned int>(clientPid),
+                static_cast<unsigned int>(agentPid));
+            return false;
+        }
+        return true;
+    } else if (success == GetNamedPipeClientProcessId_Result::UnsupportedOs) {
+        trace("Pipe client PID security check skipped: "
+            "GetNamedPipeClientProcessId unsupported on this OS version");
+        return true;
+    } else {
+        trace("GetNamedPipeClientProcessId failed: %u",
+            static_cast<unsigned int>(err));
+        return false;
+    }
 }
 
 WINPTY_API winpty_t *winpty_open(int cols, int rows)
@@ -323,7 +354,11 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     BackgroundDesktop desktop = setupBackgroundDesktop();
 
     // Start the agent.
-    startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows);
+    HANDLE agentProcess = NULL;
+    DWORD agentPid = INFINITE;
+    startAgentProcess(desktop, controlPipeName, dataPipeName, cols, rows,
+                      agentProcess, agentPid);
+    OwnedHandle autoClose(agentProcess);
 
     // TODO: Frequently, I see the CreateProcess call return successfully,
     // but the agent immediately dies.  The following pipe connect calls then
@@ -349,6 +384,13 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
     // destroyed before the agent can connect with them.
     restoreOriginalDesktop(desktop);
 
+    // Check that the pipe clients are correct.
+    if (!verifyPipeClientPid(pc->controlPipe, agentPid) ||
+            !verifyPipeClientPid(pc->dataPipe, agentPid)) {
+        delete pc;
+        return NULL;
+    }
+
     // TODO: This comment is now out-of-date.  The named pipes now have a DACL
     // that should prevent arbitrary users from connecting, even just to read.
     //
@@ -365,38 +407,6 @@ WINPTY_API winpty_t *winpty_open(int cols, int rows)
         delete pc;
         return NULL;
     }
-
-    // TODO: On Windows Vista and forward, we could call
-    // GetNamedPipeClientProcessId and verify that the PID is correct.  We could
-    // also pass the PIPE_REJECT_REMOTE_CLIENTS flag on newer OS's.
-    // TODO: I suppose this code is still subject to a denial-of-service attack
-    // from untrusted accounts making read-only connections to the pipe.  It
-    // should probably provide a SECURITY_DESCRIPTOR for the pipe, but the last
-    // time I tried that (using SDDL), I couldn't get it to work (access denied
-    // errors).
-
-    // Aside: An obvious way to setup these handles is to open both ends of the
-    // pipe in the parent process and let the child inherit its handles.
-    // Unfortunately, the Windows API makes inheriting handles problematic.
-    // MSDN says that handles have to be marked inheritable, and once they are,
-    // they are inherited by any call to CreateProcess with
-    // bInheritHandles==TRUE.  To avoid accidental inheritance, the library's
-    // clients would be obligated not to create new processes while a thread
-    // was calling winpty_open.  Moreover, to inherit handles, MSDN seems
-    // to say that bInheritHandles must be TRUE[*], but I don't want to use a
-    // TRUE bInheritHandles, because I want to avoid leaking handles into the
-    // agent process, especially if the library someday allows creating the
-    // agent process under a different user account.
-    //
-    // [*] The way that bInheritHandles and STARTF_USESTDHANDLES work together
-    // is unclear in the documentation.  On one hand, for STARTF_USESTDHANDLES,
-    // it says that bInheritHandles must be TRUE.  On Vista and up, isn't
-    // PROC_THREAD_ATTRIBUTE_HANDLE_LIST an acceptable alternative to
-    // bInheritHandles?  On the other hand, KB315939 contradicts the
-    // STARTF_USESTDHANDLES documentation by saying, "Your pipe handles will
-    // still be duplicated because Windows will always duplicate the STD
-    // handles, even when bInheritHandles is set to FALSE."  IIRC, my testing
-    // showed that the KB article was correct.
 
     return pc;
 }

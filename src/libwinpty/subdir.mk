@@ -27,6 +27,7 @@ LIBWINPTY_OBJECTS = \
 	build/libwinpty/shared/Buffer.o \
 	build/libwinpty/shared/DebugClient.o \
 	build/libwinpty/shared/GenRandom.o \
+	build/libwinpty/shared/OwnedHandle.o \
 	build/libwinpty/shared/StringUtil.o \
 	build/libwinpty/shared/WindowsSecurity.o \
 	build/libwinpty/shared/WinptyAssert.o \

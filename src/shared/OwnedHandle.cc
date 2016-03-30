@@ -18,26 +18,19 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef WINPTY_PRECOMPILED_HEADER_H
-#define WINPTY_PRECOMPILED_HEADER_H
+#include "OwnedHandle.h"
 
-#include <windows.h>
+#include "DebugClient.h"
+#include "WinptyException.h"
 
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
-
-#include <array>
-#include <limits>
-#include <memory>
-#include <new>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#endif // WINPTY_PRECOMPILED_HEADER_H
+void OwnedHandle::dispose(bool nothrow) {
+    if (m_h != nullptr && m_h != INVALID_HANDLE_VALUE) {
+        if (!CloseHandle(m_h)) {
+            trace("CloseHandle(%p) failed", m_h);
+            if (!nothrow) {
+                throwWindowsError(L"CloseHandle failed");
+            }
+        }
+    }
+    m_h = nullptr;
+}

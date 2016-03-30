@@ -18,26 +18,28 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef WINPTY_PRECOMPILED_HEADER_H
-#define WINPTY_PRECOMPILED_HEADER_H
+#ifndef WINPTY_SHARED_OWNED_HANDLE_H
+#define WINPTY_SHARED_OWNED_HANDLE_H
 
 #include <windows.h>
 
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <wchar.h>
+class OwnedHandle {
+    HANDLE m_h;
+public:
+    OwnedHandle() : m_h(nullptr) {}
+    explicit OwnedHandle(HANDLE h) : m_h(h) {}
+    ~OwnedHandle() { dispose(true); }
+    void dispose(bool nothrow=false);
+    HANDLE get() const { return m_h; }
+    HANDLE release() { HANDLE ret = m_h; m_h = nullptr; return ret; }
+    OwnedHandle(const OwnedHandle &other) = delete;
+    OwnedHandle(OwnedHandle &&other) : m_h(other.release()) {}
+    OwnedHandle &operator=(const OwnedHandle &other) = delete;
+    OwnedHandle &operator=(OwnedHandle &&other) {
+        dispose();
+        m_h = other.release();
+        return *this;
+    }
+};
 
-#include <array>
-#include <limits>
-#include <memory>
-#include <new>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
-
-#endif // WINPTY_PRECOMPILED_HEADER_H
+#endif // WINPTY_SHARED_OWNED_HANDLE_H

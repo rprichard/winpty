@@ -113,6 +113,8 @@
                 'shared/DebugClient.cc',
                 'shared/GenRandom.h',
                 'shared/GenRandom.cc',
+                'shared/OwnedHandle.h',
+                'shared/OwnedHandle.cc',
                 'shared/StringBuilder.h',
                 'shared/StringUtil.cc',
                 'shared/StringUtil.h',

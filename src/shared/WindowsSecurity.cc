@@ -24,6 +24,7 @@
 
 #include "DebugClient.h"
 #include "OsModule.h"
+#include "OwnedHandle.h"
 #include "StringBuilder.h"
 #include "WinptyAssert.h"
 #include "WinptyException.h"
@@ -66,34 +67,12 @@ Sid allocatedSid(PSID v) {
     return Sid(v, std::unique_ptr<Impl>(new Impl { v }));
 }
 
-class Handle {
-    HANDLE m_h;
-public:
-    explicit Handle(HANDLE h) : m_h(h) {}
-    ~Handle() {
-        if (m_h != nullptr) {
-            CloseHandle(m_h);
-        }
-    }
-    HANDLE get() const { return m_h; }
-    Handle(const Handle &other) = delete;
-    Handle &operator=(const Handle &other) = delete;
-    Handle(Handle &&other) : m_h(other.m_h) {
-        other.m_h = nullptr;
-    }
-    Handle &operator=(Handle &&other) {
-        m_h = other.m_h;
-        other.m_h = nullptr;
-        return *this;
-    }
-};
-
 } // anonymous namespace
 
 // Returns a handle to the thread's effective security token.  If the thread
 // is impersonating another user, its token is returned, and otherwise, the
 // process' security token is opened.  The handle is opened with TOKEN_QUERY.
-static Handle openSecurityTokenForQuery() {
+static OwnedHandle openSecurityTokenForQuery() {
     HANDLE token = nullptr;
     // It is unclear to me whether OpenAsSelf matters for winpty, or what the
     // most appropriate value is.
@@ -108,7 +87,7 @@ static Handle openSecurityTokenForQuery() {
     }
     ASSERT(token != nullptr &&
         "OpenThreadToken/OpenProcessToken token is NULL");
-    return Handle(token);
+    return OwnedHandle(token);
 }
 
 // Returns the TokenOwner of the thread's effective security token.
@@ -117,7 +96,7 @@ Sid getOwnerSid() {
         std::unique_ptr<char[]> buffer;
     };
 
-    Handle token = openSecurityTokenForQuery();
+    OwnedHandle token = openSecurityTokenForQuery();
     DWORD actual = 0;
     BOOL success;
     success = GetTokenInformation(token.get(), TokenOwner,
@@ -460,4 +439,28 @@ DWORD rejectRemoteClientsPipeFlag() {
             static_cast<int>(info.dwMinorVersion));
         return 0;
     }
+}
+
+typedef BOOL WINAPI GetNamedPipeClientProcessId_t(
+    HANDLE Pipe,
+    PULONG ClientProcessId);
+
+std::tuple<GetNamedPipeClientProcessId_Result, DWORD>
+getNamedPipeClientProcessId(HANDLE serverPipe) {
+    OsModule kernel32(L"kernel32.dll");
+    const auto pGetNamedPipeClientProcessId =
+        reinterpret_cast<GetNamedPipeClientProcessId_t*>(
+            kernel32.proc("GetNamedPipeClientProcessId"));
+    if (pGetNamedPipeClientProcessId == nullptr) {
+        return std::make_tuple(
+            GetNamedPipeClientProcessId_Result::UnsupportedOs, 0);
+    }
+    ULONG pid = 0;
+    if (!pGetNamedPipeClientProcessId(serverPipe, &pid)) {
+        return std::make_tuple(
+            GetNamedPipeClientProcessId_Result::Failure, 0);
+    }
+    return std::make_tuple(
+        GetNamedPipeClientProcessId_Result::Success,
+        static_cast<DWORD>(pid));
 }

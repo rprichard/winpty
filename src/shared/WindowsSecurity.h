@@ -26,6 +26,7 @@
 
 #include <memory>
 #include <string>
+#include <tuple>
 #include <utility>
 
 // PSID and PSECURITY_DESCRIPTOR are both pointers to void, but we want
@@ -79,13 +80,25 @@ Sid wellKnownSid(
 Sid builtinAdminsSid();
 Sid localSystemSid();
 Sid everyoneSid();
+
 SecurityDescriptor createPipeSecurityDescriptorOwnerFullControl();
 SecurityDescriptor createPipeSecurityDescriptorOwnerFullControlEveryoneWrite();
 SecurityDescriptor getObjectSecurityDescriptor(HANDLE handle);
+
 std::wstring sidToString(PSID sid);
 Sid stringToSid(const std::wstring &str);
 SecurityDescriptor stringToSd(const std::wstring &str);
 std::wstring sdToString(PSECURITY_DESCRIPTOR sd);
+
 DWORD rejectRemoteClientsPipeFlag();
+
+enum class GetNamedPipeClientProcessId_Result {
+    Success,
+    Failure,
+    UnsupportedOs,
+};
+
+std::tuple<GetNamedPipeClientProcessId_Result, DWORD>
+getNamedPipeClientProcessId(HANDLE serverPipe);
 
 #endif // WINPTY_WINDOWS_SECURITY_H
