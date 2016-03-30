@@ -129,7 +129,7 @@ std::wstring GenRandom::uniqueName() {
     // It isn't clear to me how the crypto APIs would fail.  It *probably*
     // doesn't matter that much anyway?  In principle, a predictable pipe name
     // is subject to a local denial-of-service attack.
-    auto random = randomHexString(12);
+    auto random = randomHexString(16);
     if (!random.empty()) {
         sb << L'-' << random;
     }
