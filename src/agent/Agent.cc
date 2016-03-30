@@ -839,7 +839,7 @@ void Agent::syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN])
 {
     // XXX: The marker text generated here could easily collide with ordinary
     // console output.  Does it make sense to try to avoid the collision?
-    char str[SYNC_MARKER_LEN];
+    char str[SYNC_MARKER_LEN + 1];
     winpty_snprintf(str, "S*Y*N*C*%08x", m_syncCounter);
     for (int i = 0; i < SYNC_MARKER_LEN; ++i) {
         output[i].Char.UnicodeChar = str[i];
