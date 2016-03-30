@@ -23,7 +23,12 @@ ALL_TARGETS += build/winpty-debugserver.exe
 $(eval $(call def_mingw_target,debugserver,))
 
 DEBUGSERVER_OBJECTS = \
-	build/debugserver/debugserver/DebugServer.o
+	build/debugserver/debugserver/DebugServer.o \
+	build/debugserver/shared/DebugClient.o \
+	build/debugserver/shared/OwnedHandle.o \
+	build/debugserver/shared/WindowsSecurity.o \
+	build/debugserver/shared/WinptyAssert.o \
+	build/debugserver/shared/WinptyException.o
 
 build/winpty-debugserver.exe : $(DEBUGSERVER_OBJECTS)
 	$(info Linking $@)
