@@ -1,3 +1,28 @@
+# Next Version
+
+User-visible changes:
+
+ * A major bug affecting XP users was fixed.
+   [#67](https://github.com/rprichard/winpty/issues/67)
+
+Many changes internally:
+
+ * The codebase is switched from C++03 to C++11 and uses exceptions internally.
+   No exceptions are thrown across the C APIs defined in `winpty.h`.
+ * This version drops support for the original MinGW compiler packaged with
+   Cygwin (`i686-pc-mingw32-g++`).  The MinGW-w64 compiler is still supported,
+   as is the MinGW distributed at mingw.org.  Compiling with MSVC now requires
+   MSVC 2013 or newer.  Windows XP is still supported.
+   [ec3eae8df5](https://github.com/rprichard/winpty/commit/ec3eae8df5bbbb36d7628d168b0815638d122f37)
+ * Pipe security is enhanced.  winpty works harder to produce unique pipe names
+   and includes a random component in the name.  winpty secures pipes with a
+   DACL that prevents arbitrary users from connecting to its pipes.  winpty now
+   passes `PIPE_REJECT_REMOTE_CLIENTS` on Vista and up, and it verifies that
+   the pipe client PID is correct, again on Vista and up.  Previous versions
+   *should* still be secure.
+ * `winpty-debugserver.exe` now has an `--everyone` flag that allows capturing
+   debug output from other users.
+
 # Version 0.2.2 (2016-02-25)
 
 Minor bug fixes and enhancements:
