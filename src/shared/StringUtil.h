@@ -22,9 +22,14 @@
 #define STRING_UTIL_H
 
 #include <stdlib.h>
+#include <string.h>
+#include <wchar.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
+
+#include "WinptyAssert.h"
 
 size_t winpty_wcsnlen(const wchar_t *s, size_t maxlen);
 std::string utf8FromWide(const std::wstring &input);
@@ -44,6 +49,32 @@ std::vector<T> vectorWithNulFromString(const std::basic_string<T> &str) {
     ret.insert(ret.begin(), str.begin(), str.end());
     ret.push_back('\0');
     return ret;
+}
+
+// A safer(?) version of wcsncpy that is accepted by MSVC's /SDL mode.
+template <size_t N>
+wchar_t *winpty_wcsncpy(wchar_t (&d)[N], const wchar_t *s) {
+    ASSERT(s != nullptr);
+    size_t i = 0;
+    for (; i < N; ++i) {
+        if (s[i] == L'\0') {
+            break;
+        }
+        d[i] = s[i];
+    }
+    for (; i < N; ++i) {
+        d[i] = L'\0';
+    }
+    return d;
+}
+
+// Like wcsncpy, but ensure that the destination buffer is NUL-terminated.
+template <size_t N>
+wchar_t *winpty_wcsncpy_nul(wchar_t (&d)[N], const wchar_t *s) {
+    static_assert(N > 0, "array cannot be 0-size");
+    winpty_wcsncpy(d, s);
+    d[N - 1] = L'\0';
+    return d;
 }
 
 #endif // STRING_UTIL_H

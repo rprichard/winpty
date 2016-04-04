@@ -22,8 +22,10 @@
 
 #include <windows.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+#include <algorithm>
 #include <string>
 
 #include "winpty_snprintf.h"
@@ -82,11 +84,14 @@ static const char *getDebugConfig()
     if (g_debugConfig == NULL) {
         const int bufSize = 256;
         char buf[bufSize];
-        DWORD actualSize = GetEnvironmentVariableA("WINPTY_DEBUG", buf, bufSize);
-        if (actualSize == 0 || actualSize >= (DWORD)bufSize)
+        DWORD actualSize =
+            GetEnvironmentVariableA("WINPTY_DEBUG", buf, bufSize);
+        if (actualSize == 0 || actualSize >= static_cast<DWORD>(bufSize)) {
             buf[0] = '\0';
-        char *newConfig = new char[strlen(buf) + 1];
-        strcpy(newConfig, buf);
+        }
+        const size_t len = strlen(buf) + 1;
+        char *newConfig = new char[len];
+        std::copy(buf, buf + len, newConfig);
         void *oldValue = InterlockedCompareExchangePointer(
             &g_debugConfig, newConfig, NULL);
         if (oldValue != NULL) {

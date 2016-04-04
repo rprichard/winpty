@@ -383,7 +383,7 @@ static bool setFontVista(
     infoex.cbSize = sizeof(AGENT_CONSOLE_FONT_INFOEX);
     infoex.dwFontSize.Y = pxSize;
     infoex.FontWeight = 400;
-    wcsncpy(infoex.FaceName, faceName, COUNT_OF(infoex.FaceName));
+    winpty_wcsncpy_nul(infoex.FaceName, faceName);
     dumpFontInfoEx(infoex, "setFontVista: setting font to: ");
     if (!api.SetCurrentConsoleFontEx()(conout, FALSE, &infoex)) {
         trace("setFontVista: SetCurrentConsoleFontEx call failed");
