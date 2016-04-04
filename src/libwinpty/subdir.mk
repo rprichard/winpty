@@ -30,6 +30,7 @@ LIBWINPTY_OBJECTS = \
 	build/libwinpty/shared/OwnedHandle.o \
 	build/libwinpty/shared/StringUtil.o \
 	build/libwinpty/shared/WindowsSecurity.o \
+	build/libwinpty/shared/WindowsVersion.o \
 	build/libwinpty/shared/WinptyAssert.o \
 	build/libwinpty/shared/WinptyException.o
 

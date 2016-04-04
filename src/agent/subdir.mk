@@ -39,6 +39,7 @@ AGENT_OBJECTS = \
 	build/agent/shared/Buffer.o \
 	build/agent/shared/DebugClient.o \
 	build/agent/shared/StringUtil.o \
+	build/agent/shared/WindowsVersion.o \
 	build/agent/shared/WinptyAssert.o \
 	build/agent/shared/WinptyVersion.o
 

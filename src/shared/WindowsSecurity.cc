@@ -26,6 +26,7 @@
 #include "OsModule.h"
 #include "OwnedHandle.h"
 #include "StringBuilder.h"
+#include "WindowsVersion.h"
 #include "WinptyAssert.h"
 #include "WinptyException.h"
 
@@ -423,20 +424,12 @@ std::wstring sdToString(PSECURITY_DESCRIPTOR sd) {
 // that rejects remote connections.  Return this flag on Vista, or return 0
 // otherwise.
 DWORD rejectRemoteClientsPipeFlag() {
-    // MinGW lacks this flag; MinGW-w64 has it.
-    const DWORD kPIPE_REJECT_REMOTE_CLIENTS = 8;
-
-    OSVERSIONINFOW info = { sizeof(info) };
-    if (!GetVersionExW(&info)) {
-        trace("error: GetVersionExW failed: %u",
-            static_cast<unsigned>(GetLastError()));
-        return kPIPE_REJECT_REMOTE_CLIENTS;
-    } else if (info.dwMajorVersion >= 6) {
+    if (isAtLeastWindowsVista()) {
+        // MinGW lacks this flag; MinGW-w64 has it.
+        const DWORD kPIPE_REJECT_REMOTE_CLIENTS = 8;
         return kPIPE_REJECT_REMOTE_CLIENTS;
     } else {
-        trace("Omitting PIPE_REJECT_REMOTE_CLIENTS on old OS (%d.%d)",
-            static_cast<int>(info.dwMajorVersion),
-            static_cast<int>(info.dwMinorVersion));
+        trace("Omitting PIPE_REJECT_REMOTE_CLIENTS on pre-Vista OS");
         return 0;
     }
 }

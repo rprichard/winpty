@@ -22,29 +22,9 @@
 
 #include <stdlib.h>
 
+#include "../shared/WindowsVersion.h"
 #include "Agent.h"
 #include "Win32Console.h"
-
-namespace {
-
-// Returns true if the OS version is at least Windows 8 (6.2).  This function
-// should work correctly regardless of how the executable is manifested.
-static bool isWindows8OrGreater() {
-    OSVERSIONINFO info = {0};
-    info.dwOSVersionInfoSize = sizeof(info);
-    if (!GetVersionEx(&info)) {
-        return false;
-    }
-    if (info.dwMajorVersion > 6) {
-        return true;
-    }
-    if (info.dwMajorVersion < 6) {
-        return false;
-    }
-    return info.dwMinorVersion >= 2;
-}
-
-} // anonymous namespace
 
 LargeConsoleReadBuffer::LargeConsoleReadBuffer() :
     m_rect(0, 0, 0, 0), m_rectWidth(0)
@@ -66,7 +46,7 @@ void largeConsoleRead(LargeConsoleReadBuffer &out,
     out.m_rect = readArea;
     out.m_rectWidth = readArea.width();
 
-    static const bool useLargeReads = isWindows8OrGreater();
+    static const bool useLargeReads = isAtLeastWindows8();
     if (useLargeReads) {
         console.read(readArea, out.m_data.data());
     } else {
