@@ -1,6 +1,11 @@
+init:
+ - C:\cygwin\setup-x86      -q -P mingw64-i686-gcc-g++
+ - C:\cygwin64\setup-x86_64 -q -P mingw64-x86_64-gcc-g++
+ - C:\Python27\Scripts\pip install pefile
+ - C:\msys64\usr\bin\sh -lc "pacman --noconfirm -S tar"
 
 build_script:
- - python ship\ship.py
+ - C:\Python27\python ship\ship.py
 
 artifacts:
  - path: ship\packages\*.tar.gz

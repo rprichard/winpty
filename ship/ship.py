@@ -30,7 +30,7 @@
 #
 
 import os
-#import pefile
+import pefile
 import shutil
 import subprocess
 import sys
@@ -48,17 +48,16 @@ if os.environ.get("SHELL") is not None:
     sys.exit("Error: ship.py should run outside a Cygwin environment.")
 
 def dllVersion(path):
-    return "DLLVER_TODO"
-    # pe = pefile.PE(path)
-    # ret = None
-    # for fi in pe.FileInfo:
-    #     if fi.Key != "StringFileInfo":
-    #         continue
-    #     for st in fi.StringTable:
-    #         ret = st.entries.get("FileVersion")
-    #         break
-    # assert ret is not None
-    # return ret
+    pe = pefile.PE(path)
+    ret = None
+    for fi in pe.FileInfo:
+        if fi.Key != "StringFileInfo":
+            continue
+        for st in fi.StringTable:
+            ret = st.entries.get("FileVersion")
+            break
+    assert ret is not None
+    return ret
 
 # Determine other build parameters.
 print "Determining Cygwin/MSYS2 DLL versions..."
