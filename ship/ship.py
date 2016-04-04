@@ -33,6 +33,7 @@ import os
 #import pefile
 import shutil
 import subprocess
+import sys
 
 # Ensure that we're in the root directory.
 if not os.path.exists("VERSION.txt"):
@@ -61,6 +62,7 @@ def dllVersion(path):
 
 # Determine other build parameters.
 print "Determining Cygwin/MSYS2 DLL versions..."
+sys.stdout.flush()
 COMMIT_HASH = subprocess.check_output(["git.exe", "rev-parse", "HEAD"]).decode().strip()
 BUILD_TARGETS = [
     {
