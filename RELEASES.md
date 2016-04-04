@@ -14,14 +14,17 @@ Many changes internally:
    as is the MinGW distributed at mingw.org.  Compiling with MSVC now requires
    MSVC 2013 or newer.  Windows XP is still supported.
    [ec3eae8df5](https://github.com/rprichard/winpty/commit/ec3eae8df5bbbb36d7628d168b0815638d122f37)
- * Pipe security is enhanced.  winpty works harder to produce unique pipe names
+ * Pipe security is improved.  winpty works harder to produce unique pipe names
    and includes a random component in the name.  winpty secures pipes with a
    DACL that prevents arbitrary users from connecting to its pipes.  winpty now
    passes `PIPE_REJECT_REMOTE_CLIENTS` on Vista and up, and it verifies that
-   the pipe client PID is correct, again on Vista and up.  Previous versions
-   *should* still be secure.
+   the pipe client PID is correct, again on Vista and up.  When connecting to a
+   named pipe, winpty uses the `SECURITY_IDENTIFICATION` flag to restrict
+   impersonation.  Previous versions *should* still be secure.
  * `winpty-debugserver.exe` now has an `--everyone` flag that allows capturing
    debug output from other users.
+ * The code now compiles cleanly with MSVC's "Security Development Lifecycle"
+   (`/SDL`) checks enabled.
 
 # Version 0.2.2 (2016-02-25)
 
