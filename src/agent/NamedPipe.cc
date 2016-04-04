@@ -190,13 +190,14 @@ DWORD NamedPipe::OutputWorker::getPendingIoSize()
 bool NamedPipe::connectToServer(LPCWSTR pipeName)
 {
     ASSERT(isClosed());
-    HANDLE handle = CreateFileW(pipeName,
-                                GENERIC_READ | GENERIC_WRITE,
-                                0,
-                                NULL,
-                                OPEN_EXISTING,
-                                FILE_FLAG_OVERLAPPED,
-                                NULL);
+    HANDLE handle = CreateFileW(
+        pipeName,
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION | FILE_FLAG_OVERLAPPED,
+        NULL);
     trace("connection to [%s], handle == %p",
         utf8FromWide(pipeName).c_str(), handle);
     if (handle == INVALID_HANDLE_VALUE)
