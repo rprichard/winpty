@@ -21,9 +21,12 @@
 #include "DefaultInputMap.h"
 
 #include <windows.h>
-#include <stdio.h>
 #include <string.h>
 
+#include <algorithm>
+
+#include "../shared/StringBuilder.h"
+#include "../shared/WinptyAssert.h"
 #include "InputMap.h"
 
 #define ESC "\x1B"
@@ -240,6 +243,7 @@ struct ExpandContext {
     InputMap &inputMap;
     const EscapeEncoding &e;
     char *buffer;
+    char *bufferEnd;
 };
 
 static inline void setEncoding(const ExpandContext &ctx, char *end,
@@ -272,6 +276,7 @@ static inline uint16_t keyStateForMod(int mod) {
 
 static void expandNumericEncodingSuffix(const ExpandContext &ctx, char *p,
         uint16_t extraKeyState) {
+    ASSERT(p <= ctx.bufferEnd - 1);
     {
         char *q = p;
         *q++ = '~';
@@ -297,14 +302,22 @@ static void expandNumericEncodingSuffix(const ExpandContext &ctx, char *p,
 template <bool is_numeric>
 static inline void expandEncodingAfterAltPrefix(
         const ExpandContext &ctx, char *p, uint16_t extraKeyState) {
+    auto appendId = [&](char *&ptr) {
+        const auto idstr = decOfInt(ctx.e.id);
+        ASSERT(ptr <= ctx.bufferEnd - idstr.size());
+        std::copy(idstr.data(), idstr.data() + idstr.size(), ptr);
+        ptr += idstr.size();
+    };
+    ASSERT(p <= ctx.bufferEnd - 2);
     *p++ = '\x1b';
     *p++ = ctx.e.prefix;
     if (ctx.e.modifiers & kBare) {
         char *q = p;
         if (is_numeric) {
-            q += sprintf(q, "%d", ctx.e.id);
+            appendId(q);
             expandNumericEncodingSuffix(ctx, q, extraKeyState);
         } else {
+            ASSERT(q <= ctx.bufferEnd - 1);
             *q++ = ctx.e.id;
             setEncoding(ctx, q, extraKeyState);
         }
@@ -313,6 +326,7 @@ static inline void expandEncodingAfterAltPrefix(
         ASSERT(!is_numeric && "kBareMod is invalid with numeric sequences");
         for (int mod = 2; mod <= 8; ++mod) {
             char *q = p;
+            ASSERT(q <= ctx.bufferEnd - 2);
             *q++ = '0' + mod;
             *q++ = ctx.e.id;
             setEncoding(ctx, q, extraKeyState | keyStateForMod(mod));
@@ -322,12 +336,14 @@ static inline void expandEncodingAfterAltPrefix(
         for (int mod = 2; mod <= 8; ++mod) {
             char *q = p;
             if (is_numeric) {
-                q += sprintf(q, "%d", ctx.e.id);
+                appendId(q);
+                ASSERT(q <= ctx.bufferEnd - 2);
                 *q++ = ';';
                 *q++ = '0' + mod;
                 expandNumericEncodingSuffix(
                     ctx, q, extraKeyState | keyStateForMod(mod));
             } else {
+                ASSERT(q <= ctx.bufferEnd - 4);
                 *q++ = '1';
                 *q++ = ';';
                 *q++ = '0' + mod;
@@ -350,6 +366,7 @@ static inline void expandEncoding(const ExpandContext &ctx) {
         // the Alt modifier using both methods), but I have seen a terminal
         // that emitted a prefix ESC for Alt and a non-Alt modifier.
         char *p = ctx.buffer;
+        ASSERT(p <= ctx.bufferEnd - 1);
         *p++ = '\x1b';
         expandEncodingAfterAltPrefix<is_numeric>(ctx, p, LEFT_ALT_PRESSED);
     }
@@ -360,7 +377,10 @@ template <bool is_numeric, size_t N>
 static void addEscapes(InputMap &inputMap, const EscapeEncoding (&encodings)[N]) {
     char buffer[32];
     for (size_t i = 0; i < DIM(encodings); ++i) {
-        ExpandContext ctx = { inputMap, encodings[i], buffer };
+        ExpandContext ctx = {
+            inputMap, encodings[i],
+            buffer, buffer + sizeof(buffer)
+        };
         expandEncoding<is_numeric>(ctx);
     }
 }
