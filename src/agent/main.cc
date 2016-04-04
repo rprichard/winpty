@@ -20,20 +20,23 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <wchar.h>
 
 #include "Agent.h"
 #include "DebugShowInput.h"
+#include "../shared/StringUtil.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/WinptyVersion.h"
 
 const char USAGE[] =
-"Usage: %s controlPipeName dataPipeName cols rows\n"
+"Usage: %ls controlPipeName dataPipeName cols rows\n"
 "\n"
 "Ordinarily, this program is launched by winpty.dll and is not directly\n"
 "useful to winpty users.  However, it also has options intended for\n"
 "debugging winpty.\n"
 "\n"
-"Usage: %s [options]\n"
+"Usage: %ls [options]\n"
 "\n"
 "Options:\n"
 "  --show-input     Dump INPUT_RECORDs from the console input buffer\n"
@@ -41,27 +44,28 @@ const char USAGE[] =
 "                   Include MOUSE_INPUT_RECORDs in the dump output\n"
 "  --version        Print the winpty version\n";
 
-static wchar_t *heapMbsToWcs(const char *text)
+int main()
 {
-    size_t len = mbstowcs(NULL, text, 0);
-    ASSERT(len != (size_t)-1);
-    wchar_t *ret = new wchar_t[len + 1];
-    size_t len2 = mbstowcs(ret, text, len + 1);
-    ASSERT(len == len2);
-    return ret;
-}
+    // Technically, we should free the CommandLineToArgvW return value using
+    // a single call to LocalFree, but the call will never actually happen in
+    // the normal case.
+    int argc = 0;
+    wchar_t *cmdline = GetCommandLineW();
+    ASSERT(cmdline != nullptr && "GetCommandLineW returned NULL");
+    wchar_t **argv = CommandLineToArgvW(cmdline, &argc);
+    ASSERT(argv != nullptr && "CommandLineToArgvW returned NULL");
 
-int main(int argc, char *argv[])
-{
-    if (argc == 2 && !strcmp(argv[1], "--version")) {
+    if (argc == 2 && !wcscmp(argv[1], L"--version")) {
         dumpVersionToStdout();
         return 0;
     }
 
-    if (argc == 2 && !strcmp(argv[1], "--show-input")) {
+    if (argc == 2 && !wcscmp(argv[1], L"--show-input")) {
         debugShowInput(false);
         return 0;
-    } else if (argc == 3 && !strcmp(argv[1], "--show-input") && !strcmp(argv[2], "--with-mouse")) {
+    } else if (argc == 3 &&
+            !wcscmp(argv[1], L"--show-input") &&
+            !wcscmp(argv[2], L"--with-mouse")) {
         debugShowInput(true);
         return 0;
     }
@@ -71,10 +75,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    Agent agent(heapMbsToWcs(argv[1]),
-                heapMbsToWcs(argv[2]),
-                atoi(argv[3]),
-                atoi(argv[4]));
+    Agent agent(argv[1],
+                argv[2],
+                atoi(utf8FromWide(argv[3]).c_str()),
+                atoi(utf8FromWide(argv[4]).c_str()));
     agent.run();
 
     // The Agent destructor shouldn't return, but if it does, exit

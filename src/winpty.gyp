@@ -38,6 +38,7 @@
                 'WINPTY_AGENT_ASSERT',
             ],
             'libraries' : [
+                '-lshell32',
                 '-luser32',
             ],
             'sources' : [
