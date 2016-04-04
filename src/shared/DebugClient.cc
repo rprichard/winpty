@@ -28,17 +28,40 @@
 
 #include "winpty_snprintf.h"
 
+const wchar_t *const kPipeName = L"\\\\.\\pipe\\DebugServer";
+
 void *volatile g_debugConfig;
 
 static void sendToDebugServer(const char *message)
 {
-    char response[16];
-    DWORD responseSize;
-    CallNamedPipeA(
-        "\\\\.\\pipe\\DebugServer",
-        (void*)message, strlen(message),
-        response, sizeof(response), &responseSize,
-        NMPWAIT_WAIT_FOREVER);
+    HANDLE tracePipe = INVALID_HANDLE_VALUE;
+
+    do {
+        // The default impersonation level is SECURITY_IMPERSONATION, which allows
+        // a sufficiently authorized named pipe server to impersonate the client.
+        // There's no need for impersonation in this debugging system, so reduce
+        // the impersonation level to SECURITY_IDENTIFICATION, which allows a
+        // server to merely identify us.
+        tracePipe = CreateFileW(
+            kPipeName,
+            GENERIC_READ | GENERIC_WRITE,
+            0, NULL, OPEN_EXISTING,
+            SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
+            NULL);
+    } while (tracePipe == INVALID_HANDLE_VALUE &&
+             GetLastError() == ERROR_PIPE_BUSY &&
+             WaitNamedPipe(kPipeName, NMPWAIT_WAIT_FOREVER));
+
+    if (tracePipe != INVALID_HANDLE_VALUE) {
+        DWORD newMode = PIPE_READMODE_MESSAGE;
+        SetNamedPipeHandleState(tracePipe, &newMode, NULL, NULL);
+        char response[16];
+        DWORD actual = 0;
+        TransactNamedPipe(tracePipe,
+            const_cast<char*>(message), strlen(message),
+            response, sizeof(response), &actual, NULL);
+        CloseHandle(tracePipe);
+    }
 }
 
 // Get the current UTC time as milliseconds from the epoch (ignoring leap
