@@ -41,6 +41,13 @@
                 '-lshell32',
                 '-luser32',
             ],
+            'msvs_settings': {
+                # Specify this setting here to override a setting from somewhere
+                # else, such as node's common.gypi.
+                'VCCLCompilerTool': {
+                    'ExceptionHandling': '1', # /EHsc
+                },
+            },
             'sources' : [
                 'agent/Agent.h',
                 'agent/Agent.cc',
@@ -106,6 +113,13 @@
                 '-ladvapi32',
                 '-luser32',
             ],
+            'msvs_settings': {
+                # Specify this setting here to override a setting from somewhere
+                # else, such as node's common.gypi.
+                'VCCLCompilerTool': {
+                    'ExceptionHandling': '1', # /EHsc
+                },
+            },
             'sources' : [
                 'include/winpty.h',
                 'libwinpty/winpty.cc',
@@ -136,6 +150,13 @@
         {
             'target_name' : 'winpty-debugserver',
             'type' : 'executable',
+            'msvs_settings': {
+                # Specify this setting here to override a setting from somewhere
+                # else, such as node's common.gypi.
+                'VCCLCompilerTool': {
+                    'ExceptionHandling': '1', # /EHsc
+                },
+            },
             'sources' : [
                 'debugserver/DebugServer.cc',
                 'shared/DebugClient.h',
