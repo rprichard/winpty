@@ -30,7 +30,7 @@
 #
 
 import os
-import pefile
+#import pefile
 import shutil
 import subprocess
 
@@ -47,16 +47,17 @@ if os.environ.get("SHELL") is not None:
     sys.exit("Error: ship.py should run outside a Cygwin environment.")
 
 def dllVersion(path):
-    pe = pefile.PE(path)
-    ret = None
-    for fi in pe.FileInfo:
-        if fi.Key != "StringFileInfo":
-            continue
-        for st in fi.StringTable:
-            ret = st.entries.get("FileVersion")
-            break
-    assert ret is not None
-    return ret
+    return "DLLVER_TODO"
+    # pe = pefile.PE(path)
+    # ret = None
+    # for fi in pe.FileInfo:
+    #     if fi.Key != "StringFileInfo":
+    #         continue
+    #     for st in fi.StringTable:
+    #         ret = st.entries.get("FileVersion")
+    #         break
+    # assert ret is not None
+    # return ret
 
 # Determine other build parameters.
 print "Determining Cygwin/MSYS2 DLL versions..."
@@ -70,10 +71,10 @@ BUILD_TARGETS = [
         "name": "cygwin-" + dllVersion("C:\\cygwin64\\bin\\cygwin1.dll") + "-x64",
         "path": "C:\\cygwin64\\bin",
     },
-    {
-        "name": "msys2-" + dllVersion("C:\\msys32\\usr\\bin\\msys-2.0.dll") + "-ia32",
-        "path": "C:\\msys32\\mingw32\\bin;C:\\msys32\\usr\\bin",
-    },
+    # {
+    #     "name": "msys2-" + dllVersion("C:\\msys32\\usr\\bin\\msys-2.0.dll") + "-ia32",
+    #     "path": "C:\\msys32\\mingw32\\bin;C:\\msys32\\usr\\bin",
+    # },
     {
         "name": "msys2-" + dllVersion("C:\\msys64\\usr\\bin\\msys-2.0.dll") + "-x64",
         "path": "C:\\msys64\\mingw64\\bin;C:\\msys64\\usr\\bin",

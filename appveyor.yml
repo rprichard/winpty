@@ -1,0 +1,6 @@
+
+build_script:
+ - python ship\ship.py
+
+artifacts:
+ - path: ship\packages\*.tar.gz
