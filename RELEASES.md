@@ -4,6 +4,10 @@ User-visible changes:
 
  * A major bug affecting XP users was fixed.
    [#67](https://github.com/rprichard/winpty/issues/67)
+ * The UNIX adapter is renamed from `console.exe` to `winpty.exe` to be
+   consistent with MSYS2.  The name `winpty.exe` is less likely to conflict
+   with another program and is easier to search for online (e.g. for someone
+   unfamiliar with winpty).
 
 Many changes internally:
 

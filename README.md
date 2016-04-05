@@ -21,7 +21,7 @@ server.
 winpty runs on Windows XP through Windows 10, including server versions.  It
 can be compiled into either 32-bit or 64-bit binaries.
 
-## Cygwin/MSYS adapter (`console.exe`)
+## Cygwin/MSYS adapter (`winpty.exe`)
 
 ### Prerequisites
 
@@ -31,12 +31,12 @@ You need the following to build winpty:
 * GNU make
 * A MinGW g++ toolchain capable of compiling C++11 code to build `winpty.dll`
   and `winpty-agent.exe`
-* A g++ toolchain targeting Cygwin or MSYS to build `console.exe`
+* A g++ toolchain targeting Cygwin or MSYS to build `winpty.exe`
 
 Winpty requires two g++ toolchains as it is split into two parts. The
 `winpty.dll` and `winpty-agent.exe` binaries interface with the native
 Windows command prompt window so they are compiled with the native MinGW
-toolchain.  The console.exe binary interfaces with the MSYS/Cygwin terminal so
+toolchain.  The `winpty.exe` binary interfaces with the MSYS/Cygwin terminal so
 it is compiled with the MSYS/Cygwin toolchain.
 
 MinGW appears to be split into two distributions -- MinGW (creates 32-bit
@@ -82,33 +82,29 @@ For MSYS2, use `pacman` and install at least these packages:
 
 ### Building the Unix adapter
 
-In the project directory, run `./configure`, then `make`.
-
-This will produce three binaries:
-
-* `build/winpty.dll`
-* `build/winpty-agent.exe`
-* `build/console.exe`
+In the project directory, run `./configure`, then `make`, then `make install`.
+By default, winpty is installed into `/usr/local`.  Pass `PREFIX=<path>` to
+`make install` to override this default.
 
 ### Using the Unix adapter
 
 To run a Windows console program in `mintty` or Cygwin `sshd`, prepend
-`console.exe` to the command-line:
+`winpty` to the command-line:
 
-    $ build/console.exe c:/Python27/python.exe
-    Python 2.7.2 (default, Jun 12 2011, 15:08:59) [MSC v.1500 32 bit (Intel)] on win32
-    Type "help", "copyright", "credits" or "license" for more information.
-    >>> 10 + 20
+    $ winpty powershell
+    Windows PowerShell
+    Copyright (C) 2009 Microsoft Corporation. All rights reserved.
+
+    PS C:\rprichard\proj\winpty> 10 + 20
     30
-    >>> exit()
-    $
+    PS C:\rprichard\proj\winpty> exit
 
 ## Embedding winpty / MSVC compilation
 
 See `src/include/winpty.h` for the prototypes of functions exported by
 `winpty.dll`.
 
-Only the `console.exe` binary uses Cygwin; all the other binaries work without
+Only the `winpty.exe` binary uses Cygwin; all the other binaries work without
 it and can be compiled with either MinGW or MSVC.  To compile using MSVC,
 download gyp and run `gyp -I configurations.gypi` in the `src` subdirectory.
 This will generate a `winpty.sln` and associated project files.  See the
@@ -124,7 +120,7 @@ it:
 
 1. Run `winpty-debugserver.exe` on the same computer as winpty.
 2. Set the `WINPTY_DEBUG` environment variable to `trace` for the
-   `console.exe` process and/or the process using `libwinpty.dll`.
+   `winpty.exe` process and/or the process using `libwinpty.dll`.
 
 winpty also recognizes a `WINPTY_SHOW_CONSOLE` environment variable.  Set it
 to 1 to prevent winpty from hiding the console window.
