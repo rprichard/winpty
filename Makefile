@@ -29,7 +29,7 @@
 default : all
 
 PREFIX := /usr/local
-UNIX_ADAPTER_EXE := console.exe
+UNIX_ADAPTER_EXE := winpty.exe
 MINGW_ENABLE_CXX11_FLAG := -std=c++11
 USE_PCH := 1
 
