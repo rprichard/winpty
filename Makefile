@@ -25,6 +25,7 @@
 
 .SECONDEXPANSION :
 
+.PHONY : default
 default : all
 
 PREFIX := /usr/local
@@ -96,28 +97,61 @@ endef
 
 include src/subdir.mk
 
+.PHONY : all
 all : $(ALL_TARGETS)
 
+.PHONY : tests
 tests : $(TEST_PROGRAMS)
 
-install : all
+.PHONY : install-bin
+install-bin : all
 	mkdir -p $(PREFIX)/bin
 	install -m 755 -p -s build/$(UNIX_ADAPTER_EXE) $(PREFIX)/bin
 	install -m 755 -p -s build/winpty.dll $(PREFIX)/bin
 	install -m 755 -p -s build/winpty-agent.exe $(PREFIX)/bin
+
+.PHONY : install-debugserver
+install-debugserver : all
+	mkdir -p $(PREFIX)/bin
 	install -m 755 -p -s build/winpty-debugserver.exe $(PREFIX)/bin
 
+.PHONY : install-lib
+install-lib : all
+	mkdir -p $(PREFIX)/lib
+	install -m 644 -p build/winpty.lib $(PREFIX)/lib
+
+.PHONY : install-doc
+install-doc :
+	mkdir -p $(PREFIX)/share/doc/winpty
+	install -m 644 -p LICENSE $(PREFIX)/share/doc/winpty
+	install -m 644 -p README.md $(PREFIX)/share/doc/winpty
+	install -m 644 -p RELEASES.md $(PREFIX)/share/doc/winpty
+
+.PHONY : install-include
+install-include :
+	mkdir -p $(PREFIX)/include/winpty
+	install -m 644 -p src/include/winpty.h $(PREFIX)/include/winpty
+
+.PHONY : install
+install : \
+	install-bin \
+	install-debugserver \
+	install-lib \
+	install-doc \
+	install-include
+
+.PHONY : clean
 clean :
 	rm -fr build
 
+.PHONY : clean-msvs
 clean-msvs :
 	rm -fr src/Default src/Release src/.vs
 	rm -f src/*.vcxproj src/*.vcxproj.filters src/*.sln src/*.sdf
 
+.PHONY : distclean
 distclean : clean
 	rm -f config.mk
-
-.PHONY : default all tests install clean clean-msvs distclean
 
 .PRECIOUS : %.mkdir
 %.mkdir :
