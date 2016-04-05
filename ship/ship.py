@@ -101,7 +101,7 @@ def buildTarget(target):
     subprocess.check_call(["make.exe", "clean"])
     buildArgs = ["make.exe", "USE_PCH=0", "all", "tests"]
     if target.get("allow_parallel_make", True):
-        buildArgs += ["-j8"]
+        buildArgs += ["-j2"]
     subprocess.check_call(buildArgs)
     subprocess.check_call(["build\\trivial_test.exe"])
     subprocess.check_call(["make.exe", "USE_PCH=0", "PREFIX=ship\\packages\\" + packageName, "install"])

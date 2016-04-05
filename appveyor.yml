@@ -1,12 +1,13 @@
 init:
- - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+ # - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+ - C:\MinGW\msys\1.0\bin\sh -lc "/c/MinGW/bin/mingw-get install msys-system-builder"
  - C:\cygwin\setup-x86      -q -P mingw64-i686-gcc-g++
  - C:\cygwin64\setup-x86_64 -q -P mingw64-x86_64-gcc-g++
- - C:\Python27\Scripts\pip install pefile
  - C:\msys64\usr\bin\sh -lc "pacman --noconfirm -S tar"
+ - C:\Python27\Scripts\pip install pefile
 
-on_finish:
- - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# on_finish:
+#  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 build_script:
  - C:\Python27\python ship\ship.py
