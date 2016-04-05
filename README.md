@@ -82,13 +82,9 @@ For MSYS2, use `pacman` and install at least these packages:
 
 ### Building the Unix adapter
 
-In the project directory, run `./configure`, then `make`.
-
-This will produce three binaries:
-
-* `build/winpty.dll`
-* `build/winpty-agent.exe`
-* `build/winpty.exe`
+In the project directory, run `./configure`, then `make`, then `make install`.
+By default, winpty is installed into `/usr/local`.  Pass `PREFIX=<path>` to
+`make install` to override this default.
 
 ### Using the Unix adapter
 
