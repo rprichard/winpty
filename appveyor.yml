@@ -1,23 +1,23 @@
 init:
- - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+ # - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
  - C:\MinGW\msys\1.0\bin\sh -lc "/c/MinGW/bin/mingw-get install msys-system-builder"
  - C:\cygwin\setup-x86      -q -P mingw64-i686-gcc-g++
  - C:\cygwin64\setup-x86_64 -q -P mingw64-x86_64-gcc-g++
 
-on_finish:
- - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# on_finish:
+#  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 build_script:
 
    # Verify that the code can be compiled without pre-compiled headers (PCH).
    # This is much slower than using PCH, so we only do this once.
- - ship\test_non_pch_compile.ps1 -pathPrefix "C:\cygwin64\bin"
+ - ps: ship\test_non_pch_compile.ps1 -pathPrefix "C:\cygwin64\bin"
 
    # Create each Cygwin/MSYS package.
- - ship\ship_cygwin_package.ps1 -kind cygwin -pathPrefix "C:\cygwin\bin"                           -cygwinDll C:\cygwin\bin\cygwin1.dll      -arch ia32
- - ship\ship_cygwin_package.ps1 -kind cygwin -pathPrefix "C:\cygwin64\bin"                         -cygwinDll C:\cygwin64\bin\cygwin1.dll    -arch x64
- - ship\ship_cygwin_package.ps1 -kind msys2  -pathPrefix "C:\msys64\mingw64\bin;C:\msys64\usr\bin" -cygwinDll C:\msys64\usr\bin\msys-2.0.dll -arch x64
- - ship\ship_cygwin_package.ps1 -kind msys   -pathPrefix "C:\MinGW\bin;C:\MinGW\msys\1.0\bin"      -make mingw32-make
+ - ps: ship\ship_cygwin_package.ps1 -kind cygwin -pathPrefix "C:\cygwin\bin"                           -cygwinDll C:\cygwin\bin\cygwin1.dll      -arch ia32
+ - ps: ship\ship_cygwin_package.ps1 -kind cygwin -pathPrefix "C:\cygwin64\bin"                         -cygwinDll C:\cygwin64\bin\cygwin1.dll    -arch x64
+ - ps: ship\ship_cygwin_package.ps1 -kind msys2  -pathPrefix "C:\msys64\mingw64\bin;C:\msys64\usr\bin" -cygwinDll C:\msys64\usr\bin\msys-2.0.dll -arch x64
+ - ps: ship\ship_cygwin_package.ps1 -kind msys   -pathPrefix "C:\MinGW\bin;C:\MinGW\msys\1.0\bin"      -make mingw32-make
 
 artifacts:
  - path: ship\packages\*.tar.gz
