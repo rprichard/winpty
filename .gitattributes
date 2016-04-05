@@ -1,18 +1,18 @@
 *               text=auto
 *.c             text
 *.cc            text
+*.cmd           text eol=crlf
 *.gyp           text
 *.gypi          text
 *.h             text
+*.mk            text
+*.ps1           text eol=crlf
 *.rst           text
-*.sh            text
+*.sh            text eol=lf
 *.txt           text
+*.yml           text
 .gitignore      text
 .gitattributes  text
 Makefile        text
-configure       text
-
-*.sh            eol=lf
-configure       eol=lf
-VERSION.txt     eol=lf
-shared/GetCommitHash.cmd text eol=crlf
+VERSION.txt     text eol=lf
+configure       text eol=lf

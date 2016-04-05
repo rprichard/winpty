@@ -105,7 +105,7 @@ tests : $(TEST_PROGRAMS)
 
 .PHONY : install-bin
 install-bin : all
-	mkdir -p $(PREFIX)/bin
+	mkdir -p "$(PREFIX)/bin"
 	install -m 755 -p -s build/$(UNIX_ADAPTER_EXE) $(PREFIX)/bin
 	install -m 755 -p -s build/winpty.dll $(PREFIX)/bin
 	install -m 755 -p -s build/winpty-agent.exe $(PREFIX)/bin
