@@ -6,9 +6,8 @@ init:
  # download progress even to the appveyor' pipe/logfile, producing a huge
  # amount of output.
  - ps: |
-     echo "Note: pwd is: $pwd"
      C:\MinGW\msys\1.0\bin\sh -lc "/c/MinGW/bin/mingw-get install msys-system-builder" >${env:TMP}\mingw-get.stdout.log 2>${env:TMP}\mingw-get.stderr.log
-     if (  (1 -eq 1) -or      ($LastExitCode -ne 0) -or -not (Test-Path C:\MinGW\msys\1.0\bin\i686-pc-msys-g++.exe)) {
+     if (($LastExitCode -ne 0) -or -not (Test-Path C:\MinGW\msys\1.0\bin\i686-pc-msys-g++.exe)) {
        echo "error: mingw-get failed"
        $outLog = Get-Content ${env:TMP}\mingw-get.stdout.log
        $errLog = Get-Content ${env:TMP}\mingw-get.stderr.log
