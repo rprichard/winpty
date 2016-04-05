@@ -7,7 +7,7 @@ init:
  # amount of output.
  - ps: |
      echo "Note: pwd is: $pwd"
-     C:\MinGW\msys\1.0\bin\sh -lc "/c/MinGW/bin/mingw-get install msys-system-builderxx" >mingw-get.stdout.log 2>mingw-get.stderr.log
+     C:\MinGW\msys\1.0\bin\sh -lc "/c/MinGW/bin/mingw-get install msys-system-builder" >mingw-get.stdout.log 2>mingw-get.stderr.log
      if (($LastExitCode -ne 0) -or -not (Test-Path C:\MinGW\msys\1.0\bin\i686-pc-msys-g++.exe)) {
        echo "error: mingw-get failed"
        $outLog = Get-Content mingw-get.stdout.log
@@ -18,6 +18,7 @@ init:
        echo "mingw-get stderr output:"
        echo "=================================================================="
        echo $errLog
+       echo "=================================================================="
        throw "mingw-get failed"
      }
  - C:\cygwin\setup-x86      -q -P mingw64-i686-gcc-g++
