@@ -99,12 +99,12 @@ def buildTarget(target):
     os.environ["PATH"] = target["path"] + ";" + oldPath
     subprocess.check_call(["sh.exe", "configure"])
     subprocess.check_call(["make.exe", "clean"])
-    buildArgs = ["make.exe", "USE_PCH=0", "all", "tests"]
+    buildArgs = ["make.exe", "all", "tests"]
     if target.get("allow_parallel_make", True):
         buildArgs += ["-j2"]
     subprocess.check_call(buildArgs)
     subprocess.check_call(["build\\trivial_test.exe"])
-    subprocess.check_call(["make.exe", "USE_PCH=0", "PREFIX=ship\\packages\\" + packageName, "install"])
+    subprocess.check_call(["make.exe", "PREFIX=ship\\packages\\" + packageName, "install"])
     subprocess.check_call(["tar.exe", "cvfz",
         packageName + ".tar.gz",
         packageName], cwd=os.path.join(os.getcwd(), "ship", "packages"))
