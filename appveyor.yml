@@ -1,6 +1,6 @@
 init:
  # - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
- - C:\MinGW\msys\1.0\bin\sh -lc "/c/MinGW/bin/mingw-get install msys-system-builder"
+ - C:\MinGW\msys\1.0\bin\sh -lc "/c/MinGW/bin/mingw-get install msys-system-builder" >NUL
  - C:\cygwin\setup-x86      -q -P mingw64-i686-gcc-g++
  - C:\cygwin64\setup-x86_64 -q -P mingw64-x86_64-gcc-g++
 
