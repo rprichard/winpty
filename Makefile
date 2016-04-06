@@ -155,6 +155,7 @@ distclean : clean
 
 .PRECIOUS : %.mkdir
 %.mkdir :
+	$(info Creating directory $(dir $@))
 	@mkdir -p $(dir $@)
 	@touch $@
 
