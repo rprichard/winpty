@@ -28,6 +28,16 @@ init:
 # on_finish:
 #  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
+# Tack the monotonically-increasing Appveyor build number onto the end of the
+# winpty version, and propagate the result to Appveyor so it knows the full,
+# unique version number.
+install:
+  ps: |
+    $winptyVersion = Get-Content VERSION.txt
+    $winptyVersion += ".${env:APPVEYOR_BUILD_NUMBER}"
+    Update-AppveyorBuild -Version $winptyVersion
+    [IO.File]::WriteAllText("$pwd\VERSION.txt", $winptyVersion)
+
 build_script:
 
    # Verify that the code can be compiled without pre-compiled headers (PCH).
