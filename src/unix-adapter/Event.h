@@ -49,6 +49,7 @@ public:
 private:
     // Do not allow copying the Event object.
     Event(const Event &other);
+    Event &operator=(const Event &other);
 
 private:
     HANDLE m_handle;

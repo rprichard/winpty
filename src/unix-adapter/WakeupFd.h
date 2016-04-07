@@ -32,6 +32,7 @@ public:
 private:
     // Do not allow copying the WakeupFd object.
     WakeupFd(const WakeupFd &other);
+    WakeupFd &operator=(const WakeupFd &other);
 
 private:
     int m_pipeReadFd;
