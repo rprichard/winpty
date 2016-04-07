@@ -84,7 +84,7 @@ static std::wstring dirname(const std::wstring &path)
 
 static bool pathExists(const std::wstring &path)
 {
-    return GetFileAttributes(path.c_str()) != 0xFFFFFFFF;
+    return GetFileAttributesW(path.c_str()) != 0xFFFFFFFF;
 }
 
 static std::wstring findAgentProgram()

@@ -178,9 +178,9 @@ static SecurityDescriptor finishSecurityDescriptor(
     {
         PACL aclRaw = nullptr;
         DWORD aclError =
-            SetEntriesInAcl(daclEntryCount,
-                            daclEntries,
-                            nullptr, &aclRaw);
+            SetEntriesInAclW(daclEntryCount,
+                             daclEntries,
+                             nullptr, &aclRaw);
         if (aclError != ERROR_SUCCESS) {
             WStringBuilder sb(64);
             sb << L"finishSecurityDescriptor: "

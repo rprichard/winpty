@@ -52,7 +52,7 @@ static void sendToDebugServer(const char *message)
             NULL);
     } while (tracePipe == INVALID_HANDLE_VALUE &&
              GetLastError() == ERROR_PIPE_BUSY &&
-             WaitNamedPipe(kPipeName, NMPWAIT_WAIT_FOREVER));
+             WaitNamedPipeW(kPipeName, NMPWAIT_WAIT_FOREVER));
 
     if (tracePipe != INVALID_HANDLE_VALUE) {
         DWORD newMode = PIPE_READMODE_MESSAGE;
