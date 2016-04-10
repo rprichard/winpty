@@ -123,7 +123,11 @@ bool hasDebugFlag(const char *flag)
         trace("INTERNAL ERROR: hasDebugFlag flag has comma: '%s'", flag);
         abort();
     }
-    std::string config(getDebugConfig());
+    const char *const configCStr = getDebugConfig();
+    if (configCStr[0] == '\0') {
+        return false;
+    }
+    std::string config(configCStr);
     std::string flagStr(flag);
     config = "," + config + ",";
     flagStr = "," + flagStr + ",";
