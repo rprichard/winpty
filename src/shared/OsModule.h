@@ -21,15 +21,29 @@
 #ifndef OS_MODULE_H
 #define OS_MODULE_H
 
+#include <windows.h>
+
 #include "DebugClient.h"
 #include "WinptyAssert.h"
+#include "WinptyException.h"
 
 class OsModule {
     HMODULE m_module;
 public:
-    OsModule(const wchar_t *fileName) {
+    enum class LoadErrorBehavior { Abort, Throw };
+    OsModule(const wchar_t *fileName,
+            LoadErrorBehavior behavior=LoadErrorBehavior::Abort) {
         m_module = LoadLibraryW(fileName);
-        ASSERT(m_module != NULL);
+        if (behavior == LoadErrorBehavior::Abort) {
+            ASSERT(m_module != NULL);
+        } else {
+            if (m_module == nullptr) {
+                const auto err = GetLastError();
+                throwWindowsError(
+                    (L"LoadLibraryW error: " + std::wstring(fileName)).c_str(),
+                    err);
+            }
+        }
     }
     ~OsModule() {
         FreeLibrary(m_module);

@@ -23,5 +23,6 @@
 
 bool isAtLeastWindowsVista();
 bool isAtLeastWindows8();
+void dumpWindowsVersion();
 
 #endif // WINPTY_SHARED_WINDOWS_VERSION_H

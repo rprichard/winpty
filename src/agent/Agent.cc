@@ -30,6 +30,7 @@
 #include "../shared/winpty_snprintf.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/StringUtil.h"
+#include "../shared/WindowsVersion.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -126,6 +127,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_ptySize(initialCols, initialRows)
 {
     trace("Agent starting...");
+    dumpWindowsVersion();
 
     m_bufferData.resize(BUFFER_LINE_COUNT);
 

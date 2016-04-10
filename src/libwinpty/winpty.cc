@@ -35,6 +35,7 @@
 #include "../shared/StringBuilder.h"
 #include "../shared/StringUtil.h"
 #include "../shared/WindowsSecurity.h"
+#include "../shared/WindowsVersion.h"
 #include "../shared/WinptyException.h"
 
 // TODO: Error handling, handle out-of-memory.
@@ -332,6 +333,8 @@ static bool verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid)
 
 WINPTY_API winpty_t *winpty_open(int cols, int rows)
 {
+    dumpWindowsVersion();
+
     winpty_t *pc = new winpty_t;
 
     // Start pipes.

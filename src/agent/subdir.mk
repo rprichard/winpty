@@ -41,6 +41,7 @@ AGENT_OBJECTS = \
 	build/agent/shared/StringUtil.o \
 	build/agent/shared/WindowsVersion.o \
 	build/agent/shared/WinptyAssert.o \
+	build/agent/shared/WinptyException.o \
 	build/agent/shared/WinptyVersion.o
 
 build/winpty-agent.exe : $(AGENT_OBJECTS)

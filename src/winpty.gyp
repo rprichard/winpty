@@ -165,6 +165,8 @@
                 'shared/OwnedHandle.cc',
                 'shared/OsModule.h',
                 'shared/StringBuilder.h',
+                'shared/StringUtil.cc',
+                'shared/StringUtil.h',
                 'shared/WindowsSecurity.h',
                 'shared/WindowsSecurity.cc',
                 'shared/WindowsVersion.h',

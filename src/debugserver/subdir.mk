@@ -26,6 +26,7 @@ DEBUGSERVER_OBJECTS = \
 	build/debugserver/debugserver/DebugServer.o \
 	build/debugserver/shared/DebugClient.o \
 	build/debugserver/shared/OwnedHandle.o \
+	build/debugserver/shared/StringUtil.o \
 	build/debugserver/shared/WindowsSecurity.o \
 	build/debugserver/shared/WindowsVersion.o \
 	build/debugserver/shared/WinptyAssert.o \
