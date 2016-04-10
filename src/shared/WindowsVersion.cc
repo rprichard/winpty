@@ -109,7 +109,10 @@ VS_FIXEDFILEINFO getFixedFileInfo(const std::wstring &path) {
     GET_VERSION_DLL_API(VerQueryValueW);
     DWORD size = pGetFileVersionInfoSizeW(path.c_str(), nullptr);
     if (!size) {
-        if (GetLastError() == ERROR_FILE_NOT_FOUND) {
+        // I see ERROR_FILE_NOT_FOUND on Win7 and
+        // ERROR_RESOURCE_DATA_NOT_FOUND on WinXP.
+        if (GetLastError() == ERROR_FILE_NOT_FOUND ||
+                GetLastError() == ERROR_RESOURCE_DATA_NOT_FOUND) {
             throw ModuleNotFound();
         } else {
             throwWindowsError(
