@@ -212,12 +212,44 @@ static bool shouldShowConsoleWindow()
     return GetEnvironmentVariableA("WINPTY_SHOW_CONSOLE", buf, sizeof(buf)) > 0;
 }
 
+static bool shouldCreateBackgroundDesktop() {
+    // Prior to Windows 7, winpty's repeated selection-deselection loop
+    // prevented the user from interacting with their *visible* console
+    // windows, unless we placed the console onto a background desktop.
+    // The SetProcessWindowStation call interferes with the clipboard and
+    // isn't thread-safe, though[1].  The call should perhaps occur in a
+    // special agent subprocess.  Spawning a process in a background desktop
+    // also breaks ConEmu, but marking the process SW_HIDE seems to correct
+    // that[2].
+    //
+    // Windows 7 moved a lot of console handling out of csrss.exe and into
+    // a per-console conhost.exe process, which may explain why it isn't
+    // affected.
+    //
+    // This is a somewhat risky change, so there are low-level flags to
+    // assist in debugging if there are issues.
+    //
+    // [1] https://github.com/rprichard/winpty/issues/58
+    // [2] https://github.com/rprichard/winpty/issues/70
+    bool ret = !shouldShowConsoleWindow() && !isAtLeastWindows7();
+    const bool force = hasDebugFlag("force_desktop");
+    const bool suppress = hasDebugFlag("no_desktop");
+    if (force && suppress) {
+        trace("error: Both the force_desktop and no_desktop flags are set");
+    } else if (force) {
+        ret = true;
+    } else if (suppress) {
+        ret = false;
+    }
+    return ret;
+}
+
 // Get a non-interactive window station for the agent.
 // TODO: review security w.r.t. windowstation and desktop.
 static BackgroundDesktop setupBackgroundDesktop()
 {
     BackgroundDesktop ret;
-    if (!shouldShowConsoleWindow()) {
+    if (shouldCreateBackgroundDesktop()) {
         const HWINSTA originalStation = GetProcessWindowStation();
         ret.station = CreateWindowStationW(NULL, 0, WINSTA_ALL_ACCESS, NULL);
         if (ret.station != NULL) {
@@ -230,6 +262,8 @@ static BackgroundDesktop setupBackgroundDesktop()
             assert(ret.desktop != NULL);
             ret.desktopName =
                 getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
+            trace("Created background desktop: %s",
+                utf8FromWide(ret.desktopName).c_str());
         } else {
             trace("CreateWindowStationW failed");
         }
@@ -257,6 +291,20 @@ static std::wstring getDesktopFullName()
     return getObjectName(station) + L"\\" + getObjectName(desktop);
 }
 
+static bool shouldSpecifyHideFlag() {
+    const bool force = hasDebugFlag("force_sw_hide");
+    const bool suppress = hasDebugFlag("no_sw_hide");
+    bool ret = !shouldShowConsoleWindow();
+    if (force && suppress) {
+        trace("error: Both the force_sw_hide and no_sw_hide flags are set");
+    } else if (force) {
+        ret = true;
+    } else if (suppress) {
+        ret = false;
+    }
+    return ret;
+}
+
 static void startAgentProcess(const BackgroundDesktop &desktop,
                               const std::wstring &controlPipeName,
                               const std::wstring &dataPipeName,
@@ -278,6 +326,10 @@ static void startAgentProcess(const BackgroundDesktop &desktop,
     STARTUPINFOW sui = {};
     sui.cb = sizeof(sui);
     sui.lpDesktop = desktop.station == NULL ? NULL : desktopV.data();
+    if (shouldSpecifyHideFlag()) {
+        sui.dwFlags |= STARTF_USESHOWWINDOW;
+        sui.wShowWindow = SW_HIDE;
+    }
     PROCESS_INFORMATION pi = {};
     const BOOL success =
         CreateProcessW(exePath.c_str(),

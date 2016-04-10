@@ -162,6 +162,11 @@ bool isAtLeastWindowsVista() {
     return getWindowsVersion() >= Version(6, 0);
 }
 
+// Returns true for Windows 7 (or Windows Server 2008 R2) or newer.
+bool isAtLeastWindows7() {
+    return getWindowsVersion() >= Version(6, 1);
+}
+
 // Returns true for Windows 8 (or Windows Server 2012) or newer.
 bool isAtLeastWindows8() {
     return getWindowsVersion() >= Version(6, 2);
