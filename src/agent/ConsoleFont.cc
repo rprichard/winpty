@@ -179,6 +179,9 @@ typedef BOOL WINAPI SetConsoleFont_t(
             HANDLE hOutput,
             DWORD dwFontIndex);
 
+// undocumented XP API
+typedef DWORD WINAPI GetNumberOfConsoleFonts_t();
+
 // XP and up
 typedef BOOL WINAPI GetCurrentConsoleFont_t(
             HANDLE hOutput,
@@ -236,18 +239,22 @@ class UndocumentedXPFontAPI : public XPFontAPI {
 public:
     UndocumentedXPFontAPI() : m_kernel32(L"kernel32.dll") {
         GET_MODULE_PROC(m_kernel32, SetConsoleFont);
+        GET_MODULE_PROC(m_kernel32, GetNumberOfConsoleFonts);
     }
 
     bool valid() const {
         return this->XPFontAPI::valid() &&
-            m_SetConsoleFont != NULL;
+            m_SetConsoleFont != NULL &&
+            m_GetNumberOfConsoleFonts != NULL;
     }
 
     DEFINE_ACCESSOR(SetConsoleFont)
+    DEFINE_ACCESSOR(GetNumberOfConsoleFonts)
 
 private:
     OsModule m_kernel32;
     SetConsoleFont_t *m_SetConsoleFont;
+    GetNumberOfConsoleFonts_t *m_GetNumberOfConsoleFonts;
 };
 
 class VistaFontAPI : public XPFontAPI {
@@ -272,9 +279,10 @@ private:
     SetCurrentConsoleFontEx_t *m_SetCurrentConsoleFontEx;
 };
 
-static std::vector<std::pair<DWORD, COORD> > readFontTable(XPFontAPI &api, HANDLE conout) {
+static std::vector<std::pair<DWORD, COORD> > readFontTable(
+        XPFontAPI &api, HANDLE conout, DWORD maxCount) {
     std::vector<std::pair<DWORD, COORD> > ret;
-    for (DWORD i = 0;; ++i) {
+    for (DWORD i = 0; i < maxCount; ++i) {
         COORD size = api.GetConsoleFontSize()(conout, i);
         if (size.X == 0 && size.Y == 0) {
             break;
@@ -285,6 +293,7 @@ static std::vector<std::pair<DWORD, COORD> > readFontTable(XPFontAPI &api, HANDL
 }
 
 static void dumpFontTable(HANDLE conout, const char *prefix) {
+    const int kMaxCount = 1000;
     if (!isTracingEnabled()) {
         return;
     }
@@ -293,7 +302,8 @@ static void dumpFontTable(HANDLE conout, const char *prefix) {
         trace("dumpFontTable: cannot dump font table -- missing APIs");
         return;
     }
-    std::vector<std::pair<DWORD, COORD> > table = readFontTable(api, conout);
+    std::vector<std::pair<DWORD, COORD> > table =
+        readFontTable(api, conout, kMaxCount);
     std::string line;
     char tmp[128];
     size_t first = 0;
@@ -312,6 +322,10 @@ static void dumpFontTable(HANDLE conout, const char *prefix) {
         }
         trace("%s", line.c_str());
         first = last + 1;
+    }
+    if (table.size() == kMaxCount) {
+        trace("%sfonts: ... stopped reading at %d fonts ...",
+            prefix, kMaxCount);
     }
 }
 
@@ -433,7 +447,11 @@ struct FontSizeComparator {
 
 static void setSmallFontXP(UndocumentedXPFontAPI &api, HANDLE conout) {
     // Read the console font table and sort it from smallest to largest.
-    std::vector<std::pair<DWORD, COORD> > table = readFontTable(api, conout);
+    const DWORD fontCount = api.GetNumberOfConsoleFonts()();
+    trace("setSmallFontXP: number of console fonts: %u",
+        static_cast<unsigned>(fontCount));
+    std::vector<std::pair<DWORD, COORD> > table =
+        readFontTable(api, conout, fontCount);
     std::sort(table.begin(), table.end(), FontSizeComparator());
     for (size_t i = 0; i < table.size(); ++i) {
         // Skip especially narrow fonts to permit narrower terminals.
