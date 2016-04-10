@@ -37,6 +37,7 @@
 #include "../shared/WindowsSecurity.h"
 #include "../shared/WindowsVersion.h"
 #include "../shared/WinptyException.h"
+#include "../shared/WinptyVersion.h"
 
 // TODO: Error handling, handle out-of-memory.
 
@@ -334,6 +335,7 @@ static bool verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid)
 WINPTY_API winpty_t *winpty_open(int cols, int rows)
 {
     dumpWindowsVersion();
+    dumpVersionToTrace();
 
     winpty_t *pc = new winpty_t;
 

@@ -126,8 +126,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_directMode(false),
     m_ptySize(initialCols, initialRows)
 {
-    trace("Agent starting...");
-    dumpWindowsVersion();
+    trace("Agent::Agent entered");
 
     m_bufferData.resize(BUFFER_LINE_COUNT);
 

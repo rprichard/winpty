@@ -26,6 +26,7 @@
 #include "Agent.h"
 #include "DebugShowInput.h"
 #include "../shared/StringUtil.h"
+#include "../shared/WindowsVersion.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/WinptyVersion.h"
 
@@ -46,6 +47,9 @@ const char USAGE[] =
 
 int main()
 {
+    dumpWindowsVersion();
+    dumpVersionToTrace();
+
     // Technically, we should free the CommandLineToArgvW return value using
     // a single call to LocalFree, but the call will never actually happen in
     // the normal case.

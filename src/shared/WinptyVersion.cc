@@ -22,10 +22,19 @@
 
 #include <stdio.h>
 
+#include "DebugClient.h"
+
 #define XSTRINGIFY(x) #x
 #define STRINGIFY(x) XSTRINGIFY(x)
 
 void dumpVersionToStdout() {
     printf("winpty version %s%s\n", STRINGIFY(WINPTY_VERSION), STRINGIFY(WINPTY_VERSION_SUFFIX));
     printf("commit %s\n", STRINGIFY(WINPTY_COMMIT_HASH));
+}
+
+void dumpVersionToTrace() {
+    trace("winpty version %s%s (commit %s)",
+        STRINGIFY(WINPTY_VERSION),
+        STRINGIFY(WINPTY_VERSION_SUFFIX),
+        STRINGIFY(WINPTY_COMMIT_HASH));
 }

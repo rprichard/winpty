@@ -32,7 +32,8 @@ LIBWINPTY_OBJECTS = \
 	build/libwinpty/shared/WindowsSecurity.o \
 	build/libwinpty/shared/WindowsVersion.o \
 	build/libwinpty/shared/WinptyAssert.o \
-	build/libwinpty/shared/WinptyException.o
+	build/libwinpty/shared/WinptyException.o \
+	build/libwinpty/shared/WinptyVersion.o
 
 build/winpty.dll : $(LIBWINPTY_OBJECTS)
 	$(info Linking $@)

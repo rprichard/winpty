@@ -22,5 +22,6 @@
 #define WINPTY_VERSION_H
 
 void dumpVersionToStdout();
+void dumpVersionToTrace();
 
 #endif // WINPTY_VERSION_H

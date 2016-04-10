@@ -144,6 +144,8 @@
                 'shared/WinptyAssert.cc',
                 'shared/WinptyException.h',
                 'shared/WinptyException.cc',
+                'shared/WinptyVersion.h',
+                'shared/WinptyVersion.cc',
                 'shared/winpty_snprintf.h',
             ],
         },
