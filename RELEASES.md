@@ -14,6 +14,9 @@ Bug fixes:
  * Fixed an incompatibility with ConEmu where winpty hung if ConEmu's
    "Process 'start'" feature was enabled.
    [#70](https://github.com/rprichard/winpty/issues/70)
+ * Fixed a bug where `cmd.exe` sometimes printed the message,
+   `Not enough storage is available to process this command.`.
+   [#74](https://github.com/rprichard/winpty/issues/74)
 
 Many changes internally:
 
