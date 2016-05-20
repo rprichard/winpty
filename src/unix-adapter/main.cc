@@ -224,13 +224,32 @@ static std::string argvToCommandLine(const std::vector<std::string> &argv)
 static wchar_t *heapMbsToWcs(const char *text)
 {
     // Calling mbstowcs with a NULL first argument seems to be broken on MSYS.
-    // Instead of returning the size of the converted string, it returns 0
-    // instead.  Using strlen(text) * 2 is probably big enough.
+    // Instead of returning the size of the converted string, it returns 0.
+    // Using strlen(text) * 2 is probably big enough.
     size_t maxLen = strlen(text) * 2 + 1;
     wchar_t *ret = new wchar_t[maxLen];
     size_t len = mbstowcs(ret, text, maxLen);
     assert(len != (size_t)-1 && len < maxLen);
     return ret;
+}
+
+static char *heapWcsToMbs(const wchar_t *text)
+{
+    // Calling wcstombs with a NULL first argument seems to be broken on MSYS.
+    // Instead of returning the size of the converted string, it returns 0.
+    // Using wcslen(text) * 3 is big enough for UTF-8 and probably other
+    // encodings.  For UTF-8, codepoints that fit in a single wchar
+    // (U+0000 to U+FFFF) are encoded using 1-3 bytes.  The remaining code
+    // points needs two wchar's and are encoded using 4 bytes.
+    size_t maxLen = wcslen(text) * 3 + 1;
+    char *ret = new char[maxLen];
+    size_t len = wcstombs(ret, text, maxLen);
+    if (len == (size_t)-1 || len >= maxLen) {
+        delete [] ret;
+        return NULL;
+    } else {
+        return ret;
+    }
 }
 
 void setupWin32Environment()
@@ -345,6 +364,43 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
     }
 }
 
+static std::string formatErrorMessage(DWORD err)
+{
+    // Use FormatMessageW rather than FormatMessageA, because we want to use
+    // wcstombs to convert to the Cygwin locale, which might not match the
+    // codepage FormatMessageA would use.  We need to convert using wcstombs,
+    // rather than print using %ls, because %ls doesn't work in the original
+    // MSYS.
+    wchar_t *wideMsgPtr = NULL;
+    const DWORD formatRet = FormatMessageW(
+        FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_ALLOCATE_BUFFER |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        err,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<wchar_t*>(&wideMsgPtr),
+        0,
+        NULL);
+    if (formatRet == 0 || wideMsgPtr == NULL) {
+        return std::string();
+    }
+    char *const msgPtr = heapWcsToMbs(wideMsgPtr);
+    LocalFree(wideMsgPtr);
+    if (msgPtr == NULL) {
+        return std::string();
+    }
+    std::string msg = msgPtr;
+    delete [] msgPtr;
+    const size_t pos = msg.find_last_not_of(" \r\n\t");
+    if (pos == std::string::npos) {
+        msg.clear();
+    } else {
+        msg.erase(pos + 1);
+    }
+    return msg;
+}
+
 int main(int argc, char *argv[])
 {
     setlocale(LC_ALL, "");
@@ -376,10 +432,17 @@ int main(int argc, char *argv[])
                                              NULL,
                                              NULL);
         if (ret != 0) {
-            fprintf(stderr,
-                    "Error %#x starting %s\n",
-                    (unsigned int)ret,
-                    cmdLine.c_str());
+            const std::string errorMsg = formatErrorMessage(ret);
+            if (!errorMsg.empty()) {
+                fprintf(stderr, "Could not start '%s': %s (error %#x)\n",
+                    cmdLine.c_str(),
+                    errorMsg.c_str(),
+                    static_cast<unsigned int>(ret));
+            } else {
+                fprintf(stderr, "Could not start '%s': error %#x\n",
+                    cmdLine.c_str(),
+                    static_cast<unsigned int>(ret));
+            }
             exit(1);
         }
         delete [] cmdLineW;
