@@ -80,6 +80,21 @@ For MSYS2, use `pacman` and install at least these packages:
   the appropriate compiler for your CPU architecture.
 * `make`
 
+MSYS2 provides three start menu shortcuts for starting MSYS2:
+
+* MinGW-w64 Win32 Shell
+* MinGW-w64 Win64 Shell
+* MSYS2 Shell
+
+To build winpty, use the MinGW-w64 {Win32,Win64} shortcut of the architecture
+matching MSYS2.  These shortcuts will put the g++ compiler from the
+`{mingw32,mingw64}/mingw-w64-{i686,x86_64}-gcc` packages into the `PATH`.
+
+Alternatively, instead of installing `mingw32/mingw-w64-i686-gcc` or
+`mingw64/mingw-w64-x86_64-gcc`, install the `mingw-w64-cross-gcc` and
+`mingw-w64-cross-crt-git` packages.  These packages install cross-compilers
+into `/opt/bin`, and then any of the three shortcuts will work.
+
 ### Building the Unix adapter
 
 In the project directory, run `./configure`, then `make`, then `make install`.
