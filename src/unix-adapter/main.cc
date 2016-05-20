@@ -279,6 +279,15 @@ void setupWin32Environment()
         delete [] nameW;
         delete [] valueW;
     }
+
+    // Clear the TERM variable.  The child process's immediate console/terminal
+    // environment is a Windows console, not the terminal that winpty is
+    // communicating with.  Leaving the TERM variable set can break programs in
+    // various ways.  (e.g. arrows keys broken in Cygwin less, IronPython's
+    // help(...) function doesn't start, misc programs decide they should
+    // output color escape codes on pre-Win10).  See
+    // https://github.com/rprichard/winpty/issues/43.
+    SetEnvironmentVariableW(L"TERM", NULL);
 }
 
 static void usage(const char *program, int exitCode)

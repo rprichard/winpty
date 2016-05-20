@@ -6,6 +6,8 @@ User-visible changes:
    consistent with MSYS2.  The name `winpty.exe` is less likely to conflict
    with another program and is easier to search for online (e.g. for someone
    unfamiliar with winpty).
+ * The UNIX adapter now clears the `TERM` variable.
+   [#43](https://github.com/rprichard/winpty/issues/43)
 
 Bug fixes:
 
