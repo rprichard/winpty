@@ -8,6 +8,9 @@ User-visible changes:
    unfamiliar with winpty).
  * The UNIX adapter now clears the `TERM` variable.
    [#43](https://github.com/rprichard/winpty/issues/43)
+ * An escape character appearing in a console screen buffer cell is converted
+   to a '?'.
+   [#47](https://github.com/rprichard/winpty/issues/47)
 
 Bug fixes:
 

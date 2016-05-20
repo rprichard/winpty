@@ -197,26 +197,36 @@ static void outputSetColor(std::string &out, int color)
     out.push_back('m');
 }
 
-// The Windows Console has a popup window (e.g. that appears with F7)
-// that is sometimes bordered with box-drawing characters.  With the
-// Japanese and Korean system locales (CP932 and CP949), the
-// UnicodeChar values for the box-drawing characters are 1 through 6.
-// Detect this and map the values to the correct Unicode values.
-//
-// N.B. In the English locale, the UnicodeChar values are correct, and
-// they identify single-line characters rather than double-line.  In
-// the Chinese Simplified and Traditional locales, the popups use ASCII
-// characters instead.
-static inline unsigned int fixConsolePopupBoxArt(unsigned int ch)
+static inline unsigned int fixSpecialCharacters(unsigned int ch)
 {
-    if (ch <= 6) {
+    if (ch <= 0x1b) {
         switch (ch) {
+            // The Windows Console has a popup window (e.g. that appears with
+            // F7) that is sometimes bordered with box-drawing characters.
+            // With the Japanese and Korean system locales (CP932 and CP949),
+            // the UnicodeChar values for the box-drawing characters are 1
+            // through 6.  Detect this and map the values to the correct
+            // Unicode values.
+            //
+            // N.B. In the English locale, the UnicodeChar values are correct,
+            // and they identify single-line characters rather than
+            // double-line.  In the Chinese Simplified and Traditional locales,
+            // the popups use ASCII characters instead.
             case 1: return 0x2554; // BOX DRAWINGS DOUBLE DOWN AND RIGHT
             case 2: return 0x2557; // BOX DRAWINGS DOUBLE DOWN AND LEFT
             case 3: return 0x255A; // BOX DRAWINGS DOUBLE UP AND RIGHT
             case 4: return 0x255D; // BOX DRAWINGS DOUBLE UP AND LEFT
             case 5: return 0x2551; // BOX DRAWINGS DOUBLE VERTICAL
             case 6: return 0x2550; // BOX DRAWINGS DOUBLE HORIZONTAL
+
+            // Convert an escape character to some other character.  This
+            // conversion only applies to console cells containing an escape
+            // character.  In newer versions of Windows 10 (e.g. 10.0.10586),
+            // the non-legacy console recognizes escape sequences in
+            // WriteConsole and interprets them without writing them to the
+            // cells of the screen buffer.  In that case, the conversion here
+            // does not apply.
+            case 0x1b: return '?';
         }
     }
     return ch;
@@ -344,7 +354,7 @@ void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width)
                 }
                 alreadyErasedLine = true;
             }
-            ch = fixConsolePopupBoxArt(ch);
+            ch = fixSpecialCharacters(ch);
             char enc[4];
             int enclen = encodeUtf8(enc, ch);
             if (enclen == 0) {
