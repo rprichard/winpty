@@ -33,6 +33,8 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
+extern bool g_pipe_mode;
+
 OutputHandler::OutputHandler(HANDLE winpty, WakeupFd &completionWakeup) :
     m_winpty(winpty),
     m_completionWakeup(completionWakeup),
@@ -40,7 +42,8 @@ OutputHandler::OutputHandler(HANDLE winpty, WakeupFd &completionWakeup) :
     m_shouldShutdown(0),
     m_threadCompleted(0)
 {
-    assert(isatty(STDOUT_FILENO));
+    if (!g_pipe_mode)
+        assert(isatty(STDOUT_FILENO));
     pthread_create(&m_thread, NULL, OutputHandler::threadProcS, this);
 }
 

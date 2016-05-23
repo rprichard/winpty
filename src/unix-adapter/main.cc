@@ -51,7 +51,8 @@
 #define CSI "\x1b["
 
 static WakeupFd *g_mainWakeup = NULL;
-
+bool g_pipe_mode = false;
+        
 static WakeupFd &mainWakeup()
 {
     if (g_mainWakeup == NULL) {
@@ -329,6 +330,7 @@ struct Arguments {
 static void parseArguments(int argc, char *argv[], Arguments &out)
 {
     out.mouseInput = false;
+    g_pipe_mode = false;
     const char *const program = argc >= 1 ? argv[0] : "<program>";
     int argi = 1;
     while (argi < argc) {
@@ -344,6 +346,8 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
             } else if (arg == "--version") {
                 dumpVersionToStdout();
                 exit(0);
+            } else if (arg == "--pipe") {
+                g_pipe_mode = true;
             } else if (arg == "--") {
                 break;
             } else {
@@ -449,7 +453,11 @@ int main(int argc, char *argv[])
     }
 
     registerResizeSignalHandler();
-    termios mode = setRawTerminalMode();
+    
+    termios mode;
+
+    if (!g_pipe_mode)
+        mode = setRawTerminalMode();
 
     if (args.mouseInput) {
         // Start by disabling UTF-8 coordinate mode (1005), just in case we
@@ -512,7 +520,8 @@ int main(int argc, char *argv[])
             CSI"?1006l" CSI"?1015l" CSI"?1003l" CSI"?1002l" CSI"?1000l");
     }
 
-    restoreTerminalMode(mode);
+    if (!g_pipe_mode)
+        restoreTerminalMode(mode);
     winpty_close(winpty);
 
     return exitCode;
