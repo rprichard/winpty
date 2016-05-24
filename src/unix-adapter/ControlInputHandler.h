@@ -18,8 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef UNIX_ADAPTER_CONTROL_HANDLER_H
-#define UNIX_ADAPTER_CONTROL_HANDLER_H
+#ifndef UNIX_ADAPTER_CONTROL_INPUT_HANDLER_H
+#define UNIX_ADAPTER_CONTROL_INPUT_HANDLER_H
 
 #include <windows.h>
 #include <pthread.h>
@@ -29,17 +29,17 @@
 #include "WakeupFd.h"
 
 // Connect winpty overlapped I/O to Cygwin blocking STDOUT_FILENO.
-class ControlHandler {
+class ControlInputHandler {
 public:
-    ControlHandler(HANDLE control, HANDLE winpty, WakeupFd &completionWakeup);
-    ~ControlHandler() { shutdown(); }
+    ControlInputHandler(HANDLE control, HANDLE winpty, WakeupFd &completionWakeup);
+    ~ControlInputHandler() { shutdown(); }
     bool isComplete() { return m_threadCompleted; }
     void startShutdown() { m_shouldShutdown = 1; m_wakeup.set(); }
     void shutdown();
 
 private:
     static void *threadProcS(void *pvthis) {
-        reinterpret_cast<ControlHandler*>(pvthis)->threadProc();
+        reinterpret_cast<ControlInputHandler*>(pvthis)->threadProc();
         return NULL;
     }
     void threadProc();

@@ -49,6 +49,9 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
+#include "ControlInputHandler.h"
+#include "ControlOutputHandler.h"
+
 #define CSI "\x1b["
 
 static WakeupFd *g_mainWakeup = NULL;
@@ -504,13 +507,17 @@ int main(int argc, char *argv[])
     }
 
     HANDLE control_pipe = INVALID_HANDLE_VALUE;
-    ControlHandler * controlHandler = NULL;
+    ControlInputHandler * controlInputHandler = NULL;
+    ControlOutputHandler * controlOutputHandler = NULL;
     
     if (g_pipe_mode) {
         control_pipe = createControlPipe();
-        controlHandler = new ControlHandler(control_pipe,
-                                            winpty_get_control_pipe(winptr),
-                                            mainWakeup());
+        controlInputHandler = new ControlInputHandler(control_pipe,
+                                                      winpty_get_control_pipe(winptr),
+                                                      mainWakeup());
+        controlOutputHandler = new ControlOutputHandler(control_pipe,
+                                                        winpty_get_control_pipe(winptr),
+                                                        mainWakeup());
     }
     
     OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
@@ -543,11 +550,6 @@ int main(int argc, char *argv[])
     outputHandler.shutdown();
     inputHandler.shutdown();
 
-    if (controlHandler) {
-        controlHandler->shutdown();
-        delete controlHandler;
-    }
-
     const int exitCode = winpty_get_exit_code(winpty);
 
     if (args.mouseInput) {
@@ -562,8 +564,17 @@ int main(int argc, char *argv[])
         restoreTerminalMode(mode);
     winpty_close(winpty);
 
-    if (control_pipe != INVALID_HANDLE_VALUE)
+    //control pipe may block on control pipe or winpty control pipe
+    //so do shutdown on everything closed
+    if (g_pipe_mode) {
         CloseHandle(control_pipe);
+        
+        controlInputHandler->shutdown();
+        delete controlInputHandler;
+        
+        controlOutputHandler->shutdown();
+        delete controlOutputHandler;
+    }
 
     return exitCode;
 }
