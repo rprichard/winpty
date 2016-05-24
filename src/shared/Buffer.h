@@ -21,7 +21,6 @@
 #ifndef WINPTY_SHARED_BUFFER_H
 #define WINPTY_SHARED_BUFFER_H
 
-#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 

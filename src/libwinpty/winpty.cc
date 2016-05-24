@@ -18,24 +18,28 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#include <winpty.h>
 #include <windows.h>
-#include <assert.h>
-#include <string.h>
-#include <stdio.h>
+
+#include <winpty.h>
+
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <limits>
 #include <string>
 #include <vector>
-#include <limits>
-#include "../shared/DebugClient.h"
+
 #include "../shared/AgentMsg.h"
 #include "../shared/Buffer.h"
+#include "../shared/DebugClient.h"
 #include "../shared/GenRandom.h"
 #include "../shared/OwnedHandle.h"
 #include "../shared/StringBuilder.h"
 #include "../shared/StringUtil.h"
 #include "../shared/WindowsSecurity.h"
 #include "../shared/WindowsVersion.h"
+#include "../shared/WinptyAssert.h"
 #include "../shared/WinptyException.h"
 #include "../shared/WinptyVersion.h"
 
@@ -61,7 +65,7 @@ static HMODULE getCurrentModule()
                 GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                 reinterpret_cast<LPCWSTR>(getCurrentModule),
                 &module)) {
-        assert(false && "GetModuleHandleEx failed");
+        ASSERT(false && "GetModuleHandleEx failed");
     }
     return module;
 }
@@ -71,7 +75,7 @@ static std::wstring getModuleFileName(HMODULE module)
     const int bufsize = 4096;
     wchar_t path[bufsize];
     int size = GetModuleFileNameW(module, path, bufsize);
-    assert(size != 0 && size != bufsize);
+    ASSERT(size != 0 && size != bufsize);
     return std::wstring(path);
 }
 
@@ -93,7 +97,7 @@ static std::wstring findAgentProgram()
 {
     std::wstring progDir = dirname(getModuleFileName(getCurrentModule()));
     std::wstring ret = progDir + (L"\\" AGENT_EXE);
-    assert(pathExists(ret));
+    ASSERT(pathExists(ret));
     return ret;
 }
 
@@ -106,7 +110,7 @@ static bool connectNamedPipe(HANDLE handle, bool overlapped)
         pover = &over;
         memset(&over, 0, sizeof(over));
         over.hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
-        assert(over.hEvent != NULL);
+        ASSERT(over.hEvent != NULL);
     }
     bool success = ConnectNamedPipe(handle, pover);
     if (overlapped && !success && GetLastError() == ERROR_IO_PENDING) {
@@ -143,7 +147,7 @@ static int32_t readInt32(winpty_t *pc)
     int32_t result;
     DWORD actual;
     BOOL success = ReadFile(pc->controlPipe, &result, sizeof(int32_t), &actual, NULL);
-    assert(success && actual == sizeof(int32_t));
+    ASSERT(success && actual == sizeof(int32_t));
     return result;
 }
 
@@ -193,12 +197,12 @@ static std::wstring getObjectName(HANDLE object)
     GetUserObjectInformationW(object, UOI_NAME,
                               NULL, 0,
                               &lengthNeeded);
-    assert(lengthNeeded % sizeof(wchar_t) == 0);
+    ASSERT(lengthNeeded % sizeof(wchar_t) == 0);
     wchar_t *tmp = new wchar_t[lengthNeeded / 2];
     success = GetUserObjectInformationW(object, UOI_NAME,
                                         tmp, lengthNeeded,
                                         NULL);
-    assert(success && "GetUserObjectInformationW failed");
+    ASSERT(success && "GetUserObjectInformationW failed");
     std::wstring ret = tmp;
     delete [] tmp;
     return ret;
@@ -255,11 +259,11 @@ static BackgroundDesktop setupBackgroundDesktop()
         if (ret.station != NULL) {
             ret.originalStation = originalStation;
             bool success = SetProcessWindowStation(ret.station);
-            assert(success && "SetProcessWindowStation failed");
+            ASSERT(success && "SetProcessWindowStation failed");
             ret.desktop = CreateDesktopW(L"Default", NULL, NULL, 0, GENERIC_ALL, NULL);
-            assert(ret.originalStation != NULL);
-            assert(ret.station != NULL);
-            assert(ret.desktop != NULL);
+            ASSERT(ret.originalStation != NULL);
+            ASSERT(ret.station != NULL);
+            ASSERT(ret.desktop != NULL);
             ret.desktopName =
                 getObjectName(ret.station) + L"\\" + getObjectName(ret.desktop);
             trace("Created background desktop: %s",
@@ -286,8 +290,8 @@ static std::wstring getDesktopFullName()
     // to be passed to CloseDesktop.
     HWINSTA station = GetProcessWindowStation();
     HDESK desktop = GetThreadDesktop(GetCurrentThreadId());
-    assert(station != NULL && "GetProcessWindowStation returned NULL");
-    assert(desktop != NULL && "GetThreadDesktop returned NULL");
+    ASSERT(station != NULL && "GetProcessWindowStation returned NULL");
+    ASSERT(desktop != NULL && "GetThreadDesktop returned NULL");
     return getObjectName(station) + L"\\" + getObjectName(desktop);
 }
 
