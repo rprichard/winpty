@@ -43,9 +43,9 @@
 #include "../shared/WinptyException.h"
 #include "../shared/WinptyVersion.h"
 
-// TODO: Error handling, handle out-of-memory.
+#include "AgentLocation.h"
 
-#define AGENT_EXE L"winpty-agent.exe"
+// TODO: Error handling, handle out-of-memory.
 
 struct winpty_s {
     winpty_s();
@@ -55,50 +55,6 @@ struct winpty_s {
 
 winpty_s::winpty_s() : controlPipe(NULL), dataPipe(NULL)
 {
-}
-
-static HMODULE getCurrentModule()
-{
-    HMODULE module;
-    if (!GetModuleHandleExW(
-                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                reinterpret_cast<LPCWSTR>(getCurrentModule),
-                &module)) {
-        ASSERT(false && "GetModuleHandleEx failed");
-    }
-    return module;
-}
-
-static std::wstring getModuleFileName(HMODULE module)
-{
-    const int bufsize = 4096;
-    wchar_t path[bufsize];
-    int size = GetModuleFileNameW(module, path, bufsize);
-    ASSERT(size != 0 && size != bufsize);
-    return std::wstring(path);
-}
-
-static std::wstring dirname(const std::wstring &path)
-{
-    std::wstring::size_type pos = path.find_last_of(L"\\/");
-    if (pos == std::wstring::npos)
-        return L"";
-    else
-        return path.substr(0, pos);
-}
-
-static bool pathExists(const std::wstring &path)
-{
-    return GetFileAttributesW(path.c_str()) != 0xFFFFFFFF;
-}
-
-static std::wstring findAgentProgram()
-{
-    std::wstring progDir = dirname(getModuleFileName(getCurrentModule()));
-    std::wstring ret = progDir + (L"\\" AGENT_EXE);
-    ASSERT(pathExists(ret));
-    return ret;
 }
 
 // Call ConnectNamedPipe and block, even for an overlapped pipe.  If the

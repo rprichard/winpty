@@ -23,6 +23,7 @@ ALL_TARGETS += build/winpty.dll
 $(eval $(call def_mingw_target,libwinpty,-DCOMPILING_WINPTY_DLL))
 
 LIBWINPTY_OBJECTS = \
+	build/libwinpty/libwinpty/AgentLocation.o \
 	build/libwinpty/libwinpty/winpty.o \
 	build/libwinpty/shared/Buffer.o \
 	build/libwinpty/shared/DebugClient.o \

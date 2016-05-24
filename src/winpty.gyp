@@ -122,6 +122,8 @@
             },
             'sources' : [
                 'include/winpty.h',
+                'libwinpty/AgentLocation.cc',
+                'libwinpty/AgentLocation.h',
                 'libwinpty/winpty.cc',
                 'shared/AgentMsg.h',
                 'shared/Buffer.h',
