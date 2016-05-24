@@ -542,6 +542,11 @@ WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc)
     return pc->dataPipe;
 }
 
+WINPTY_API HANDLE winpty_get_control_pipe(winpty_t *pc)
+{
+    return pc->controlPipe;
+}
+
 WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows)
 {
     auto packet = newPacket();

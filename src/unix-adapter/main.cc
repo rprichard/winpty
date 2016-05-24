@@ -43,6 +43,7 @@
 #include "../shared/DebugClient.h"
 #include "../shared/UnixCtrlChars.h"
 #include "../shared/WinptyVersion.h"
+#include "../shared/StringBuilder.h"
 #include "InputHandler.h"
 #include "OutputHandler.h"
 #include "Util.h"
@@ -319,6 +320,7 @@ static void usage(const char *program, int exitCode)
     printf("  --mouse     Enable terminal mouse input\n");
     printf("  --showkey   Dump STDIN escape sequences\n");
     printf("  --version   Show the winpty version number\n");
+    printf("  --pipe      run winpty in pipe mode, the stdin/stdout/stderr will be piped from other process\n");
     exit(exitCode);
 }
 
@@ -331,6 +333,7 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
 {
     out.mouseInput = false;
     g_pipe_mode = false;
+
     const char *const program = argc >= 1 ? argv[0] : "<program>";
     int argi = 1;
     while (argi < argc) {
@@ -403,6 +406,26 @@ static std::string formatErrorMessage(DWORD err)
         msg.erase(pos + 1);
     }
     return msg;
+}
+
+static HANDLE createControlPipe() {
+    WStringBuilder sb(4);
+    sb << GetCurrentProcessId();
+
+    const std::wstring control_pipe_name =
+            L"\\\\.\\pipe\\winpty-" + sb.str_moved();
+
+    return CreateNamedPipeW(control_pipe_name.c_str(),
+                            /*dwOpenMode=*/
+                            PIPE_ACCESS_DUPLEX |
+                            FILE_FLAG_FIRST_PIPE_INSTANCE,
+                            /*dwPipeMode=*/
+                            0,
+                            /*nMaxInstances=*/1,
+                            /*nOutBufferSize=*/0,
+                            /*nInBufferSize=*/0,
+                            /*nDefaultTimeOut=*/3000,
+                            NULL);
 }
 
 int main(int argc, char *argv[])
@@ -480,6 +503,16 @@ int main(int argc, char *argv[])
             CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
     }
 
+    HANDLE control_pipe = INVALID_HANDLE_VALUE;
+    ControlHandler * controlHandler = NULL;
+    
+    if (g_pipe_mode) {
+        control_pipe = createControlPipe();
+        controlHandler = new ControlHandler(control_pipe,
+                                            winpty_get_control_pipe(winptr),
+                                            mainWakeup());
+    }
+    
     OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
     InputHandler inputHandler(winpty_get_data_pipe(winpty), mainWakeup());
 
@@ -510,6 +543,11 @@ int main(int argc, char *argv[])
     outputHandler.shutdown();
     inputHandler.shutdown();
 
+    if (controlHandler) {
+        controlHandler->shutdown();
+        delete controlHandler;
+    }
+
     const int exitCode = winpty_get_exit_code(winpty);
 
     if (args.mouseInput) {
@@ -523,6 +561,9 @@ int main(int argc, char *argv[])
     if (!g_pipe_mode)
         restoreTerminalMode(mode);
     winpty_close(winpty);
+
+    if (control_pipe != INVALID_HANDLE_VALUE)
+        CloseHandle(control_pipe);
 
     return exitCode;
 }
