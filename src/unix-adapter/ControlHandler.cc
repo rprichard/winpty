@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#include "ControlOutputHandler.h"
+#include "ControlHandler.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -33,18 +33,18 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
-ControlOutputHandler::ControlOutputHandler(HANDLE control, HANDLE winpty, WakeupFd &completionWakeup) :
-    m_control(control),
-    m_winpty(winpty),
+ControlHandler::ControlHandler(HANDLE r, HANDLE w, WakeupFd &completionWakeup) :
+    m_read_pipe(r),
+    m_write_pipe(w),
     m_completionWakeup(completionWakeup),
     m_threadHasBeenJoined(false),
     m_shouldShutdown(0),
     m_threadCompleted(0)
 {
-    pthread_create(&m_thread, NULL, ControlOutputHandler::threadProcS, this);
+    pthread_create(&m_thread, NULL, ControlHandler::threadProcS, this);
 }
 
-void ControlOutputHandler::shutdown() {
+void ControlHandler::shutdown() {
     startShutdown();
     if (!m_threadHasBeenJoined) {
         int ret = pthread_join(m_thread, NULL);
@@ -53,12 +53,12 @@ void ControlOutputHandler::shutdown() {
     }
 }
 
-void ControlOutputHandler::threadProc() {
+void ControlHandler::threadProc() {
     while (true) {
         // Handle shutdown
         m_wakeup.reset();
         if (m_shouldShutdown) {
-            trace("ControlOutputHandler: shutting down");
+            trace("ControlHandler: shutting down");
             break;
         }
 
@@ -66,16 +66,16 @@ void ControlOutputHandler::threadProc() {
         DWORD numRead;
         char data;
             
-        BOOL ret = ReadFile(m_winpty,
+        BOOL ret = ReadFile(m_read_pipe,
                             &data, 1,
                             &numRead,
                             nullptr);
         if (!ret || numRead == 0) {
             if (!ret && GetLastError() == ERROR_BROKEN_PIPE) {
-                trace("ControlOutputHandler: pipe closed: numRead=%u",
+                trace("ControlHandler: pipe closed: numRead=%u",
                       static_cast<unsigned int>(numRead));
             } else {
-                trace("ControlOutputHandler: read failed: "
+                trace("ControlHandler: read failed: "
                       "ret=%d lastError=0x%x numRead=%u",
                       ret,
                       static_cast<unsigned int>(GetLastError()),
@@ -86,16 +86,16 @@ void ControlOutputHandler::threadProc() {
         
         //Write to pipe
         DWORD written;
-        ret = WriteFile(m_control,
+        ret = WriteFile(m_write_pipe,
                         &data, numRead,
                         &written,
                         nullptr);
         if (!ret || written != numRead) {
             if (!ret && GetLastError() == ERROR_BROKEN_PIPE) {
-                trace("ControlInputHandler: pipe closed: written=%u",
+                trace("ControlHandler: pipe closed: written=%u",
                       static_cast<unsigned int>(written));
             } else {
-                trace("ControlInputHandler: write failed: "
+                trace("ControlHandler: write failed: "
                       "ret=%d lastError=0x%x numRead=%d written=%u",
                       ret,
                       static_cast<unsigned int>(GetLastError()),

@@ -49,8 +49,8 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
-#include "ControlInputHandler.h"
-#include "ControlOutputHandler.h"
+#include "ControlHandler.h"
+
 
 #define CSI "\x1b["
 
@@ -418,7 +418,7 @@ static HANDLE createControlPipe() {
     const std::wstring control_pipe_name =
             L"\\\\.\\pipe\\winpty-" + sb.str_moved();
 
-    return CreateNamedPipeW(control_pipe_name.c_str(),
+    HANDLE h = CreateNamedPipeW(control_pipe_name.c_str(),
                             /*dwOpenMode=*/
                             PIPE_ACCESS_DUPLEX |
                             FILE_FLAG_FIRST_PIPE_INSTANCE,
@@ -429,6 +429,11 @@ static HANDLE createControlPipe() {
                             /*nInBufferSize=*/0,
                             /*nDefaultTimeOut=*/3000,
                             NULL);
+
+    if (h != INVALID_HANDLE_VALUE)
+        ConnectNamedPipe(h, NULL);
+
+    return h;
 }
 
 int main(int argc, char *argv[])
@@ -512,12 +517,18 @@ int main(int argc, char *argv[])
     
     if (g_pipe_mode) {
         control_pipe = createControlPipe();
-        controlInputHandler = new ControlInputHandler(control_pipe,
-                                                      winpty_get_control_pipe(winptr),
-                                                      mainWakeup());
-        controlOutputHandler = new ControlOutputHandler(control_pipe,
-                                                        winpty_get_control_pipe(winptr),
-                                                        mainWakeup());
+
+        if (control_pipe == INVALID_HANDLE_VALUE) {
+            fprintf(stderr, "Error creating control pipe.\n");
+            exit(1);
+        }
+            
+        controlInputHandler = new ControlHandler(control_pipe,
+                                                 winpty_get_control_pipe(winptr),
+                                                 mainWakeup());
+        controlOutputHandler = new ControlHandler(winpty_get_control_pipe(winptr),
+                                                  control_pipe,
+                                                  mainWakeup());
     }
     
     OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
