@@ -18,8 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef AGENTMSG_H
-#define AGENTMSG_H
+#ifndef WINPTY_SHARED_AGENT_MSG_H
+#define WINPTY_SHARED_AGENT_MSG_H
 
 struct AgentMsg
 {
@@ -33,4 +33,4 @@ struct AgentMsg
     };
 };
 
-#endif // AGENTMSG_H
+#endif // WINPTY_SHARED_AGENT_MSG_H

@@ -18,8 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef STRING_UTIL_H
-#define STRING_UTIL_H
+#ifndef WINPTY_SHARED_STRING_UTIL_H
+#define WINPTY_SHARED_STRING_UTIL_H
 
 #include <stdlib.h>
 #include <string.h>
@@ -77,4 +77,4 @@ wchar_t *winpty_wcsncpy_nul(wchar_t (&d)[N], const wchar_t *s) {
     return d;
 }
 
-#endif // STRING_UTIL_H
+#endif // WINPTY_SHARED_STRING_UTIL_H

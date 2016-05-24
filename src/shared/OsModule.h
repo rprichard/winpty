@@ -18,8 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef OS_MODULE_H
-#define OS_MODULE_H
+#ifndef WINPTY_SHARED_OS_MODULE_H
+#define WINPTY_SHARED_OS_MODULE_H
 
 #include <windows.h>
 
@@ -58,4 +58,4 @@ public:
     }
 };
 
-#endif // OS_MODULE_H
+#endif // WINPTY_SHARED_OS_MODULE_H

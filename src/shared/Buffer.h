@@ -18,8 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef WINPTY_SHARED_BUFFER_H
+#define WINPTY_SHARED_BUFFER_H
 
 #include <assert.h>
 #include <stdint.h>
@@ -99,4 +99,4 @@ public:
     }
 };
 
-#endif /* BUFFER_H */
+#endif // WINPTY_SHARED_BUFFER_H
