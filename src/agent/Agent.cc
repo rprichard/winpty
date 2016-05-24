@@ -128,6 +128,13 @@ Agent::Agent(LPCWSTR controlPipeName,
 {
     trace("Agent::Agent entered");
 
+    // The console window must be non-NULL.  It is used for two purposes:
+    //  (1) "Freezing" the console to detect the exact number of lines that
+    //      have scrolled.
+    //  (2) Killing processes attached to the console, by posting a WM_CLOSE
+    //      message to the console window.
+    ASSERT(GetConsoleWindow() != nullptr);
+
     m_bufferData.resize(BUFFER_LINE_COUNT);
 
     m_console = new Win32Console;
