@@ -34,7 +34,7 @@ class NamedPipe;
 class Terminal
 {
 public:
-    explicit Terminal(NamedPipe *output);
+    explicit Terminal(NamedPipe &output) : m_output(output) {}
     enum SendClearFlag { OmitClear, SendClear };
     void reset(SendClearFlag sendClearFirst, int64_t newLine);
     void sendLine(int64_t line, const CHAR_INFO *lineData, int width);
@@ -46,12 +46,12 @@ private:
     void moveTerminalToLine(int64_t line);
 
 private:
-    NamedPipe *m_output;
-    int64_t m_remoteLine;
-    bool m_cursorHidden;
+    NamedPipe &m_output;
+    int64_t m_remoteLine = 0;
+    bool m_cursorHidden = false;
     std::pair<int, int64_t> m_cursorPos;
-    int m_remoteColor;
-    bool m_consoleMode;
+    int m_remoteColor = -1;
+    bool m_consoleMode = false;
     std::string m_termLine;
 };
 

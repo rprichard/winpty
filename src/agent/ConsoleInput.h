@@ -24,6 +24,7 @@
 #include <windows.h>
 #include <stdint.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -37,8 +38,7 @@ class DsrSender;
 class ConsoleInput
 {
 public:
-    ConsoleInput(DsrSender *dsrSender);
-    ~ConsoleInput();
+    ConsoleInput(DsrSender &dsrSender);
     void writeInput(const std::string &input);
     void flushIncompleteEscapeCode();
     void setMouseInputEnabled(bool val) { m_mouseInputEnabled = val; }
@@ -68,21 +68,20 @@ private:
                            uint16_t keyState);
 
 private:
-    Win32Console *m_console;
-    DsrSender *m_dsrSender;
-    bool m_dsrSent;
+    std::unique_ptr<Win32Console> m_console;
+    DsrSender &m_dsrSender;
+    bool m_dsrSent = false;
     std::string m_byteQueue;
     InputMap m_inputMap;
-    DWORD m_lastWriteTick;
-    DWORD m_mouseButtonState;
+    DWORD m_lastWriteTick = 0;
+    DWORD m_mouseButtonState = 0;
     struct DoubleClickDetection {
-        DoubleClickDetection() : button(0), tick(0), released(0) {}
-        DWORD button;
+        DWORD button = 0;
         Coord pos;
-        DWORD tick;
-        bool released;
+        DWORD tick = 0;
+        bool released = false;
     } m_doubleClick;
-    bool m_mouseInputEnabled;
+    bool m_mouseInputEnabled = false;
     SmallRect m_mouseWindowRect;
 };
 

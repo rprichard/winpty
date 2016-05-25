@@ -32,8 +32,8 @@ class NamedPipe
 private:
     // The EventLoop uses these private members.
     friend class EventLoop;
-    NamedPipe();
-    ~NamedPipe();
+    NamedPipe() {}
+    ~NamedPipe() { closePipe(); }
     bool serviceIo(std::vector<HANDLE> *waitHandles);
 
     enum class ServiceResult { NoProgress, Error, Progress };
@@ -95,12 +95,12 @@ public:
 
 private:
     // Input/output buffers
-    size_t m_readBufferSize;
+    size_t m_readBufferSize = 64 * 1024;
     std::string m_inQueue;
     std::string m_outQueue;
-    HANDLE m_handle;
-    InputWorker *m_inputWorker;
-    OutputWorker *m_outputWorker;
+    HANDLE m_handle = nullptr;
+    InputWorker *m_inputWorker = nullptr;
+    OutputWorker *m_outputWorker = nullptr;
 };
 
 #endif // NAMEDPIPE_H

@@ -24,6 +24,7 @@
 #include <windows.h>
 #include <stdint.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -59,21 +60,21 @@ public:
     void sendDsr();
 
 private:
-    NamedPipe *makeSocket(LPCWSTR pipeName);
+    NamedPipe &makePipe(LPCWSTR pipeName);
     void resetConsoleTracking(
         Terminal::SendClearFlag sendClear, const SmallRect &windowRect);
 
 private:
-    void pollControlSocket();
+    void pollControlPipe();
     void handlePacket(ReadBuffer &packet);
     int handleStartProcessPacket(ReadBuffer &packet);
     int handleSetSizePacket(ReadBuffer &packet);
-    void pollDataSocket();
+    void pollDataPipe();
     void updateMouseInputFlags(bool forceTrace=false);
 
 protected:
     virtual void onPollTimeout();
-    virtual void onPipeIo(NamedPipe *namedPipe);
+    virtual void onPipeIo(NamedPipe &namedPipe);
 
 private:
     void markEntireWindowDirty(const SmallRect &windowRect);
@@ -93,30 +94,30 @@ private:
     void createSyncMarker(int row);
 
 private:
-    bool m_useMark;
-    Win32Console *m_console;
-    bool m_consoleMouseInputEnabled;
-    bool m_consoleQuickEditEnabled;
-    NamedPipe *m_controlSocket;
-    NamedPipe *m_dataSocket;
-    bool m_closingDataSocket;
-    Terminal *m_terminal;
-    ConsoleInput *m_consoleInput;
-    HANDLE m_childProcess;
-    int m_childExitCode;
+    bool m_useMark = false;
+    std::unique_ptr<Win32Console> m_console;
+    bool m_consoleMouseInputEnabled = false;
+    bool m_consoleQuickEditEnabled = false;
+    NamedPipe *m_controlPipe = nullptr;
+    NamedPipe *m_dataPipe = nullptr;
+    bool m_closingDataPipe = false;
+    std::unique_ptr<Terminal> m_terminal;
+    std::unique_ptr<ConsoleInput> m_consoleInput;
+    HANDLE m_childProcess = nullptr;
+    int m_childExitCode = -1;
 
-    int m_syncRow;
-    int m_syncCounter;
+    int m_syncRow = 0;
+    int m_syncCounter = 0;
 
-    bool m_directMode;
+    bool m_directMode = false;
     Coord m_ptySize;
-    int64_t m_scrapedLineCount;
-    int64_t m_scrolledCount;
-    int64_t m_maxBufferedLine;
+    int64_t m_scrapedLineCount = 0;
+    int64_t m_scrolledCount = 0;
+    int64_t m_maxBufferedLine = 0;
     LargeConsoleReadBuffer m_readBuffer;
     std::vector<ConsoleLine> m_bufferData;
-    int m_dirtyWindowTop;
-    int m_dirtyLineCount;
+    int m_dirtyWindowTop = 0;
+    int m_dirtyLineCount = 0;
 
     // If the title is initialized to the empty string, then cmd.exe will
     // sometimes print this error:

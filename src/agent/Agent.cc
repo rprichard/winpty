@@ -117,13 +117,6 @@ Agent::Agent(LPCWSTR controlPipeName,
              LPCWSTR dataPipeName,
              int initialCols,
              int initialRows) :
-    m_useMark(false),
-    m_closingDataSocket(false),
-    m_terminal(NULL),
-    m_childProcess(NULL),
-    m_childExitCode(-1),
-    m_syncCounter(0),
-    m_directMode(false),
     m_ptySize(initialCols, initialRows)
 {
     trace("Agent::Agent entered");
@@ -137,7 +130,7 @@ Agent::Agent(LPCWSTR controlPipeName,
 
     m_bufferData.resize(BUFFER_LINE_COUNT);
 
-    m_console = new Win32Console;
+    m_console.reset(new Win32Console);
     setSmallFont(m_console->conout());
     m_useMark = !detectWhetherMarkMovesCursor(*m_console);
     trace("Using %s syscommand to freeze console",
@@ -153,10 +146,10 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_console->setTextAttribute(7);
     m_console->clearAllLines(m_console->bufferInfo());
 
-    m_controlSocket = makeSocket(controlPipeName);
-    m_dataSocket = makeSocket(dataPipeName);
-    m_terminal = new Terminal(m_dataSocket);
-    m_consoleInput = new ConsoleInput(this);
+    m_controlPipe = &makePipe(controlPipeName);
+    m_dataPipe = &makePipe(dataPipeName);
+    m_terminal.reset(new Terminal(*m_dataPipe));
+    m_consoleInput.reset(new ConsoleInput(*this));
 
     resetConsoleTracking(Terminal::OmitClear, m_console->windowRect());
 
@@ -191,9 +184,6 @@ Agent::~Agent()
     if (m_childProcess != NULL) {
         CloseHandle(m_childProcess);
     }
-    delete m_console;
-    delete m_terminal;
-    delete m_consoleInput;
 }
 
 // Write a "Device Status Report" command to the terminal.  The terminal will
@@ -202,18 +192,18 @@ Agent::~Agent()
 // bytes before it are complete keypresses.
 void Agent::sendDsr()
 {
-    m_dataSocket->write("\x1B[6n");
+    m_dataPipe->write("\x1B[6n");
 }
 
-NamedPipe *Agent::makeSocket(LPCWSTR pipeName)
+NamedPipe &Agent::makePipe(LPCWSTR pipeName)
 {
-    NamedPipe *pipe = createNamedPipe();
-    if (!pipe->connectToServer(pipeName)) {
+    NamedPipe &pipe = createNamedPipe();
+    if (!pipe.connectToServer(pipeName)) {
         trace("error: could not connect to %s",
             utf8FromWide(pipeName).c_str());
         ::exit(1);
     }
-    pipe->setReadBufferSize(64 * 1024);
+    pipe.setReadBufferSize(64 * 1024);
     return pipe;
 }
 
@@ -235,17 +225,18 @@ void Agent::resetConsoleTracking(
     m_terminal->reset(sendClear, m_scrapedLineCount);
 }
 
-void Agent::onPipeIo(NamedPipe *namedPipe)
+void Agent::onPipeIo(NamedPipe &namedPipe)
 {
-    if (namedPipe == m_controlSocket)
-        pollControlSocket();
-    else if (namedPipe == m_dataSocket)
-        pollDataSocket();
+    if (&namedPipe == m_controlPipe) {
+        pollControlPipe();
+    } else if (&namedPipe == m_dataPipe) {
+        pollDataPipe();
+    }
 }
 
-void Agent::pollControlSocket()
+void Agent::pollControlPipe()
 {
-    if (m_controlSocket->isClosed()) {
+    if (m_controlPipe->isClosed()) {
         trace("Agent shutting down");
         shutdown();
         return;
@@ -254,20 +245,20 @@ void Agent::pollControlSocket()
     while (true) {
         uint64_t packetSize = 0;
         const auto amt1 =
-            m_controlSocket->peek(&packetSize, sizeof(packetSize));
+            m_controlPipe->peek(&packetSize, sizeof(packetSize));
         if (amt1 < sizeof(packetSize)) {
             break;
         }
         ASSERT(packetSize >= sizeof(packetSize) && packetSize <= SIZE_MAX);
-        if (m_controlSocket->bytesAvailable() < packetSize) {
-            if (m_controlSocket->readBufferSize() < packetSize) {
-                m_controlSocket->setReadBufferSize(packetSize);
+        if (m_controlPipe->bytesAvailable() < packetSize) {
+            if (m_controlPipe->readBufferSize() < packetSize) {
+                m_controlPipe->setReadBufferSize(packetSize);
             }
             break;
         }
         std::vector<char> packetData;
         packetData.resize(packetSize);
-        const auto amt2 = m_controlSocket->read(packetData.data(), packetSize);
+        const auto amt2 = m_controlPipe->read(packetData.data(), packetSize);
         ASSERT(amt2 == packetSize);
         try {
             ReadBuffer buffer(std::move(packetData));
@@ -316,7 +307,7 @@ void Agent::handlePacket(ReadBuffer &packet)
     default:
         trace("Unrecognized message, id:%d", type);
     }
-    m_controlSocket->write(&result, sizeof(result));
+    m_controlPipe->write(&result, sizeof(result));
 }
 
 int Agent::handleStartProcessPacket(ReadBuffer &packet)
@@ -373,9 +364,9 @@ int Agent::handleSetSizePacket(ReadBuffer &packet)
     return 0;
 }
 
-void Agent::pollDataSocket()
+void Agent::pollDataPipe()
 {
-    const std::string newData = m_dataSocket->readAllToString();
+    const std::string newData = m_dataPipe->readAllToString();
     if (hasDebugFlag("input_separated_bytes")) {
         // This debug flag is intended to help with testing incomplete escape
         // sequences and multibyte UTF-8 encodings.  (I wonder if the normal
@@ -389,11 +380,11 @@ void Agent::pollDataSocket()
 
     // If the child process had exited, then close the data socket if we've
     // finished sending all of the collected output.
-    if (m_closingDataSocket &&
-            !m_dataSocket->isClosed() &&
-            m_dataSocket->bytesToSend() == 0) {
+    if (m_closingDataPipe &&
+            !m_dataPipe->isClosed() &&
+            m_dataPipe->bytesToSend() == 0) {
         trace("Closing data pipe after data is sent");
-        m_dataSocket->closePipe();
+        m_dataPipe->closePipe();
     }
 }
 
@@ -435,20 +426,20 @@ void Agent::onPollTimeout()
         // Close the data socket to signal to the client that the child
         // process has exited.  If there's any data left to send, send it
         // before closing the socket.
-        m_closingDataSocket = true;
+        m_closingDataPipe = true;
     }
 
     // Scrape for output *after* the above exit-check to ensure that we collect
     // the child process's final output.
-    if (!m_dataSocket->isClosed()) {
+    if (!m_dataPipe->isClosed()) {
         syncConsoleContentAndSize(false);
     }
 
-    if (m_closingDataSocket &&
-            !m_dataSocket->isClosed() &&
-            m_dataSocket->bytesToSend() == 0) {
+    if (m_closingDataPipe &&
+            !m_dataPipe->isClosed() &&
+            m_dataPipe->bytesToSend() == 0) {
         trace("Closing data pipe after child exit");
-        m_dataSocket->closePipe();
+        m_dataPipe->closePipe();
     }
 }
 
@@ -662,7 +653,7 @@ void Agent::syncConsoleTitle()
     if (newTitle != m_currentTitle) {
         std::string command = std::string("\x1b]0;") +
                 wstringToUtf8String(newTitle) + "\x07";
-        m_dataSocket->write(command.c_str());
+        m_dataPipe->write(command.c_str());
         m_currentTitle = newTitle;
     }
 }
@@ -828,8 +819,7 @@ void Agent::reopenConsole()
 {
     // Reopen CONOUT.  The application may have changed the active screen
     // buffer.  (See https://github.com/rprichard/winpty/issues/34)
-    delete m_console;
-    m_console = new Win32Console();
+    m_console.reset(new Win32Console());
 }
 
 void Agent::freezeConsole()

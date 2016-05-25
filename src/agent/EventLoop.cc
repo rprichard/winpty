@@ -26,14 +26,11 @@
 #include "../shared/DebugClient.h"
 #include "../shared/WinptyAssert.h"
 
-EventLoop::EventLoop() : m_exiting(false), m_pollInterval(0)
-{
-}
-
-EventLoop::~EventLoop()
-{
-    for (size_t i = 0; i < m_pipes.size(); ++i)
-        delete m_pipes[i];
+EventLoop::~EventLoop() {
+    for (NamedPipe *pipe : m_pipes) {
+        delete pipe;
+    }
+    m_pipes.clear();
 }
 
 // Enter the event loop.  Runs until the I/O or timeout handler calls exit().
@@ -48,7 +45,7 @@ void EventLoop::run()
         waitHandles.clear();
         for (size_t i = 0; i < m_pipes.size(); ++i) {
             if (m_pipes[i]->serviceIo(&waitHandles)) {
-                onPipeIo(m_pipes[i]);
+                onPipeIo(*m_pipes[i]);
                 didSomething = true;
             }
         }
@@ -84,11 +81,11 @@ void EventLoop::run()
     }
 }
 
-NamedPipe *EventLoop::createNamedPipe()
+NamedPipe &EventLoop::createNamedPipe()
 {
     NamedPipe *ret = new NamedPipe();
     m_pipes.push_back(ret);
-    return ret;
+    return *ret;
 }
 
 void EventLoop::setPollInterval(int ms)
@@ -99,12 +96,4 @@ void EventLoop::setPollInterval(int ms)
 void EventLoop::shutdown()
 {
     m_exiting = true;
-}
-
-void EventLoop::onPollTimeout()
-{
-}
-
-void EventLoop::onPipeIo(NamedPipe *namedPipe)
-{
 }

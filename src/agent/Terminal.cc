@@ -286,15 +286,6 @@ static inline void scanUnicodeScalarValue(
 
 } // anonymous namespace
 
-Terminal::Terminal(NamedPipe *output) :
-    m_output(output),
-    m_remoteLine(0),
-    m_cursorHidden(false),
-    m_remoteColor(-1),
-    m_consoleMode(false)
-{
-}
-
 void Terminal::setConsoleMode(int mode)
 {
     if (mode == 1)
@@ -309,7 +300,7 @@ void Terminal::reset(SendClearFlag sendClearFirst, int64_t newLine)
         // 0m   ==> reset SGR parameters
         // 1;1H ==> move cursor to top-left position
         // 2J   ==> clear the entire screen
-        m_output->write(CSI"0m" CSI"1;1H" CSI"2J");
+        m_output.write(CSI"0m" CSI"1;1H" CSI"2J");
     }
     m_remoteLine = newLine;
     m_cursorHidden = false;
@@ -366,10 +357,10 @@ void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width)
         }
     }
 
-    m_output->write(m_termLine.data(), trimmedLineLength);
+    m_output.write(m_termLine.data(), trimmedLineLength);
 
     if (!alreadyErasedLine && !m_consoleMode) {
-        m_output->write(CSI"0K"); // Erase from cursor to EOL
+        m_output.write(CSI"0K"); // Erase from cursor to EOL
     }
 }
 
@@ -382,7 +373,7 @@ void Terminal::finishOutput(const std::pair<int, int64_t> &newCursorPos)
         char buffer[32];
         winpty_snprintf(buffer, CSI"%dG" CSI"?25h", newCursorPos.first + 1);
         if (!m_consoleMode)
-            m_output->write(buffer);
+            m_output.write(buffer);
         m_cursorHidden = false;
     }
     m_cursorPos = newCursorPos;
@@ -393,7 +384,7 @@ void Terminal::hideTerminalCursor()
     if (m_cursorHidden)
         return;
     if (!m_consoleMode)
-        m_output->write(CSI"?25l");
+        m_output.write(CSI"?25l");
     m_cursorHidden = true;
 }
 
@@ -410,15 +401,15 @@ void Terminal::moveTerminalToLine(int64_t line)
         winpty_snprintf(buffer, "\r" CSI"%dA",
             static_cast<int>(m_remoteLine - line));
         if (!m_consoleMode)
-            m_output->write(buffer);
+            m_output.write(buffer);
         m_remoteLine = line;
     } else if (line > m_remoteLine) {
         while (line > m_remoteLine) {
             if (!m_consoleMode)
-                m_output->write("\r\n");
+                m_output.write("\r\n");
             m_remoteLine++;
         }
     } else {
-        m_output->write("\r");
+        m_output.write("\r");
     }
 }

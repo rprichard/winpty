@@ -28,21 +28,20 @@ class NamedPipe;
 class EventLoop
 {
 public:
-    EventLoop();
     virtual ~EventLoop();
     void run();
 
 protected:
-    NamedPipe *createNamedPipe();
+    NamedPipe &createNamedPipe();
     void setPollInterval(int ms);
     void shutdown();
-    virtual void onPollTimeout();
-    virtual void onPipeIo(NamedPipe *namedPipe);
+    virtual void onPollTimeout()                    {}
+    virtual void onPipeIo(NamedPipe &namedPipe)     {}
 
 private:
-    bool m_exiting;
+    bool m_exiting = false;
     std::vector<NamedPipe*> m_pipes;
-    int m_pollInterval;
+    int m_pollInterval = 0;
 };
 
 #endif // EVENTLOOP_H

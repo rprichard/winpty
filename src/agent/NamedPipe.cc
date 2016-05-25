@@ -28,19 +28,6 @@
 #include "../shared/StringUtil.h"
 #include "../shared/WinptyAssert.h"
 
-NamedPipe::NamedPipe() :
-    m_readBufferSize(64 * 1024),
-    m_handle(NULL),
-    m_inputWorker(NULL),
-    m_outputWorker(NULL)
-{
-}
-
-NamedPipe::~NamedPipe()
-{
-    closePipe();
-}
-
 // Returns true if anything happens (data received, data sent, pipe error).
 bool NamedPipe::serviceIo(std::vector<HANDLE> *waitHandles)
 {

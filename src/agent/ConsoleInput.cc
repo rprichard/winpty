@@ -209,23 +209,14 @@ static int utf8CharLength(char firstByte)
 
 } // anonymous namespace
 
-ConsoleInput::ConsoleInput(DsrSender *dsrSender) :
+ConsoleInput::ConsoleInput(DsrSender &dsrSender) :
     m_console(new Win32Console),
-    m_dsrSender(dsrSender),
-    m_dsrSent(false),
-    m_lastWriteTick(0),
-    m_mouseButtonState(0),
-    m_mouseInputEnabled(false)
+    m_dsrSender(dsrSender)
 {
     addDefaultEntriesToInputMap(m_inputMap);
     if (hasDebugFlag("dump_input_map")) {
         m_inputMap.dumpInputMap();
     }
-}
-
-ConsoleInput::~ConsoleInput()
-{
-    delete m_console;
 }
 
 void ConsoleInput::writeInput(const std::string &input)
@@ -267,7 +258,7 @@ void ConsoleInput::writeInput(const std::string &input)
     doWrite(false);
     if (!m_byteQueue.empty() && !m_dsrSent) {
         trace("send DSR");
-        m_dsrSender->sendDsr();
+        m_dsrSender.sendDsr();
         m_dsrSent = true;
     }
     m_lastWriteTick = GetTickCount();
