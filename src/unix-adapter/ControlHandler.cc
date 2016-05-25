@@ -53,6 +53,43 @@ void ControlHandler::shutdown() {
     }
 }
 
+static BOOL read_pipe(HANDLE p, char * buf, int read_size) {
+    char * tmp = buf;
+    
+    while (read_size > 0) {
+        DWORD numRead = 0;
+        BOOL ret = ReadFile(p,
+                            tmp,
+                            read_size,
+                            &numRead,
+                            NULL);
+
+        if (!ret || numRead == 0) {
+            return FALSE;
+        }
+
+        read_size -= numRead;
+        tmp += numRead;
+    }
+
+    return TRUE;
+}
+
+static BOOL read_packet(HANDLE p, std::vector<char> & buf) {
+    typedef unsigned __int64 uint64_t;
+    
+    uint64_t size = 0;
+
+    char * tmp = (char *)&size;
+    if (!read_pipe(p, tmp, sizeof(uint64_t)))
+        return FALSE;
+
+    buf.insert(buf.end(), tmp, tmp + sizeof(uint64_t));
+    buf.resize(size);
+
+    return read_pipe(p, &buf[sizeof(uint64_t)], size - sizeof(uint64_t));
+}
+
 void ControlHandler::threadProc() {
     while (true) {
         // Handle shutdown
@@ -63,48 +100,45 @@ void ControlHandler::threadProc() {
         }
 
         // Read from the pipe.
-        DWORD numRead;
-        char data;
-            
-        BOOL ret = ReadFile(m_read_pipe,
-                            &data, 1,
-                            &numRead,
-                            nullptr);
-        if (!ret || numRead == 0) {
-            if (!ret && GetLastError() == ERROR_BROKEN_PIPE) {
-                trace("ControlHandler: pipe closed: numRead=%u",
-                      static_cast<unsigned int>(numRead));
-            } else {
-                trace("ControlHandler: read failed: "
-                      "ret=%d lastError=0x%x numRead=%u",
-                      ret,
-                      static_cast<unsigned int>(GetLastError()),
-                      static_cast<unsigned int>(numRead));
-            }
+        std::vector<char> data;
+
+        ConnectNamedPipe(m_read_pipe, NULL);
+
+        BOOL ret = read_packet(m_read_pipe,
+                               data);
+        
+        if (!ret) {
+            trace("ControlHandler: read failed: "
+                  "ret=%d lastError=0x%x",
+                  ret,
+                  static_cast<unsigned int>(GetLastError()));
             break;
         }
         
         //Write to pipe
         DWORD written;
         ret = WriteFile(m_write_pipe,
-                        &data, numRead,
+                        &data[0], data.size(),
                         &written,
-                        nullptr);
-        if (!ret || written != numRead) {
+                        NULL);
+        if (!ret || written != data.size()) {
             if (!ret && GetLastError() == ERROR_BROKEN_PIPE) {
                 trace("ControlHandler: pipe closed: written=%u",
                       static_cast<unsigned int>(written));
             } else {
                 trace("ControlHandler: write failed: "
-                      "ret=%d lastError=0x%x numRead=%d written=%u",
+                      "ret=%d lastError=0x%x numRead=%ld written=%u",
                       ret,
                       static_cast<unsigned int>(GetLastError()),
-                      numRead,
+                      static_cast<DWORD>(data.size()),
                       static_cast<unsigned int>(written));
             }
             break;
         }
-        
+
+        DWORD numRead = 0;
+        ReadFile(m_write_pipe, &data[0], 4, &numRead, NULL);
+        WriteFile(m_read_pipe, &data[0], numRead, &written, NULL);
     }
     m_threadCompleted = 1;
     m_completionWakeup.set();

@@ -43,7 +43,6 @@
 #include "../shared/DebugClient.h"
 #include "../shared/UnixCtrlChars.h"
 #include "../shared/WinptyVersion.h"
-#include "../shared/StringBuilder.h"
 #include "InputHandler.h"
 #include "OutputHandler.h"
 #include "Util.h"
@@ -411,29 +410,23 @@ static std::string formatErrorMessage(DWORD err)
     return msg;
 }
 
-static HANDLE createControlPipe() {
-    WStringBuilder sb(4);
-    sb << GetCurrentProcessId();
+static void createControlPipe(HANDLE & r) {
+    DWORD pid = GetCurrentProcessId();
 
-    const std::wstring control_pipe_name =
-            L"\\\\.\\pipe\\winpty-" + sb.str_moved();
+    WCHAR buf[255] = {0};
+    wsprintf(buf, L"\\\\.\\pipe\\winpty-%ld", pid);
 
-    HANDLE h = CreateNamedPipeW(control_pipe_name.c_str(),
+    r = CreateNamedPipeW(buf,
                             /*dwOpenMode=*/
                             PIPE_ACCESS_DUPLEX |
                             FILE_FLAG_FIRST_PIPE_INSTANCE,
                             /*dwPipeMode=*/
-                            0,
+                            PIPE_TYPE_MESSAGE | PIPE_WAIT,
                             /*nMaxInstances=*/1,
-                            /*nOutBufferSize=*/0,
-                            /*nInBufferSize=*/0,
+                            /*nOutBufferSize=*/64 * 1024,
+                            /*nInBufferSize=*/64 * 1024,
                             /*nDefaultTimeOut=*/3000,
                             NULL);
-
-    if (h != INVALID_HANDLE_VALUE)
-        ConnectNamedPipe(h, NULL);
-
-    return h;
 }
 
 int main(int argc, char *argv[])
@@ -512,25 +505,21 @@ int main(int argc, char *argv[])
     }
 
     HANDLE control_pipe = INVALID_HANDLE_VALUE;
-    ControlInputHandler * controlInputHandler = NULL;
-    ControlOutputHandler * controlOutputHandler = NULL;
+    ControlHandler * controlInputHandler = NULL;
     
     if (g_pipe_mode) {
-        control_pipe = createControlPipe();
+        createControlPipe(control_pipe);
 
         if (control_pipe == INVALID_HANDLE_VALUE) {
             fprintf(stderr, "Error creating control pipe.\n");
             exit(1);
         }
-            
+
         controlInputHandler = new ControlHandler(control_pipe,
-                                                 winpty_get_control_pipe(winptr),
+                                                 winpty_get_control_pipe(winpty),
                                                  mainWakeup());
-        controlOutputHandler = new ControlHandler(winpty_get_control_pipe(winptr),
-                                                  control_pipe,
-                                                  mainWakeup());
     }
-    
+
     OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
     InputHandler inputHandler(winpty_get_data_pipe(winpty), mainWakeup());
 
@@ -579,12 +568,11 @@ int main(int argc, char *argv[])
     //so do shutdown on everything closed
     if (g_pipe_mode) {
         CloseHandle(control_pipe);
-        
-        controlInputHandler->shutdown();
-        delete controlInputHandler;
-        
-        controlOutputHandler->shutdown();
-        delete controlOutputHandler;
+
+        if (controlInputHandler) {
+            controlInputHandler->shutdown();
+            delete controlInputHandler;
+        }
     }
 
     return exitCode;
