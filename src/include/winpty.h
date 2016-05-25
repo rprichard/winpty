@@ -87,6 +87,12 @@ WINPTY_API int winpty_get_process_id(winpty_t *pc);
 WINPTY_API HANDLE winpty_get_data_pipe(winpty_t *pc);
 
 /*
+ * Returns an overlapped-mode pipe handle that can be read and written
+ * like a Unix terminal.
+ */
+WINPTY_API HANDLE winpty_get_control_pipe(winpty_t *pc);
+    
+/*
  * Change the size of the Windows console.
  */
 WINPTY_API int winpty_set_size(winpty_t *pc, int cols, int rows);

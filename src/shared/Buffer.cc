@@ -45,7 +45,7 @@ void WriteBuffer::putRawData(const void *data, size_t len) {
 void WriteBuffer::replaceRawData(size_t pos, const void *data, size_t len) {
     ASSERT(pos <= m_buf.size() && len <= m_buf.size() - pos);
     const auto p = reinterpret_cast<const char*>(data);
-    std::copy(p, p + len, m_buf.begin());
+    std::copy(p, p + len, m_buf.begin() + pos);
 }
 
 void WriteBuffer::putInt32(int32_t i) {

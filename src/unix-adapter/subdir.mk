@@ -23,6 +23,7 @@ ALL_TARGETS += build/$(UNIX_ADAPTER_EXE)
 $(eval $(call def_unix_target,unix-adapter,))
 
 UNIX_ADAPTER_OBJECTS = \
+	build/unix-adapter/unix-adapter/ControlHandler.o \
 	build/unix-adapter/unix-adapter/InputHandler.o \
 	build/unix-adapter/unix-adapter/OutputHandler.o \
 	build/unix-adapter/unix-adapter/Util.o \

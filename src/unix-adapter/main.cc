@@ -48,10 +48,14 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
+#include "ControlHandler.h"
+
+
 #define CSI "\x1b["
 
 static WakeupFd *g_mainWakeup = NULL;
-
+bool g_pipe_mode = false;
+        
 static WakeupFd &mainWakeup()
 {
     if (g_mainWakeup == NULL) {
@@ -318,6 +322,7 @@ static void usage(const char *program, int exitCode)
     printf("  --mouse     Enable terminal mouse input\n");
     printf("  --showkey   Dump STDIN escape sequences\n");
     printf("  --version   Show the winpty version number\n");
+    printf("  --pipe      run winpty in pipe mode, the stdin/stdout/stderr will be piped from other process\n");
     exit(exitCode);
 }
 
@@ -329,6 +334,8 @@ struct Arguments {
 static void parseArguments(int argc, char *argv[], Arguments &out)
 {
     out.mouseInput = false;
+    g_pipe_mode = false;
+
     const char *const program = argc >= 1 ? argv[0] : "<program>";
     int argi = 1;
     while (argi < argc) {
@@ -344,6 +351,8 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
             } else if (arg == "--version") {
                 dumpVersionToStdout();
                 exit(0);
+            } else if (arg == "--pipe") {
+                g_pipe_mode = true;
             } else if (arg == "--") {
                 break;
             } else {
@@ -401,6 +410,25 @@ static std::string formatErrorMessage(DWORD err)
     return msg;
 }
 
+static void createControlPipe(HANDLE & r) {
+    DWORD pid = GetCurrentProcessId();
+
+    WCHAR buf[255] = {0};
+    wsprintf(buf, L"\\\\.\\pipe\\winpty-%ld", pid);
+
+    r = CreateNamedPipeW(buf,
+                            /*dwOpenMode=*/
+                            PIPE_ACCESS_DUPLEX |
+                            FILE_FLAG_FIRST_PIPE_INSTANCE,
+                            /*dwPipeMode=*/
+                            PIPE_TYPE_MESSAGE | PIPE_WAIT,
+                            /*nMaxInstances=*/1,
+                            /*nOutBufferSize=*/64 * 1024,
+                            /*nInBufferSize=*/64 * 1024,
+                            /*nDefaultTimeOut=*/3000,
+                            NULL);
+}
+
 int main(int argc, char *argv[])
 {
     setlocale(LC_ALL, "");
@@ -449,7 +477,11 @@ int main(int argc, char *argv[])
     }
 
     registerResizeSignalHandler();
-    termios mode = setRawTerminalMode();
+    
+    termios mode;
+
+    if (!g_pipe_mode)
+        mode = setRawTerminalMode();
 
     if (args.mouseInput) {
         // Start by disabling UTF-8 coordinate mode (1005), just in case we
@@ -470,6 +502,22 @@ int main(int argc, char *argv[])
         writeStr(STDOUT_FILENO,
             CSI"?1005l"
             CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
+    }
+
+    HANDLE control_pipe = INVALID_HANDLE_VALUE;
+    ControlHandler * controlInputHandler = NULL;
+    
+    if (g_pipe_mode) {
+        createControlPipe(control_pipe);
+
+        if (control_pipe == INVALID_HANDLE_VALUE) {
+            fprintf(stderr, "Error creating control pipe.\n");
+            exit(1);
+        }
+
+        controlInputHandler = new ControlHandler(control_pipe,
+                                                 winpty_get_control_pipe(winpty),
+                                                 mainWakeup());
     }
 
     OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
@@ -512,8 +560,20 @@ int main(int argc, char *argv[])
             CSI"?1006l" CSI"?1015l" CSI"?1003l" CSI"?1002l" CSI"?1000l");
     }
 
-    restoreTerminalMode(mode);
+    if (!g_pipe_mode)
+        restoreTerminalMode(mode);
     winpty_close(winpty);
+
+    //control pipe may block on control pipe or winpty control pipe
+    //so do shutdown on everything closed
+    if (g_pipe_mode) {
+        CloseHandle(control_pipe);
+
+        if (controlInputHandler) {
+            controlInputHandler->shutdown();
+            delete controlInputHandler;
+        }
+    }
 
     return exitCode;
 }
