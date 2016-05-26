@@ -30,7 +30,6 @@
 
 Win32Console::Win32Console() : m_titleWorkBuf(16)
 {
-    m_conin = GetStdHandle(STD_INPUT_HANDLE);
     m_conout = CreateFileW(L"CONOUT$",
                            GENERIC_READ | GENERIC_WRITE,
                            FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -41,11 +40,6 @@ Win32Console::Win32Console() : m_titleWorkBuf(16)
 Win32Console::~Win32Console()
 {
     CloseHandle(m_conout);
-}
-
-HANDLE Win32Console::conin()
-{
-    return m_conin;
 }
 
 HANDLE Win32Console::conout()
@@ -130,25 +124,6 @@ void Win32Console::setCursorPosition(const Coord &coord)
     if (!SetConsoleCursorPosition(m_conout, coord)) {
         trace("SetConsoleCursorPosition failed");
     }
-}
-
-void Win32Console::writeInput(const INPUT_RECORD *ir, int count)
-{
-    // TODO: error handling
-    DWORD dummy = 0;
-    if (!WriteConsoleInput(m_conin, ir, count, &dummy)) {
-        trace("WriteConsoleInput failed");
-    }
-}
-
-bool Win32Console::processedInputMode()
-{
-    // TODO: error handling
-    DWORD mode = 0;
-    if (!GetConsoleMode(m_conin, &mode)) {
-        trace("GetConsoleMode failed");
-    }
-    return (mode & ENABLE_PROCESSED_INPUT) == ENABLE_PROCESSED_INPUT;
 }
 
 void Win32Console::read(const SmallRect &rect, CHAR_INFO *data)

@@ -209,14 +209,15 @@ static int utf8CharLength(char firstByte)
 
 } // anonymous namespace
 
-ConsoleInput::ConsoleInput(DsrSender &dsrSender) :
-    m_console(new Win32Console),
+ConsoleInput::ConsoleInput(HANDLE conin, DsrSender &dsrSender) :
+    m_conin(conin),
     m_dsrSender(dsrSender)
 {
     addDefaultEntriesToInputMap(m_inputMap);
     if (hasDebugFlag("dump_input_map")) {
         m_inputMap.dumpInputMap();
     }
+    updateMouseInputFlags(true);
 }
 
 void ConsoleInput::writeInput(const std::string &input)
@@ -273,6 +274,22 @@ void ConsoleInput::flushIncompleteEscapeCode()
     }
 }
 
+void ConsoleInput::updateMouseInputFlags(bool forceTrace)
+{
+    const DWORD mode = inputConsoleMode();
+    const bool newFlagMI = mode & ENABLE_MOUSE_INPUT;
+    const bool newFlagQE = mode & ENABLE_QUICK_EDIT_MODE;
+    if (forceTrace ||
+            newFlagMI != m_mouseInputEnabled ||
+            newFlagQE != m_quickEditEnabled) {
+        trace("CONIN mode: ENABLE_MOUSE_INPUT=%s ENABLE_QUICK_EDIT_MODE=%s",
+            newFlagMI ? "enabled" : "disabled",
+            newFlagQE ? "enabled" : "disabled");
+    }
+    m_mouseInputEnabled = newFlagMI;
+    m_quickEditEnabled = newFlagQE;
+}
+
 void ConsoleInput::doWrite(bool isEof)
 {
     const char *data = m_byteQueue.c_str();
@@ -285,7 +302,10 @@ void ConsoleInput::doWrite(bool isEof)
         idx += charSize;
     }
     m_byteQueue.erase(0, idx);
-    m_console->writeInput(records.data(), records.size());
+    DWORD actual = 0;
+    if (!WriteConsoleInput(m_conin, records.data(), records.size(), &actual)) {
+        trace("WriteConsoleInput failed");
+    }
 }
 
 int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
@@ -296,7 +316,7 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
     ASSERT(inputSize >= 1);
 
     // Ctrl-C.
-    if (input[0] == '\x03' && m_console->processedInputMode()) {
+    if (input[0] == '\x03' && (inputConsoleMode() & ENABLE_PROCESSED_INPUT)) {
         trace("Ctrl-C");
         BOOL ret = GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
         trace("GenerateConsoleCtrlEvent: %d", ret);
@@ -467,7 +487,7 @@ int ConsoleInput::scanMouseInput(std::vector<INPUT_RECORD> &records,
 
     mer.dwButtonState |= m_mouseButtonState;
 
-    if (m_mouseInputEnabled) {
+    if (m_mouseInputEnabled && !m_quickEditEnabled) {
         if (isTracingEnabled()) {
             static bool debugInput = hasDebugFlag("input");
             if (debugInput) {
@@ -583,4 +603,14 @@ void ConsoleInput::appendInputRecord(std::vector<INPUT_RECORD> &records,
     ir.Event.KeyEvent.uChar.UnicodeChar = unicodeChar;
     ir.Event.KeyEvent.dwControlKeyState = keyState;
     records.push_back(ir);
+}
+
+DWORD ConsoleInput::inputConsoleMode()
+{
+    DWORD mode = 0;
+    if (!GetConsoleMode(m_conin, &mode)) {
+        trace("GetConsoleMode failed");
+        return 0;
+    }
+    return mode;
 }

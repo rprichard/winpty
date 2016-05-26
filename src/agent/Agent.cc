@@ -190,8 +190,9 @@ Agent::Agent(LPCWSTR controlPipeName,
     setupPacket.putWString(m_conoutPipe->name());
     writePacket(setupPacket);
 
+    const HANDLE conin = GetStdHandle(STD_INPUT_HANDLE);
     m_terminal.reset(new Terminal(*m_conoutPipe));
-    m_consoleInput.reset(new ConsoleInput(*this));
+    m_consoleInput.reset(new ConsoleInput(conin, *this));
 
     resetConsoleTracking(Terminal::OmitClear, m_console->windowRect());
 
@@ -206,16 +207,15 @@ Agent::Agent(LPCWSTR controlPipeName,
     // console, and I think it's better to default it off for the sake of
     // programs that care about mouse input.
     DWORD mode = 0;
-    if (!GetConsoleMode(m_console->conin(), &mode)) {
+    if (!GetConsoleMode(conin, &mode)) {
         trace("Agent startup: GetConsoleMode failed");
     } else {
         mode &= ~ENABLE_QUICK_EDIT_MODE;
-        if (!SetConsoleMode(m_console->conin(), mode)) {
+        if (!SetConsoleMode(conin, mode)) {
             trace("Agent startup: SetConsoleMode failed");
         }
     }
 
-    updateMouseInputFlags(true);
     setPollInterval(25);
 }
 
@@ -461,28 +461,10 @@ void Agent::pollConoutPipe()
     }
 }
 
-void Agent::updateMouseInputFlags(bool forceTrace)
-{
-    DWORD mode = 0;
-    GetConsoleMode(m_console->conin(), &mode);
-    const bool newFlagMI = mode & ENABLE_MOUSE_INPUT;
-    const bool newFlagQE = mode & ENABLE_QUICK_EDIT_MODE;
-    if (forceTrace ||
-            newFlagMI != m_consoleMouseInputEnabled ||
-            newFlagQE != m_consoleQuickEditEnabled) {
-        trace("CONIN mode: ENABLE_MOUSE_INPUT=%s ENABLE_QUICK_EDIT_MODE=%s",
-            newFlagMI ? "enabled" : "disabled",
-            newFlagQE ? "enabled" : "disabled");
-    }
-    m_consoleMouseInputEnabled = newFlagMI;
-    m_consoleQuickEditEnabled = newFlagQE;
-    m_consoleInput->setMouseInputEnabled(newFlagMI && !newFlagQE);
-}
-
 void Agent::onPollTimeout()
 {
     // Check the mouse input flag so we can output a trace message.
-    updateMouseInputFlags();
+    m_consoleInput->updateMouseInputFlags();
 
     // Give the ConsoleInput object a chance to flush input from an incomplete
     // escape sequence (e.g. pressing ESC).

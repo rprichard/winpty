@@ -74,7 +74,6 @@ private:
     void handleSetSizePacket(ReadBuffer &packet);
     void pollConinPipe();
     void pollConoutPipe();
-    void updateMouseInputFlags(bool forceTrace=false);
 
 protected:
     virtual void onPollTimeout();
@@ -100,8 +99,6 @@ private:
 private:
     bool m_useMark = false;
     std::unique_ptr<Win32Console> m_console;
-    bool m_consoleMouseInputEnabled = false;
-    bool m_consoleQuickEditEnabled = false;
     NamedPipe *m_controlPipe = nullptr;
     NamedPipe *m_coninPipe = nullptr;
     NamedPipe *m_conoutPipe = nullptr;

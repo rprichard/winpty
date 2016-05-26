@@ -48,7 +48,6 @@ public:
     Win32Console();
     ~Win32Console();
 
-    HANDLE conin();
     HANDLE conout();
     HWND hwnd();
     void clearLines(int row, int count, const ConsoleScreenBufferInfo &info);
@@ -65,10 +64,6 @@ public:
     Coord cursorPosition();
     void setCursorPosition(const Coord &point);
 
-    // Input stream.
-    void writeInput(const INPUT_RECORD *ir, int count=1);
-    bool processedInputMode();
-
     // Screen content.
     void read(const SmallRect &rect, CHAR_INFO *data);
     void write(const SmallRect &rect, const CHAR_INFO *data);
@@ -80,7 +75,6 @@ public:
     void setTextAttribute(WORD attributes);
 
 private:
-    HANDLE m_conin;
     HANDLE m_conout;
     std::vector<wchar_t> m_titleWorkBuf;
 };
