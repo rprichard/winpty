@@ -30,11 +30,6 @@
 #include "../include/winpty.h"
 #include "../shared/DebugClient.h"
 
-// Create a manual reset, initially unset event.
-static HANDLE createEvent() {
-    return CreateEventW(NULL, TRUE, FALSE, NULL);
-}
-
 static std::vector<unsigned char> filterContent(
         const std::vector<unsigned char> &content) {
     std::vector<unsigned char> result;
@@ -62,50 +57,60 @@ static std::vector<unsigned char> filterContent(
     return result;
 }
 
-// Read bytes from the overlapped file handle until the file is closed or
+// Read bytes from the non-overlapped file handle until the file is closed or
 // until an I/O error occurs.
 static std::vector<unsigned char> readAll(HANDLE handle) {
-    const HANDLE event = createEvent();
     unsigned char buf[1024];
     std::vector<unsigned char> result;
     while (true) {
-        OVERLAPPED over;
-        memset(&over, 0, sizeof(over));
-        over.hEvent = event;
         DWORD amount = 0;
-        BOOL ret = ReadFile(handle, buf, sizeof(buf), &amount, &over);
-        if (!ret && GetLastError() == ERROR_IO_PENDING)
-            ret = GetOverlappedResult(handle, &over, &amount, TRUE);
-        if (!ret || amount == 0)
+        BOOL ret = ReadFile(handle, buf, sizeof(buf), &amount, nullptr);
+        if (!ret || amount == 0) {
             break;
+        }
         result.insert(result.end(), buf, buf + amount);
     }
-    CloseHandle(event);
     return result;
 }
 
 static void parentTest() {
     wchar_t program[1024];
     wchar_t cmdline[1024];
-    GetModuleFileNameW(NULL, program, 1024);
+    GetModuleFileNameW(nullptr, program, 1024);
     snwprintf(cmdline, sizeof(cmdline) / sizeof(cmdline[0]),
               L"\"%s\" CHILD", program);
 
-    winpty_t *pty = winpty_open(80, 25);
-    assert(pty != NULL);
-    int ret = winpty_start_process(pty, program, cmdline, NULL, NULL);
-    assert(ret == 0);
+    auto agentCfg = winpty_config_new(0, nullptr);
+    assert(agentCfg != nullptr);
+    auto pty = winpty_open(agentCfg, nullptr);
+    assert(pty != nullptr);
+    winpty_config_free(agentCfg);
 
-    HANDLE input = winpty_get_data_pipe(pty);
-    auto content = readAll(input);
+    HANDLE conout = CreateFileW(
+        winpty_conout_name(pty),
+        GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    assert(conout != INVALID_HANDLE_VALUE);
+
+    auto spawnCfg = winpty_spawn_config_new(
+            WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN, program, cmdline,
+            nullptr, nullptr, nullptr);
+    assert(spawnCfg != nullptr);
+    HANDLE process = nullptr;
+    BOOL spawnSuccess = winpty_spawn(
+        pty, spawnCfg, &process, nullptr, nullptr, nullptr);
+    assert(spawnSuccess && process != nullptr);
+
+    auto content = readAll(conout);
     content = filterContent(content);
 
     std::vector<unsigned char> expectedContent = {
         'H', 'I', '\n', 'X', 'Y', '\n'
     };
-    assert(winpty_get_exit_code(pty) == 42);
+    DWORD exitCode = 0;
+    assert(GetExitCodeProcess(process, &exitCode) && exitCode == 42);
+    CloseHandle(process);
     assert(content == expectedContent);
-    winpty_close(pty);
+    winpty_free(pty);
 }
 
 static void childTest() {

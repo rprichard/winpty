@@ -31,7 +31,7 @@
 #include "../shared/WinptyVersion.h"
 
 const char USAGE[] =
-"Usage: %ls controlPipeName dataPipeName cols rows\n"
+"Usage: %ls controlPipeName flags cols rows\n"
 "\n"
 "Ordinarily, this program is launched by winpty.dll and is not directly\n"
 "useful to winpty users.  However, it also has options intended for\n"
@@ -45,8 +45,11 @@ const char USAGE[] =
 "                   Include MOUSE_INPUT_RECORDs in the dump output\n"
 "  --version        Print the winpty version\n";
 
-int main()
-{
+static uint64_t winpty_atoi64(const char *str) {
+    return strtoll(str, NULL, 10);
+}
+
+int main() {
     dumpWindowsVersion();
     dumpVersionToTrace();
 
@@ -80,7 +83,7 @@ int main()
     }
 
     Agent agent(argv[1],
-                argv[2],
+                winpty_atoi64(utf8FromWide(argv[2]).c_str()),
                 atoi(utf8FromWide(argv[3]).c_str()),
                 atoi(utf8FromWide(argv[4]).c_str()));
     agent.run();

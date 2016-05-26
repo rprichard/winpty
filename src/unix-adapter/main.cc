@@ -252,6 +252,17 @@ static char *heapWcsToMbs(const wchar_t *text)
     }
 }
 
+static std::string wcsToMbs(const wchar_t *text)
+{
+    std::string ret;
+    const char *ptr = heapWcsToMbs(text);
+    if (ptr != NULL) {
+        ret = ptr;
+        delete [] ptr;
+    }
+    return ret;
+}
+
 void setupWin32Environment()
 {
     std::map<std::string, std::string> varsToCopy;
@@ -364,7 +375,7 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
     }
 }
 
-static std::string formatErrorMessage(DWORD err)
+static std::string errorMessageToString(DWORD err)
 {
     // Use FormatMessageW rather than FormatMessageA, because we want to use
     // wcstombs to convert to the Cygwin locale, which might not match the
@@ -385,13 +396,8 @@ static std::string formatErrorMessage(DWORD err)
     if (formatRet == 0 || wideMsgPtr == NULL) {
         return std::string();
     }
-    char *const msgPtr = heapWcsToMbs(wideMsgPtr);
+    std::string msg = wcsToMbs(wideMsgPtr);
     LocalFree(wideMsgPtr);
-    if (msgPtr == NULL) {
-        return std::string();
-    }
-    std::string msg = msgPtr;
-    delete [] msgPtr;
     const size_t pos = msg.find_last_not_of(" \r\n\t");
     if (pos == std::string::npos) {
         msg.clear();
@@ -399,6 +405,21 @@ static std::string formatErrorMessage(DWORD err)
         msg.erase(pos + 1);
     }
     return msg;
+}
+
+static std::string formatErrorMessage(DWORD err)
+{
+    char buf[64];
+    sprintf(buf, "error %#x", static_cast<unsigned int>(err));
+    std::string ret = errorMessageToString(err);
+    if (ret.empty()) {
+        ret += buf;
+    } else {
+        ret += " (";
+        ret += buf;
+        ret += ")";
+    }
+    return ret;
 }
 
 int main(int argc, char *argv[])
@@ -415,36 +436,62 @@ int main(int argc, char *argv[])
     winsize sz;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
 
-    winpty_t *winpty = winpty_open(sz.ws_col, sz.ws_row);
-    if (winpty == NULL) {
-        fprintf(stderr, "Error creating winpty.\n");
+    winpty_config_t *agentCfg = winpty_config_new(0, NULL);
+    assert(agentCfg != NULL);
+    winpty_config_set_initial_size(agentCfg, sz.ws_col, sz.ws_row, NULL);
+
+    winpty_error_ptr_t openErr = NULL;
+    winpty_t *wp = winpty_open(agentCfg, &openErr);
+    if (wp == NULL) {
+        fprintf(stderr, "Error creating winpty: %s\n",
+            wcsToMbs(winpty_error_msg(openErr)).c_str());
         exit(1);
     }
+    winpty_config_free(agentCfg);
+    winpty_error_free(openErr);
+
+    const wchar_t *coninName = winpty_conin_name(wp);
+    const wchar_t *conoutName = winpty_conout_name(wp);
+    HANDLE conin =
+        CreateFileW(coninName, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE conout =
+        CreateFileW(conoutName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    assert(conin != INVALID_HANDLE_VALUE);
+    assert(conout != INVALID_HANDLE_VALUE);
+
+    HANDLE childHandle = NULL;
 
     {
         // Start the child process under the console.
         args.childArgv[0] = convertPosixPathToWin(args.childArgv[0]);
         std::string cmdLine = argvToCommandLine(args.childArgv);
         wchar_t *cmdLineW = heapMbsToWcs(cmdLine.c_str());
-        const int ret = winpty_start_process(winpty,
-                                             NULL,
-                                             cmdLineW,
-                                             NULL,
-                                             NULL);
-        if (ret != 0) {
-            const std::string errorMsg = formatErrorMessage(ret);
-            if (!errorMsg.empty()) {
-                fprintf(stderr, "Could not start '%s': %s (error %#x)\n",
+
+        winpty_spawn_config_t *spawnCfg = winpty_spawn_config_new(
+                WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN,
+                NULL, cmdLineW, NULL, NULL, NULL);
+        assert(spawnCfg != NULL);
+
+        winpty_error_ptr_t spawnErr = NULL;
+        DWORD lastError = 0;
+        BOOL spawnRet = winpty_spawn(wp, spawnCfg, &childHandle, NULL,
+            &lastError, &spawnErr);
+        winpty_spawn_config_free(spawnCfg);
+
+        if (!spawnRet) {
+            winpty_result_t spawnCode = winpty_error_code(spawnErr);
+            if (spawnCode == WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED) {
+                fprintf(stderr, "Could not start '%s': %s\n",
                     cmdLine.c_str(),
-                    errorMsg.c_str(),
-                    static_cast<unsigned int>(ret));
+                    formatErrorMessage(lastError).c_str());
             } else {
-                fprintf(stderr, "Could not start '%s': error %#x\n",
+                fprintf(stderr, "Could not start '%s': internal error: %s\n",
                     cmdLine.c_str(),
-                    static_cast<unsigned int>(ret));
+                    wcsToMbs(winpty_error_msg(spawnErr)).c_str());
             }
             exit(1);
         }
+        winpty_error_free(spawnErr);
         delete [] cmdLineW;
     }
 
@@ -472,8 +519,8 @@ int main(int argc, char *argv[])
             CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
     }
 
-    OutputHandler outputHandler(winpty_get_data_pipe(winpty), mainWakeup());
-    InputHandler inputHandler(winpty_get_data_pipe(winpty), mainWakeup());
+    InputHandler inputHandler(conin, mainWakeup());
+    OutputHandler outputHandler(conout, mainWakeup());
 
     while (true) {
         fd_set readfds;
@@ -488,21 +535,26 @@ int main(int argc, char *argv[])
             ioctl(STDIN_FILENO, TIOCGWINSZ, &sz2);
             if (memcmp(&sz, &sz2, sizeof(sz)) != 0) {
                 sz = sz2;
-                winpty_set_size(winpty, sz.ws_col, sz.ws_row);
+                winpty_set_size(wp, sz.ws_col, sz.ws_row, NULL);
             }
         }
 
         // Check for an I/O handler shutting down (possibly indicating that the
         // child process has exited).
-        if (outputHandler.isComplete() || inputHandler.isComplete()) {
+        if (inputHandler.isComplete() || outputHandler.isComplete()) {
             break;
         }
     }
 
-    outputHandler.shutdown();
-    inputHandler.shutdown();
+    // Kill the agent connection.  This will kill the agent, closing the CONIN
+    // and CONOUT pipes on the agent pipe, prompting our I/O handler to shut
+    // down.
+    winpty_free(wp);
 
-    const int exitCode = winpty_get_exit_code(winpty);
+    inputHandler.shutdown();
+    outputHandler.shutdown();
+    CloseHandle(conin);
+    CloseHandle(conout);
 
     if (args.mouseInput) {
         // Reseting both encoding modes (1006 and 1015) is necessary, but
@@ -513,7 +565,11 @@ int main(int argc, char *argv[])
     }
 
     restoreTerminalMode(mode);
-    winpty_close(winpty);
 
+    DWORD exitCode = 0;
+    if (!GetExitCodeProcess(childHandle, &exitCode)) {
+        exitCode = 1;
+    }
+    CloseHandle(childHandle);
     return exitCode;
 }

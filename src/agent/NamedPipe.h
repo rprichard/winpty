@@ -22,8 +22,12 @@
 #define NAMEDPIPE_H
 
 #include <windows.h>
+
+#include <memory>
 #include <string>
 #include <vector>
+
+#include "../shared/OwnedHandle.h"
 
 class EventLoop;
 
@@ -35,6 +39,7 @@ private:
     NamedPipe() {}
     ~NamedPipe() { closePipe(); }
     bool serviceIo(std::vector<HANDLE> *waitHandles);
+    void startPipeWorkers();
 
     enum class ServiceResult { NoProgress, Error, Progress };
 
@@ -42,17 +47,17 @@ private:
     class IoWorker
     {
     public:
-        IoWorker(NamedPipe *namedPipe);
-        virtual ~IoWorker();
+        IoWorker(NamedPipe &namedPipe);
+        virtual ~IoWorker() {}
         ServiceResult service();
         void waitForCanceledIo();
         HANDLE getWaitEvent();
     protected:
-        NamedPipe *m_namedPipe;
-        bool m_pending;
-        DWORD m_currentIoSize;
-        HANDLE m_event;
-        OVERLAPPED m_over;
+        NamedPipe &m_namedPipe;
+        bool m_pending = false;
+        DWORD m_currentIoSize = 0;
+        OwnedHandle m_event;
+        OVERLAPPED m_over = {};
         enum { kIoSize = 64 * 1024 };
         char m_buffer[kIoSize];
         virtual void completeIo(DWORD size) = 0;
@@ -62,7 +67,7 @@ private:
     class InputWorker : public IoWorker
     {
     public:
-        InputWorker(NamedPipe *namedPipe) : IoWorker(namedPipe) {}
+        InputWorker(NamedPipe &namedPipe) : IoWorker(namedPipe) {}
     protected:
         virtual void completeIo(DWORD size);
         virtual bool shouldIssueIo(DWORD *size, bool *isRead);
@@ -71,7 +76,7 @@ private:
     class OutputWorker : public IoWorker
     {
     public:
-        OutputWorker(NamedPipe *namedPipe) : IoWorker(namedPipe) {}
+        OutputWorker(NamedPipe &namedPipe) : IoWorker(namedPipe) {}
         DWORD getPendingIoSize();
     protected:
         virtual void completeIo(DWORD size);
@@ -79,7 +84,15 @@ private:
     };
 
 public:
-    bool connectToServer(LPCWSTR pipeName);
+    struct OpenMode {
+        typedef int t;
+        enum { None = 0, Reading = 1, Writing = 2, Duplex = 3 };
+    };
+
+    std::wstring name() const { return m_name; }
+    void openServerPipe(LPCWSTR pipeName, OpenMode::t openMode,
+                        int outBufferSize, int inBufferSize);
+    void connectToServer(LPCWSTR pipeName, OpenMode::t openMode);
     size_t bytesToSend();
     void write(const void *data, size_t size);
     void write(const char *text);
@@ -91,16 +104,21 @@ public:
     std::string readToString(size_t size);
     std::string readAllToString();
     void closePipe();
-    bool isClosed();
+    bool isClosed() { return m_handle == nullptr; }
+    bool isConnecting() { return m_connectEvent.get() != nullptr; }
 
 private:
     // Input/output buffers
+    std::wstring m_name;
+    OVERLAPPED m_connectOver = {};
+    OwnedHandle m_connectEvent;
+    OpenMode::t m_openMode = OpenMode::None;
     size_t m_readBufferSize = 64 * 1024;
     std::string m_inQueue;
     std::string m_outQueue;
     HANDLE m_handle = nullptr;
-    InputWorker *m_inputWorker = nullptr;
-    OutputWorker *m_outputWorker = nullptr;
+    std::unique_ptr<InputWorker> m_inputWorker;
+    std::unique_ptr<OutputWorker> m_outputWorker;
 };
 
 #endif // NAMEDPIPE_H

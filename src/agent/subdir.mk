@@ -38,7 +38,10 @@ AGENT_OBJECTS = \
 	build/agent/agent/main.o \
 	build/agent/shared/Buffer.o \
 	build/agent/shared/DebugClient.o \
+	build/agent/shared/GenRandom.o \
+	build/agent/shared/OwnedHandle.o \
 	build/agent/shared/StringUtil.o \
+	build/agent/shared/WindowsSecurity.o \
 	build/agent/shared/WindowsVersion.o \
 	build/agent/shared/WinptyAssert.o \
 	build/agent/shared/WinptyException.o \

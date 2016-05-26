@@ -29,15 +29,13 @@
 #include <vector>
 
 #include "../shared/DebugClient.h"
-#include "Event.h"
 #include "Util.h"
 #include "WakeupFd.h"
 
-OutputHandler::OutputHandler(HANDLE winpty, WakeupFd &completionWakeup) :
-    m_winpty(winpty),
+OutputHandler::OutputHandler(HANDLE conout, WakeupFd &completionWakeup) :
+    m_conout(conout),
     m_completionWakeup(completionWakeup),
     m_threadHasBeenJoined(false),
-    m_shouldShutdown(0),
     m_threadCompleted(0)
 {
     assert(isatty(STDOUT_FILENO));
@@ -45,7 +43,6 @@ OutputHandler::OutputHandler(HANDLE winpty, WakeupFd &completionWakeup) :
 }
 
 void OutputHandler::shutdown() {
-    startShutdown();
     if (!m_threadHasBeenJoined) {
         int ret = pthread_join(m_thread, NULL);
         assert(ret == 0 && "pthread_join failed");
@@ -54,41 +51,12 @@ void OutputHandler::shutdown() {
 }
 
 void OutputHandler::threadProc() {
-    Event ioEvent;
     std::vector<char> buffer(4096);
     while (true) {
-        // Handle shutdown
-        m_wakeup.reset();
-        if (m_shouldShutdown) {
-            trace("OutputHandler: shutting down");
-            break;
-        }
-
-        // Read from the pipe.
-        DWORD numRead;
-        OVERLAPPED over = {0};
-        over.hEvent = ioEvent.handle();
-        BOOL ret = ReadFile(m_winpty,
+        DWORD numRead = 0;
+        BOOL ret = ReadFile(m_conout,
                             &buffer[0], buffer.size(),
-                            &numRead,
-                            &over);
-        if (!ret && GetLastError() == ERROR_IO_PENDING) {
-            const HANDLE handles[] = {
-                ioEvent.handle(),
-                m_wakeup.handle(),
-            };
-            const DWORD waitRet =
-                WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-            if (waitRet == WAIT_OBJECT_0 + 1) {
-                trace("OutputHandler: shutting down, canceling I/O");
-                assert(m_shouldShutdown);
-                CancelIo(m_winpty);
-                GetOverlappedResult(m_winpty, &over, &numRead, TRUE);
-                break;
-            }
-            assert(waitRet == WAIT_OBJECT_0);
-            ret = GetOverlappedResult(m_winpty, &over, &numRead, TRUE);
-        }
+                            &numRead, NULL);
         if (!ret || numRead == 0) {
             if (!ret && GetLastError() == ERROR_BROKEN_PIPE) {
                 trace("OutputHandler: pipe closed: numRead=%u",

@@ -26,6 +26,8 @@
 
 #include "../shared/WinptyAssert.h"
 
+#include "LibWinptyException.h"
+
 #define AGENT_EXE L"winpty-agent.exe"
 
 static HMODULE getCurrentModule() {
@@ -64,6 +66,10 @@ static bool pathExists(const std::wstring &path) {
 std::wstring findAgentProgram() {
     std::wstring progDir = dirname(getModuleFileName(getCurrentModule()));
     std::wstring ret = progDir + (L"\\" AGENT_EXE);
-    ASSERT(pathExists(ret));
+    if (!pathExists(ret)) {
+        throw LibWinptyException(
+            WINPTY_ERROR_AGENT_EXE_MISSING,
+            (L"agent executable does not exist: '" + ret + L"'").c_str());
+    }
     return ret;
 }

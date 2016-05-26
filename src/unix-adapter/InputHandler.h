@@ -25,13 +25,12 @@
 #include <pthread.h>
 #include <signal.h>
 
-#include "DualWakeup.h"
 #include "WakeupFd.h"
 
-// Connect Cygwin blocking tty STDIN_FILENO to winpty overlapped I/O.
+// Connect Cygwin blocking tty STDIN_FILENO to winpty CONIN.
 class InputHandler {
 public:
-    InputHandler(HANDLE winpty, WakeupFd &completionWakeup);
+    InputHandler(HANDLE conin, WakeupFd &completionWakeup);
     ~InputHandler() { shutdown(); }
     bool isComplete() { return m_threadCompleted; }
     void startShutdown() { m_shouldShutdown = 1; m_wakeup.set(); }
@@ -44,10 +43,10 @@ private:
     }
     void threadProc();
 
-    HANDLE m_winpty;
+    HANDLE m_conin;
     pthread_t m_thread;
     WakeupFd &m_completionWakeup;
-    DualWakeup m_wakeup;
+    WakeupFd m_wakeup;
     bool m_threadHasBeenJoined;
     volatile sig_atomic_t m_shouldShutdown;
     volatile sig_atomic_t m_threadCompleted;

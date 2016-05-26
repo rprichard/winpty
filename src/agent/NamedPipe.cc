@@ -26,43 +26,71 @@
 #include "NamedPipe.h"
 #include "../shared/DebugClient.h"
 #include "../shared/StringUtil.h"
+#include "../shared/WindowsSecurity.h"
 #include "../shared/WinptyAssert.h"
 
 // Returns true if anything happens (data received, data sent, pipe error).
 bool NamedPipe::serviceIo(std::vector<HANDLE> *waitHandles)
 {
+    bool justConnected = false;
     const auto kError = ServiceResult::Error;
     const auto kProgress = ServiceResult::Progress;
+    const auto kNoProgress = ServiceResult::NoProgress;
     if (m_handle == NULL) {
         return false;
     }
-    const auto readProgress = m_inputWorker->service();
-    const auto writeProgress = m_outputWorker->service();
+    if (m_connectEvent.get() != nullptr) {
+        // We're still connecting this server pipe.  Check whether the pipe is
+        // now connected.  If it isn't, add the pipe to the list of handles to
+        // wait on.
+        DWORD actual = 0;
+        BOOL success =
+            GetOverlappedResult(m_handle, &m_connectOver, &actual, FALSE);
+        if (!success && GetLastError() == ERROR_PIPE_CONNECTED) {
+            // I'm not sure this can happen, but it's easy to handle if it
+            // does.
+            success = TRUE;
+        }
+        if (!success) {
+            ASSERT(GetLastError() == ERROR_IO_INCOMPLETE &&
+                "Pended ConnectNamedPipe call failed");
+            waitHandles->push_back(m_connectEvent.get());
+        } else {
+            trace("Server pipe [%s] connected",
+                utf8FromWide(m_name).c_str());
+            m_connectEvent.dispose();
+            startPipeWorkers();
+            justConnected = true;
+        }
+    }
+    const auto readProgress = m_inputWorker ? m_inputWorker->service() : kNoProgress;
+    const auto writeProgress = m_outputWorker ? m_outputWorker->service() : kNoProgress;
     if (readProgress == kError || writeProgress == kError) {
         closePipe();
         return true;
     }
-    if (m_inputWorker->getWaitEvent() != NULL) {
+    if (m_inputWorker && m_inputWorker->getWaitEvent() != nullptr) {
         waitHandles->push_back(m_inputWorker->getWaitEvent());
     }
-    if (m_outputWorker->getWaitEvent() != NULL) {
+    if (m_outputWorker && m_outputWorker->getWaitEvent() != nullptr) {
         waitHandles->push_back(m_outputWorker->getWaitEvent());
     }
-    return readProgress == kProgress || writeProgress == kProgress;
+    return justConnected
+        || readProgress == kProgress
+        || writeProgress == kProgress;
 }
 
-NamedPipe::IoWorker::IoWorker(NamedPipe *namedPipe) :
+// manual reset, initially unset
+static OwnedHandle createEvent() {
+    HANDLE ret = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    ASSERT(ret != nullptr && "CreateEventW failed");
+    return OwnedHandle(ret);
+}
+
+NamedPipe::IoWorker::IoWorker(NamedPipe &namedPipe) :
     m_namedPipe(namedPipe),
-    m_pending(false),
-    m_currentIoSize(0)
+    m_event(createEvent())
 {
-    m_event = CreateEventW(NULL, TRUE, FALSE, NULL);
-    ASSERT(m_event != NULL);
-}
-
-NamedPipe::IoWorker::~IoWorker()
-{
-    CloseHandle(m_event);
 }
 
 NamedPipe::ServiceResult NamedPipe::IoWorker::service()
@@ -70,7 +98,7 @@ NamedPipe::ServiceResult NamedPipe::IoWorker::service()
     ServiceResult progress = ServiceResult::NoProgress;
     if (m_pending) {
         DWORD actual = 0;
-        BOOL ret = GetOverlappedResult(m_namedPipe->m_handle, &m_over, &actual, FALSE);
+        BOOL ret = GetOverlappedResult(m_namedPipe.m_handle, &m_over, &actual, FALSE);
         if (!ret) {
             if (GetLastError() == ERROR_IO_INCOMPLETE) {
                 // There is a pending I/O.
@@ -80,7 +108,7 @@ NamedPipe::ServiceResult NamedPipe::IoWorker::service()
                 return ServiceResult::Error;
             }
         }
-        ResetEvent(m_event);
+        ResetEvent(m_event.get());
         m_pending = false;
         completeIo(actual);
         m_currentIoSize = 0;
@@ -92,10 +120,10 @@ NamedPipe::ServiceResult NamedPipe::IoWorker::service()
         m_currentIoSize = nextSize;
         DWORD actual = 0;
         memset(&m_over, 0, sizeof(m_over));
-        m_over.hEvent = m_event;
+        m_over.hEvent = m_event.get();
         BOOL ret = isRead
-                ? ReadFile(m_namedPipe->m_handle, m_buffer, nextSize, &actual, &m_over)
-                : WriteFile(m_namedPipe->m_handle, m_buffer, nextSize, &actual, &m_over);
+                ? ReadFile(m_namedPipe.m_handle, m_buffer, nextSize, &actual, &m_over)
+                : WriteFile(m_namedPipe.m_handle, m_buffer, nextSize, &actual, &m_over);
         if (!ret) {
             if (GetLastError() == ERROR_IO_PENDING) {
                 // There is a pending I/O.
@@ -106,7 +134,7 @@ NamedPipe::ServiceResult NamedPipe::IoWorker::service()
                 return ServiceResult::Error;
             }
         }
-        ResetEvent(m_event);
+        ResetEvent(m_event.get());
         completeIo(actual);
         m_currentIoSize = 0;
         progress = ServiceResult::Progress;
@@ -121,27 +149,27 @@ void NamedPipe::IoWorker::waitForCanceledIo()
 {
     if (m_pending) {
         DWORD actual = 0;
-        GetOverlappedResult(m_namedPipe->m_handle, &m_over, &actual, TRUE);
+        GetOverlappedResult(m_namedPipe.m_handle, &m_over, &actual, TRUE);
         m_pending = false;
     }
 }
 
 HANDLE NamedPipe::IoWorker::getWaitEvent()
 {
-    return m_pending ? m_event : NULL;
+    return m_pending ? m_event.get() : NULL;
 }
 
 void NamedPipe::InputWorker::completeIo(DWORD size)
 {
-    m_namedPipe->m_inQueue.append(m_buffer, size);
+    m_namedPipe.m_inQueue.append(m_buffer, size);
 }
 
 bool NamedPipe::InputWorker::shouldIssueIo(DWORD *size, bool *isRead)
 {
     *isRead = true;
-    if (m_namedPipe->isClosed()) {
+    if (m_namedPipe.isClosed()) {
         return false;
-    } else if (m_namedPipe->m_inQueue.size() < m_namedPipe->readBufferSize()) {
+    } else if (m_namedPipe.m_inQueue.size() < m_namedPipe.readBufferSize()) {
         *size = kIoSize;
         return true;
     } else {
@@ -157,8 +185,8 @@ void NamedPipe::OutputWorker::completeIo(DWORD size)
 bool NamedPipe::OutputWorker::shouldIssueIo(DWORD *size, bool *isRead)
 {
     *isRead = false;
-    if (!m_namedPipe->m_outQueue.empty()) {
-        auto &out = m_namedPipe->m_outQueue;
+    if (!m_namedPipe.m_outQueue.empty()) {
+        auto &out = m_namedPipe.m_outQueue;
         const DWORD writeSize = std::min<size_t>(out.size(), kIoSize);
         std::copy(&out[0], &out[writeSize], m_buffer);
         out.erase(0, writeSize);
@@ -174,9 +202,58 @@ DWORD NamedPipe::OutputWorker::getPendingIoSize()
     return m_pending ? m_currentIoSize : 0;
 }
 
-bool NamedPipe::connectToServer(LPCWSTR pipeName)
+void NamedPipe::openServerPipe(LPCWSTR pipeName, OpenMode::t openMode,
+                               int outBufferSize, int inBufferSize) {
+    ASSERT(isClosed());
+    ASSERT((openMode & OpenMode::Duplex) != 0);
+    const DWORD winOpenMode =
+              ((openMode & OpenMode::Reading) ? PIPE_ACCESS_INBOUND : 0)
+            | ((openMode & OpenMode::Writing) ? PIPE_ACCESS_OUTBOUND : 0)
+            | FILE_FLAG_FIRST_PIPE_INSTANCE
+            | FILE_FLAG_OVERLAPPED;
+    const auto sd = createPipeSecurityDescriptorOwnerFullControl();
+    ASSERT(sd && "error creating data pipe SECURITY_DESCRIPTOR");
+    SECURITY_ATTRIBUTES sa = {};
+    sa.nLength = sizeof(sa);
+    sa.lpSecurityDescriptor = sd.get();
+    HANDLE handle = CreateNamedPipeW(
+        pipeName,
+        /*dwOpenMode=*/winOpenMode,
+        /*dwPipeMode=*/rejectRemoteClientsPipeFlag(),
+        /*nMaxInstances=*/1,
+        /*nOutBufferSize=*/outBufferSize,
+        /*nInBufferSize=*/inBufferSize,
+        /*nDefaultTimeOut=*/30000,
+        &sa);
+    trace("opened server pipe [%s], handle == %p",
+        utf8FromWide(pipeName).c_str(), handle);
+    ASSERT(handle != INVALID_HANDLE_VALUE && "Could not open server pipe");
+    m_name = pipeName;
+    m_handle = handle;
+    m_openMode = openMode;
+
+    // Start an asynchronous connection attempt.
+    m_connectEvent = createEvent();
+    memset(&m_connectOver, 0, sizeof(m_connectOver));
+    m_connectOver.hEvent = m_connectEvent.get();
+    BOOL success = ConnectNamedPipe(m_handle, &m_connectOver);
+    const auto err = GetLastError();
+    if (!success && err == ERROR_PIPE_CONNECTED) {
+        success = TRUE;
+    }
+    if (success) {
+        trace("Server pipe [%s] connected", utf8FromWide(pipeName).c_str());
+        m_connectEvent.dispose();
+        startPipeWorkers();
+    } else if (err != ERROR_IO_PENDING) {
+        ASSERT(false && "ConnectNamedPipe call failed");
+    }
+}
+
+void NamedPipe::connectToServer(LPCWSTR pipeName, OpenMode::t openMode)
 {
     ASSERT(isClosed());
+    ASSERT((openMode & OpenMode::Duplex) != 0);
     HANDLE handle = CreateFileW(
         pipeName,
         GENERIC_READ | GENERIC_WRITE,
@@ -185,18 +262,28 @@ bool NamedPipe::connectToServer(LPCWSTR pipeName)
         OPEN_EXISTING,
         SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION | FILE_FLAG_OVERLAPPED,
         NULL);
-    trace("connection to [%s], handle == %p",
+    trace("connected to [%s], handle == %p",
         utf8FromWide(pipeName).c_str(), handle);
-    if (handle == INVALID_HANDLE_VALUE)
-        return false;
+    ASSERT(handle != INVALID_HANDLE_VALUE && "Could not connect to pipe");
+    m_name = pipeName;
     m_handle = handle;
-    m_inputWorker = new InputWorker(this);
-    m_outputWorker = new OutputWorker(this);
-    return true;
+    m_openMode = openMode;
+    startPipeWorkers();
+}
+
+void NamedPipe::startPipeWorkers()
+{
+    if (m_openMode & OpenMode::Reading) {
+        m_inputWorker.reset(new InputWorker(*this));
+    }
+    if (m_openMode & OpenMode::Writing) {
+        m_outputWorker.reset(new OutputWorker(*this));
+    }
 }
 
 size_t NamedPipe::bytesToSend()
 {
+    ASSERT(m_openMode & OpenMode::Writing);
     auto ret = m_outQueue.size();
     if (m_outputWorker != NULL) {
         ret += m_outputWorker->getPendingIoSize();
@@ -206,6 +293,7 @@ size_t NamedPipe::bytesToSend()
 
 void NamedPipe::write(const void *data, size_t size)
 {
+    ASSERT(m_openMode & OpenMode::Writing);
     m_outQueue.append(reinterpret_cast<const char*>(data), size);
 }
 
@@ -216,21 +304,25 @@ void NamedPipe::write(const char *text)
 
 size_t NamedPipe::readBufferSize()
 {
+    ASSERT(m_openMode & OpenMode::Reading);
     return m_readBufferSize;
 }
 
 void NamedPipe::setReadBufferSize(size_t size)
 {
+    ASSERT(m_openMode & OpenMode::Reading);
     m_readBufferSize = size;
 }
 
 size_t NamedPipe::bytesAvailable()
 {
+    ASSERT(m_openMode & OpenMode::Reading);
     return m_inQueue.size();
 }
 
 size_t NamedPipe::peek(void *data, size_t size)
 {
+    ASSERT(m_openMode & OpenMode::Reading);
     const auto out = reinterpret_cast<char*>(data);
     const size_t ret = std::min(size, m_inQueue.size());
     std::copy(&m_inQueue[0], &m_inQueue[size], out);
@@ -246,6 +338,7 @@ size_t NamedPipe::read(void *data, size_t size)
 
 std::string NamedPipe::readToString(size_t size)
 {
+    ASSERT(m_openMode & OpenMode::Reading);
     size_t retSize = std::min(size, m_inQueue.size());
     std::string ret = m_inQueue.substr(0, retSize);
     m_inQueue.erase(0, retSize);
@@ -254,6 +347,7 @@ std::string NamedPipe::readToString(size_t size)
 
 std::string NamedPipe::readAllToString()
 {
+    ASSERT(m_openMode & OpenMode::Reading);
     std::string ret = m_inQueue;
     m_inQueue.clear();
     return ret;
@@ -261,20 +355,23 @@ std::string NamedPipe::readAllToString()
 
 void NamedPipe::closePipe()
 {
-    if (m_handle == NULL)
+    if (m_handle == NULL) {
         return;
+    }
     CancelIo(m_handle);
-    m_inputWorker->waitForCanceledIo();
-    m_outputWorker->waitForCanceledIo();
-    delete m_inputWorker;
-    delete m_outputWorker;
+    if (m_connectEvent.get() != nullptr) {
+        DWORD actual = 0;
+        GetOverlappedResult(m_handle, &m_connectOver, &actual, TRUE);
+        m_connectEvent.dispose();
+    }
+    if (m_inputWorker) {
+        m_inputWorker->waitForCanceledIo();
+        m_inputWorker.reset();
+    }
+    if (m_outputWorker) {
+        m_outputWorker->waitForCanceledIo();
+        m_outputWorker.reset();
+    }
     CloseHandle(m_handle);
     m_handle = NULL;
-    m_inputWorker = NULL;
-    m_outputWorker = NULL;
-}
-
-bool NamedPipe::isClosed()
-{
-    return m_handle == NULL;
 }

@@ -19,26 +19,35 @@
 // IN THE SOFTWARE.
 
 #include "Agent.h"
-#include "Win32Console.h"
-#include "ConsoleInput.h"
-#include "Terminal.h"
-#include "NamedPipe.h"
-#include "ConsoleFont.h"
-#include "../shared/DebugClient.h"
-#include "../shared/AgentMsg.h"
-#include "../shared/Buffer.h"
-#include "../shared/winpty_snprintf.h"
-#include "../shared/WinptyAssert.h"
-#include "../shared/StringUtil.h"
-#include "../shared/WindowsVersion.h"
+
+#include <windows.h>
+
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
-#include <windows.h>
-#include <vector>
+
 #include <string>
 #include <utility>
+#include <vector>
+
+#include "../include/winpty_constants.h"
+
+#include "../shared/AgentMsg.h"
+#include "../shared/Buffer.h"
+#include "../shared/DebugClient.h"
+#include "../shared/GenRandom.h"
+#include "../shared/StringBuilder.h"
+#include "../shared/StringUtil.h"
+#include "../shared/WindowsVersion.h"
+#include "../shared/WinptyAssert.h"
+#include "../shared/winpty_snprintf.h"
+
+#include "ConsoleFont.h"
+#include "ConsoleInput.h"
+#include "NamedPipe.h"
+#include "Terminal.h"
+#include "Win32Console.h"
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
@@ -111,10 +120,35 @@ static bool detectWhetherMarkMovesCursor(Win32Console &console)
     return ret;
 }
 
+static inline WriteBuffer newPacket() {
+    WriteBuffer packet;
+    packet.putRawValue<uint64_t>(0); // Reserve space for size.
+    return packet;
+}
+
+static HANDLE duplicateHandle(HANDLE h) {
+    HANDLE ret = nullptr;
+    if (!DuplicateHandle(
+            GetCurrentProcess(), h,
+            GetCurrentProcess(), &ret,
+            0, FALSE, DUPLICATE_SAME_ACCESS)) {
+        ASSERT(false && "DuplicateHandle failed!");
+    }
+    return ret;
+}
+
+// It's safe to truncate a handle from 64-bits to 32-bits, or to sign-extend it
+// back to 64-bits.  See the MSDN article, "Interprocess Communication Between
+// 32-bit and 64-bit Applications".
+// https://msdn.microsoft.com/en-us/library/windows/desktop/aa384203.aspx
+static int64_t int64FromHandle(HANDLE h) {
+    return static_cast<int64_t>(reinterpret_cast<intptr_t>(h));
+}
+
 } // anonymous namespace
 
 Agent::Agent(LPCWSTR controlPipeName,
-             LPCWSTR dataPipeName,
+             uint64_t agentFlags,
              int initialCols,
              int initialRows) :
     m_ptySize(initialCols, initialRows)
@@ -146,9 +180,17 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_console->setTextAttribute(7);
     m_console->clearAllLines(m_console->bufferInfo());
 
-    m_controlPipe = &makePipe(controlPipeName);
-    m_dataPipe = &makePipe(dataPipeName);
-    m_terminal.reset(new Terminal(*m_dataPipe));
+    m_controlPipe = &connectToControlPipe(controlPipeName);
+    m_coninPipe = &createDataServerPipe(false, L"conin");
+    m_conoutPipe = &createDataServerPipe(true, L"conout");
+
+    // Send an initial response packet to winpty.dll containing pipe names.
+    auto setupPacket = newPacket();
+    setupPacket.putWString(m_coninPipe->name());
+    setupPacket.putWString(m_conoutPipe->name());
+    writePacket(setupPacket);
+
+    m_terminal.reset(new Terminal(*m_conoutPipe));
     m_consoleInput.reset(new ConsoleInput(*this));
 
     resetConsoleTracking(Terminal::OmitClear, m_console->windowRect());
@@ -192,18 +234,36 @@ Agent::~Agent()
 // bytes before it are complete keypresses.
 void Agent::sendDsr()
 {
-    m_dataPipe->write("\x1B[6n");
+    // TODO: Disable this in console mode.
+    m_conoutPipe->write("\x1B[6n");
 }
 
-NamedPipe &Agent::makePipe(LPCWSTR pipeName)
+NamedPipe &Agent::connectToControlPipe(LPCWSTR pipeName)
 {
     NamedPipe &pipe = createNamedPipe();
-    if (!pipe.connectToServer(pipeName)) {
-        trace("error: could not connect to %s",
-            utf8FromWide(pipeName).c_str());
-        ::exit(1);
-    }
+    pipe.connectToServer(pipeName, NamedPipe::OpenMode::Duplex);
     pipe.setReadBufferSize(64 * 1024);
+    return pipe;
+}
+
+// Returns a new server named pipe.  It has not yet been connected.
+NamedPipe &Agent::createDataServerPipe(bool write, const wchar_t *kind)
+{
+    const auto name =
+        (WStringBuilder(128)
+            << L"\\\\.\\pipe\\winpty-data-"
+            << kind << L'-'
+            << GenRandom().uniqueName()).str_moved();
+    NamedPipe &pipe = createNamedPipe();
+    pipe.openServerPipe(
+        name.c_str(),
+        write ? NamedPipe::OpenMode::Writing
+              : NamedPipe::OpenMode::Reading,
+        write ? 8192 : 0,
+        write ? 0 : 256);
+    if (!write) {
+        pipe.setReadBufferSize(64 * 1024);
+    }
     return pipe;
 }
 
@@ -227,10 +287,12 @@ void Agent::resetConsoleTracking(
 
 void Agent::onPipeIo(NamedPipe &namedPipe)
 {
-    if (&namedPipe == m_controlPipe) {
+    if (&namedPipe == m_conoutPipe) {
+        pollConoutPipe();
+    } else if (&namedPipe == m_coninPipe) {
+        pollConinPipe();
+    } else if (&namedPipe == m_controlPipe) {
         pollControlPipe();
-    } else if (&namedPipe == m_dataPipe) {
-        pollDataPipe();
     }
 }
 
@@ -272,14 +334,10 @@ void Agent::pollControlPipe()
 
 void Agent::handlePacket(ReadBuffer &packet)
 {
-    int type = packet.getInt32();
-    int32_t result = -1;
+    const int type = packet.getInt32();
     switch (type) {
-    case AgentMsg::Ping:
-        result = 0;
-        break;
     case AgentMsg::StartProcess:
-        result = handleStartProcessPacket(packet);
+        handleStartProcessPacket(packet);
         break;
     case AgentMsg::SetSize:
         // TODO: I think it might make sense to collapse consecutive SetSize
@@ -287,33 +345,28 @@ void Agent::handlePacket(ReadBuffer &packet)
         // messages faster than they can be processed, and some GUIs might
         // generate a flood of them, so if we can read multiple SetSize packets
         // at once, we can ignore the early ones.
-        result = handleSetSizePacket(packet);
-        break;
-    case AgentMsg::GetExitCode:
-        packet.assertEof();
-        result = m_childExitCode;
-        break;
-    case AgentMsg::GetProcessId:
-        packet.assertEof();
-        if (m_childProcess == NULL)
-            result = -1;
-        else
-            result = GetProcessId(m_childProcess);
-        break;
-    case AgentMsg::SetConsoleMode:
-        m_terminal->setConsoleMode(packet.getInt32());
-        result = 0;
+        handleSetSizePacket(packet);
         break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
-    m_controlPipe->write(&result, sizeof(result));
 }
 
-int Agent::handleStartProcessPacket(ReadBuffer &packet)
+void Agent::writePacket(WriteBuffer &packet)
 {
-    ASSERT(m_childProcess == NULL);
+    const auto &bytes = packet.buf();
+    packet.replaceRawValue<uint64_t>(0, bytes.size());
+    m_controlPipe->write(bytes.data(), bytes.size());
+}
 
+void Agent::handleStartProcessPacket(ReadBuffer &packet)
+{
+    ASSERT(m_childProcess == nullptr);
+    ASSERT(!m_closingConoutPipe);
+
+    const uint64_t spawnFlags = packet.getInt64();
+    const bool wantProcessHandle = packet.getInt32();
+    const bool wantThreadHandle = packet.getInt32();
     const auto program = packet.getWString();
     const auto cmdline = packet.getWString();
     const auto cwd = packet.getWString();
@@ -325,48 +378,65 @@ int Agent::handleStartProcessPacket(ReadBuffer &packet)
     auto desktopV = vectorWithNulFromString(desktop);
     auto envV = vectorFromString(env);
 
-    LPCWSTR programArg = program.empty() ? NULL : program.c_str();
-    LPWSTR cmdlineArg = cmdline.empty() ? NULL : cmdlineV.data();
-    LPCWSTR cwdArg = cwd.empty() ? NULL : cwd.c_str();
-    LPWSTR envArg = env.empty() ? NULL : envV.data();
+    LPCWSTR programArg = program.empty() ? nullptr : program.c_str();
+    LPWSTR cmdlineArg = cmdline.empty() ? nullptr : cmdlineV.data();
+    LPCWSTR cwdArg = cwd.empty() ? nullptr : cwd.c_str();
+    LPWSTR envArg = env.empty() ? nullptr : envV.data();
 
     STARTUPINFOW sui = {};
     PROCESS_INFORMATION pi = {};
     sui.cb = sizeof(sui);
-    sui.lpDesktop = desktop.empty() ? NULL : desktopV.data();
+    sui.lpDesktop = desktop.empty() ? nullptr : desktopV.data();
 
     const BOOL success =
-        CreateProcessW(programArg, cmdlineArg, NULL, NULL,
+        CreateProcessW(programArg, cmdlineArg, nullptr, nullptr,
                        /*bInheritHandles=*/FALSE,
                        /*dwCreationFlags=*/CREATE_UNICODE_ENVIRONMENT |
                        /*CREATE_NEW_PROCESS_GROUP*/0,
                        envArg, cwdArg, &sui, &pi);
-    const int ret = success ? 0 : GetLastError();
+    const int lastError = success ? 0 : GetLastError();
 
     trace("CreateProcess: %s %u",
           (success ? "success" : "fail"),
           static_cast<unsigned int>(pi.dwProcessId));
 
+    int64_t replyProcess = 0;
+    int64_t replyThread = 0;
+
     if (success) {
+        if (wantProcessHandle) {
+            replyProcess = int64FromHandle(duplicateHandle(pi.hProcess));
+        }
+        if (wantThreadHandle) {
+            replyThread = int64FromHandle(duplicateHandle(pi.hThread));
+        }
         CloseHandle(pi.hThread);
         m_childProcess = pi.hProcess;
+        m_autoShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN);
     }
 
-    return ret;
+    // Write reply.
+    auto reply = newPacket();
+    reply.putInt32(success);
+    reply.putInt32(lastError);
+    reply.putInt64(replyProcess);
+    reply.putInt64(replyThread);
+    writePacket(reply);
 }
 
-int Agent::handleSetSizePacket(ReadBuffer &packet)
+void Agent::handleSetSizePacket(ReadBuffer &packet)
 {
     int cols = packet.getInt32();
     int rows = packet.getInt32();
     packet.assertEof();
     resizeWindow(cols, rows);
-    return 0;
+    auto reply = newPacket();
+    writePacket(reply);
 }
 
-void Agent::pollDataPipe()
+void Agent::pollConinPipe()
 {
-    const std::string newData = m_dataPipe->readAllToString();
+    const std::string newData = m_coninPipe->readAllToString();
     if (hasDebugFlag("input_separated_bytes")) {
         // This debug flag is intended to help with testing incomplete escape
         // sequences and multibyte UTF-8 encodings.  (I wonder if the normal
@@ -377,14 +447,17 @@ void Agent::pollDataPipe()
     } else {
         m_consoleInput->writeInput(newData);
     }
+}
 
+void Agent::pollConoutPipe()
+{
     // If the child process had exited, then close the data socket if we've
     // finished sending all of the collected output.
-    if (m_closingDataPipe &&
-            !m_dataPipe->isClosed() &&
-            m_dataPipe->bytesToSend() == 0) {
+    if (m_closingConoutPipe &&
+            !m_conoutPipe->isClosed() &&
+            m_conoutPipe->bytesToSend() == 0) {
         trace("Closing data pipe after data is sent");
-        m_dataPipe->closePipe();
+        m_conoutPipe->closePipe();
     }
 }
 
@@ -415,31 +488,36 @@ void Agent::onPollTimeout()
     // escape sequence (e.g. pressing ESC).
     m_consoleInput->flushIncompleteEscapeCode();
 
+    const bool shouldScrapeContent = !m_closingConoutPipe;
+
     // Check if the child process has exited.
-    if (WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
-        DWORD exitCode;
-        if (GetExitCodeProcess(m_childProcess, &exitCode))
+    if (m_autoShutdown &&
+            m_childProcess != nullptr &&
+            WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
+        DWORD exitCode = 0;
+        if (GetExitCodeProcess(m_childProcess, &exitCode)) {
             m_childExitCode = exitCode;
+        }
         CloseHandle(m_childProcess);
-        m_childProcess = NULL;
+        m_childProcess = nullptr;
 
         // Close the data socket to signal to the client that the child
         // process has exited.  If there's any data left to send, send it
         // before closing the socket.
-        m_closingDataPipe = true;
+        m_closingConoutPipe = true;
     }
 
     // Scrape for output *after* the above exit-check to ensure that we collect
     // the child process's final output.
-    if (!m_dataPipe->isClosed()) {
+    if (shouldScrapeContent) {
         syncConsoleContentAndSize(false);
     }
 
-    if (m_closingDataPipe &&
-            !m_dataPipe->isClosed() &&
-            m_dataPipe->bytesToSend() == 0) {
+    if (m_closingConoutPipe &&
+            !m_conoutPipe->isClosed() &&
+            m_conoutPipe->bytesToSend() == 0) {
         trace("Closing data pipe after child exit");
-        m_dataPipe->closePipe();
+        m_conoutPipe->closePipe();
     }
 }
 
@@ -653,7 +731,7 @@ void Agent::syncConsoleTitle()
     if (newTitle != m_currentTitle) {
         std::string command = std::string("\x1b]0;") +
                 wstringToUtf8String(newTitle) + "\x07";
-        m_dataPipe->write(command.c_str());
+        m_conoutPipe->write(command.c_str());
         m_currentTitle = newTitle;
     }
 }

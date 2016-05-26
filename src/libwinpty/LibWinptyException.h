@@ -1,4 +1,4 @@
-// Copyright (c) 2015 Ryan Prichard
+// Copyright (c) 2016 Ryan Prichard
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -18,32 +18,37 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef UNIX_ADAPTER_DUAL_WAKEUP_H
-#define UNIX_ADAPTER_DUAL_WAKEUP_H
+#ifndef LIB_WINPTY_EXCEPTION_H
+#define LIB_WINPTY_EXCEPTION_H
 
-#include "Event.h"
-#include "WakeupFd.h"
+#include "../include/winpty.h"
 
-class DualWakeup {
+#include "../shared/WinptyException.h"
+
+#include <memory>
+#include <string>
+
+class LibWinptyException : public WinptyException {
 public:
-    void set() {
-        m_event.set();
-        m_wakeupfd.set();
+    LibWinptyException(winpty_result_t code, const wchar_t *what) :
+        m_code(code), m_what(std::make_shared<std::wstring>(what)) {}
+
+    winpty_result_t code() const WINPTY_NOEXCEPT {
+        return m_code;
     }
-    void reset() {
-        m_event.reset();
-        m_wakeupfd.reset();
+
+    const wchar_t *what() const WINPTY_NOEXCEPT {
+        return m_what->c_str();
     }
-    HANDLE handle() {
-        return m_event.handle();
-    }
-    int fd() {
-        return m_wakeupfd.fd();
+
+    std::shared_ptr<std::wstring> whatSharedStr() const WINPTY_NOEXCEPT {
+        return m_what;
     }
 
 private:
-    Event m_event;
-    WakeupFd m_wakeupfd;
+    winpty_result_t m_code;
+    // Using a shared_ptr ensures that copying the object raises no exception.
+    std::shared_ptr<std::wstring> m_what;
 };
 
-#endif // UNIX_ADAPTER_DUAL_WAKEUP_H
+#endif // LIB_WINPTY_EXCEPTION_H

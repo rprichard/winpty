@@ -131,6 +131,7 @@ install-doc :
 install-include :
 	mkdir -p $(PREFIX)/include/winpty
 	install -m 644 -p src/include/winpty.h $(PREFIX)/include/winpty
+	install -m 644 -p src/include/winpty_constants.h $(PREFIX)/include/winpty
 
 .PHONY : install
 install : \

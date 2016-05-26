@@ -18,41 +18,37 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef UNIX_ADAPTER_EVENT_H
-#define UNIX_ADAPTER_EVENT_H
+// Recent 4.x MinGW and MinGW-w64 gcc compilers lack std::mutex and
+// std::lock_guard.  I have a 5.2.0 MinGW-w64 compiler packaged through MSYS2
+// that *is* new enough, but that's one compiler against several deficient
+// ones.  Wrap CRITICAL_SECTION instead.
+
+#ifndef WINPTY_SHARED_MUTEX_H
+#define WINPTY_SHARED_MUTEX_H
 
 #include <windows.h>
-#include <assert.h>
 
-// A manual reset, initially unset event.  Automatically closes on destruction.
-class Event {
+class Mutex {
+    CRITICAL_SECTION m_mutex;
 public:
-    Event() {
-        m_handle = CreateEventW(NULL, TRUE, FALSE, NULL);
-        assert(m_handle != NULL);
-    }
-    ~Event() {
-        CloseHandle(m_handle);
-    }
-    HANDLE handle() {
-        return m_handle;
-    }
-    void set() {
-        BOOL success = SetEvent(m_handle);
-        assert(success && "SetEvent failed");
-    }
-    void reset() {
-        BOOL success = ResetEvent(m_handle);
-        assert(success && "ResetEvent failed");
-    }
+    Mutex()         { InitializeCriticalSection(&m_mutex);  }
+    ~Mutex()        { DeleteCriticalSection(&m_mutex);      }
+    void lock()     { EnterCriticalSection(&m_mutex);       }
+    void unlock()   { LeaveCriticalSection(&m_mutex);       }
 
-private:
-    // Do not allow copying the Event object.
-    Event(const Event &other);
-    Event &operator=(const Event &other);
-
-private:
-    HANDLE m_handle;
+    Mutex(const Mutex &other) = delete;
+    Mutex &operator=(const Mutex &other) = delete;
 };
 
-#endif // UNIX_ADAPTER_EVENT_H
+template <typename T>
+class LockGuard {
+    T &m_lock;
+public:
+    LockGuard(T &lock) : m_lock(lock)  { m_lock.lock();    }
+    ~LockGuard()                       { m_lock.unlock();  }
+
+    LockGuard(const LockGuard &other) = delete;
+    LockGuard &operator=(const LockGuard &other) = delete;
+};
+
+#endif // WINPTY_SHARED_MUTEX_H

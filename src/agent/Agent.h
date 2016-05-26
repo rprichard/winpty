@@ -39,6 +39,7 @@
 class Win32Console;
 class ConsoleInput;
 class ReadBuffer;
+class WriteBuffer;
 class NamedPipe;
 struct ConsoleScreenBufferInfo;
 
@@ -53,23 +54,26 @@ class Agent : public EventLoop, public DsrSender
 {
 public:
     Agent(LPCWSTR controlPipeName,
-          LPCWSTR dataPipeName,
+          uint64_t agentFlags,
           int initialCols,
           int initialRows);
     virtual ~Agent();
     void sendDsr();
 
 private:
-    NamedPipe &makePipe(LPCWSTR pipeName);
+    NamedPipe &connectToControlPipe(LPCWSTR pipeName);
+    NamedPipe &createDataServerPipe(bool write, const wchar_t *kind);
     void resetConsoleTracking(
         Terminal::SendClearFlag sendClear, const SmallRect &windowRect);
 
 private:
     void pollControlPipe();
     void handlePacket(ReadBuffer &packet);
-    int handleStartProcessPacket(ReadBuffer &packet);
-    int handleSetSizePacket(ReadBuffer &packet);
-    void pollDataPipe();
+    void writePacket(WriteBuffer &packet);
+    void handleStartProcessPacket(ReadBuffer &packet);
+    void handleSetSizePacket(ReadBuffer &packet);
+    void pollConinPipe();
+    void pollConoutPipe();
     void updateMouseInputFlags(bool forceTrace=false);
 
 protected:
@@ -99,11 +103,13 @@ private:
     bool m_consoleMouseInputEnabled = false;
     bool m_consoleQuickEditEnabled = false;
     NamedPipe *m_controlPipe = nullptr;
-    NamedPipe *m_dataPipe = nullptr;
-    bool m_closingDataPipe = false;
+    NamedPipe *m_coninPipe = nullptr;
+    NamedPipe *m_conoutPipe = nullptr;
+    bool m_closingConoutPipe = false;
     std::unique_ptr<Terminal> m_terminal;
     std::unique_ptr<ConsoleInput> m_consoleInput;
     HANDLE m_childProcess = nullptr;
+    bool m_autoShutdown = false;
     int m_childExitCode = -1;
 
     int m_syncRow = 0;

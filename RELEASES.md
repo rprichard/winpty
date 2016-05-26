@@ -1,3 +1,7 @@
+# Next Version
+
+The winpty library has a new API that should be easier for embedding.
+
 # Version 0.3.0 (2016-05-20)
 
 User-visible changes:
