@@ -110,7 +110,6 @@ private:
     std::unique_ptr<ConsoleInput> m_consoleInput;
     HANDLE m_childProcess = nullptr;
     bool m_autoShutdown = false;
-    int m_childExitCode = -1;
 
     int m_syncRow = 0;
     int m_syncCounter = 0;

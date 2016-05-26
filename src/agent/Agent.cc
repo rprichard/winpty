@@ -494,10 +494,6 @@ void Agent::onPollTimeout()
     if (m_autoShutdown &&
             m_childProcess != nullptr &&
             WaitForSingleObject(m_childProcess, 0) == WAIT_OBJECT_0) {
-        DWORD exitCode = 0;
-        if (GetExitCodeProcess(m_childProcess, &exitCode)) {
-            m_childExitCode = exitCode;
-        }
         CloseHandle(m_childProcess);
         m_childProcess = nullptr;
 
