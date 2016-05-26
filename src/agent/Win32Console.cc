@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2015 Ryan Prichard
+// Copyright (c) 2011-2016 Ryan Prichard
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -30,119 +30,13 @@
 
 Win32Console::Win32Console() : m_titleWorkBuf(16)
 {
-    m_conout = CreateFileW(L"CONOUT$",
-                           GENERIC_READ | GENERIC_WRITE,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_EXISTING, 0, NULL);
-    ASSERT(m_conout != INVALID_HANDLE_VALUE);
-}
-
-Win32Console::~Win32Console()
-{
-    CloseHandle(m_conout);
-}
-
-HANDLE Win32Console::conout()
-{
-    return m_conout;
-}
-
-HWND Win32Console::hwnd()
-{
-    return GetConsoleWindow();
-}
-
-void Win32Console::clearLines(
-    int row,
-    int count,
-    const ConsoleScreenBufferInfo &info)
-{
-    // TODO: error handling
-    const int width = info.bufferSize().X;
-    DWORD actual = 0;
-    if (!FillConsoleOutputCharacterW(
-            m_conout, L' ', width * count, Coord(0, row),
-            &actual) || static_cast<int>(actual) != width * count) {
-        trace("FillConsoleOutputCharacterW failed");
-    }
-    if (!FillConsoleOutputAttribute(
-            m_conout, info.wAttributes, width * count, Coord(0, row),
-            &actual) || static_cast<int>(actual) != width * count) {
-        trace("FillConsoleOutputAttribute failed");
-    }
-}
-
-void Win32Console::clearAllLines(const ConsoleScreenBufferInfo &info)
-{
-    clearLines(0, info.bufferSize().Y, info);
-}
-
-ConsoleScreenBufferInfo Win32Console::bufferInfo()
-{
-    // TODO: error handling
-    ConsoleScreenBufferInfo info;
-    if (!GetConsoleScreenBufferInfo(m_conout, &info)) {
-        trace("GetConsoleScreenBufferInfo failed");
-    }
-    return info;
-}
-
-Coord Win32Console::bufferSize()
-{
-    return bufferInfo().bufferSize();
-}
-
-SmallRect Win32Console::windowRect()
-{
-    return bufferInfo().windowRect();
-}
-
-void Win32Console::resizeBuffer(const Coord &size)
-{
-    // TODO: error handling
-    if (!SetConsoleScreenBufferSize(m_conout, size)) {
-        trace("SetConsoleScreenBufferSize failed");
-    }
-}
-
-void Win32Console::moveWindow(const SmallRect &rect)
-{
-    // TODO: error handling
-    if (!SetConsoleWindowInfo(m_conout, TRUE, &rect)) {
-        trace("SetConsoleWindowInfo failed");
-    }
-}
-
-Coord Win32Console::cursorPosition()
-{
-    return bufferInfo().dwCursorPosition;
-}
-
-void Win32Console::setCursorPosition(const Coord &coord)
-{
-    // TODO: error handling
-    if (!SetConsoleCursorPosition(m_conout, coord)) {
-        trace("SetConsoleCursorPosition failed");
-    }
-}
-
-void Win32Console::read(const SmallRect &rect, CHAR_INFO *data)
-{
-    // TODO: error handling
-    SmallRect tmp(rect);
-    if (!ReadConsoleOutputW(m_conout, data, rect.size(), Coord(), &tmp)) {
-        trace("ReadConsoleOutput failed [x:%d,y:%d,w:%d,h:%d]",
-              rect.Left, rect.Top, rect.width(), rect.height());
-    }
-}
-
-void Win32Console::write(const SmallRect &rect, const CHAR_INFO *data)
-{
-    // TODO: error handling
-    SmallRect tmp(rect);
-    if (!WriteConsoleOutputW(m_conout, data, rect.size(), Coord(), &tmp)) {
-        trace("WriteConsoleOutput failed");
-    }
+    // The console window must be non-NULL.  It is used for two purposes:
+    //  (1) "Freezing" the console to detect the exact number of lines that
+    //      have scrolled.
+    //  (2) Killing processes attached to the console, by posting a WM_CLOSE
+    //      message to the console window.
+    m_hwnd = GetConsoleWindow();
+    ASSERT(m_hwnd != nullptr);
 }
 
 std::wstring Win32Console::title()
@@ -191,12 +85,5 @@ void Win32Console::setTitle(const std::wstring &title)
 {
     if (!SetConsoleTitleW(title.c_str())) {
         trace("SetConsoleTitleW failed");
-    }
-}
-
-void Win32Console::setTextAttribute(WORD attributes)
-{
-    if (!SetConsoleTextAttribute(m_conout, attributes)) {
-        trace("SetConsoleTextAttribute failed");
     }
 }

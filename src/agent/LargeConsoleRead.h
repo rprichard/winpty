@@ -30,7 +30,7 @@
 #include "../shared/DebugClient.h"
 #include "../shared/WinptyAssert.h"
 
-class Win32Console;
+class Win32ConsoleBuffer;
 
 class LargeConsoleReadBuffer {
 public:
@@ -60,7 +60,7 @@ private:
     std::vector<CHAR_INFO> m_data;
 
     friend void largeConsoleRead(LargeConsoleReadBuffer &out,
-                                 Win32Console &console,
+                                 Win32ConsoleBuffer &buffer,
                                  const SmallRect &readArea);
 };
 

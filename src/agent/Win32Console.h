@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2015 Ryan Prichard
+// Copyright (c) 2011-2016 Ryan Prichard
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to
@@ -18,65 +18,26 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 // IN THE SOFTWARE.
 
-#ifndef WIN32CONSOLE_H
-#define WIN32CONSOLE_H
+#ifndef AGENT_WIN32_CONSOLE_H
+#define AGENT_WIN32_CONSOLE_H
 
 #include <windows.h>
-#include <wchar.h>
 
 #include <string>
 #include <vector>
-
-#include "Coord.h"
-#include "SmallRect.h"
-
-struct ConsoleScreenBufferInfo : CONSOLE_SCREEN_BUFFER_INFO
-{
-    ConsoleScreenBufferInfo()
-    {
-        memset(this, 0, sizeof(*this));
-    }
-
-    Coord bufferSize() const        { return dwSize;    }
-    SmallRect windowRect() const    { return srWindow;  }
-    Coord cursorPosition() const    { return dwCursorPosition; }
-};
 
 class Win32Console
 {
 public:
     Win32Console();
-    ~Win32Console();
 
-    HANDLE conout();
-    HWND hwnd();
-    void clearLines(int row, int count, const ConsoleScreenBufferInfo &info);
-    void clearAllLines(const ConsoleScreenBufferInfo &info);
-
-    // Buffer and window sizes.
-    ConsoleScreenBufferInfo bufferInfo();
-    Coord bufferSize();
-    SmallRect windowRect();
-    void resizeBuffer(const Coord &size);
-    void moveWindow(const SmallRect &rect);
-
-    // Cursor.
-    Coord cursorPosition();
-    void setCursorPosition(const Coord &point);
-
-    // Screen content.
-    void read(const SmallRect &rect, CHAR_INFO *data);
-    void write(const SmallRect &rect, const CHAR_INFO *data);
-
-    // Title.
+    HWND hwnd() { return m_hwnd; }
     std::wstring title();
     void setTitle(const std::wstring &title);
 
-    void setTextAttribute(WORD attributes);
-
 private:
-    HANDLE m_conout;
+    HWND m_hwnd;
     std::vector<wchar_t> m_titleWorkBuf;
 };
 
-#endif // WIN32CONSOLE_H
+#endif // AGENT_WIN32_CONSOLE_H

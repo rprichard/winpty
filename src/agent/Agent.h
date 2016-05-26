@@ -28,20 +28,20 @@
 #include <string>
 #include <vector>
 
-#include "EventLoop.h"
-#include "DsrSender.h"
-#include "Coord.h"
-#include "SmallRect.h"
 #include "ConsoleLine.h"
-#include "Terminal.h"
+#include "Coord.h"
+#include "DsrSender.h"
+#include "EventLoop.h"
 #include "LargeConsoleRead.h"
+#include "SmallRect.h"
+#include "Terminal.h"
+#include "Win32Console.h"
 
-class Win32Console;
 class ConsoleInput;
+class ConsoleScreenBufferInfo;
+class NamedPipe;
 class ReadBuffer;
 class WriteBuffer;
-class NamedPipe;
-struct ConsoleScreenBufferInfo;
 
 // We must be able to issue a single ReadConsoleOutputW call of
 // MAX_CONSOLE_WIDTH characters, and a single read of approximately several
@@ -98,7 +98,8 @@ private:
 
 private:
     bool m_useMark = false;
-    std::unique_ptr<Win32Console> m_console;
+    Win32Console m_console;
+    std::unique_ptr<Win32ConsoleBuffer> m_consoleBuffer;
     NamedPipe *m_controlPipe = nullptr;
     NamedPipe *m_coninPipe = nullptr;
     NamedPipe *m_conoutPipe = nullptr;

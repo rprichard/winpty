@@ -24,7 +24,7 @@
 
 #include "../shared/WindowsVersion.h"
 #include "Agent.h"
-#include "Win32Console.h"
+#include "Win32ConsoleBuffer.h"
 
 LargeConsoleReadBuffer::LargeConsoleReadBuffer() :
     m_rect(0, 0, 0, 0), m_rectWidth(0)
@@ -32,7 +32,7 @@ LargeConsoleReadBuffer::LargeConsoleReadBuffer() :
 }
 
 void largeConsoleRead(LargeConsoleReadBuffer &out,
-                      Win32Console &console,
+                      Win32ConsoleBuffer &buffer,
                       const SmallRect &readArea) {
     ASSERT(readArea.Left >= 0 &&
            readArea.Top >= 0 &&
@@ -48,7 +48,7 @@ void largeConsoleRead(LargeConsoleReadBuffer &out,
 
     static const bool useLargeReads = isAtLeastWindows8();
     if (useLargeReads) {
-        console.read(readArea, out.m_data.data());
+        buffer.read(readArea, out.m_data.data());
     } else {
         const int maxReadLines = std::max(1, MAX_CONSOLE_WIDTH / readArea.width());
         int curLine = readArea.Top;
@@ -58,7 +58,7 @@ void largeConsoleRead(LargeConsoleReadBuffer &out,
                 curLine,
                 readArea.width(),
                 std::min(maxReadLines, readArea.Bottom + 1 - curLine));
-            console.read(subReadArea, out.lineDataMut(curLine));
+            buffer.read(subReadArea, out.lineDataMut(curLine));
             curLine = subReadArea.Bottom + 1;
         }
     }

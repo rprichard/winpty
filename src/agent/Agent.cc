@@ -47,7 +47,7 @@
 #include "ConsoleInput.h"
 #include "NamedPipe.h"
 #include "Terminal.h"
-#include "Win32Console.h"
+#include "Win32ConsoleBuffer.h"
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
@@ -105,17 +105,18 @@ static void sendEscape(HWND hwnd) {
 // The Windows 10 legacy-mode console behaves the same way as previous console
 // versions, so detect which syscommand to use by testing whether Mark changes
 // the cursor position.
-static bool detectWhetherMarkMovesCursor(Win32Console &console)
+static bool detectWhetherMarkMovesCursor(
+        Win32Console &console, Win32ConsoleBuffer &buffer)
 {
-    const ConsoleScreenBufferInfo info = console.bufferInfo();
-    console.resizeBuffer(Coord(
+    const ConsoleScreenBufferInfo info = buffer.bufferInfo();
+    buffer.resizeBuffer(Coord(
         std::max<int>(2, info.dwSize.X),
         std::max<int>(2, info.dwSize.Y)));
-    console.moveWindow(SmallRect(0, 0, 2, 2));
+    buffer.moveWindow(SmallRect(0, 0, 2, 2));
     const Coord initialPosition(1, 1);
-    console.setCursorPosition(initialPosition);
+    buffer.setCursorPosition(initialPosition);
     sendSysCommand(console.hwnd(), SC_CONSOLE_MARK);
-    bool ret = console.cursorPosition() != initialPosition;
+    bool ret = buffer.cursorPosition() != initialPosition;
     sendEscape(console.hwnd());
     return ret;
 }
@@ -155,30 +156,23 @@ Agent::Agent(LPCWSTR controlPipeName,
 {
     trace("Agent::Agent entered");
 
-    // The console window must be non-NULL.  It is used for two purposes:
-    //  (1) "Freezing" the console to detect the exact number of lines that
-    //      have scrolled.
-    //  (2) Killing processes attached to the console, by posting a WM_CLOSE
-    //      message to the console window.
-    ASSERT(GetConsoleWindow() != nullptr);
-
     m_bufferData.resize(BUFFER_LINE_COUNT);
 
-    m_console.reset(new Win32Console);
-    setSmallFont(m_console->conout());
-    m_useMark = !detectWhetherMarkMovesCursor(*m_console);
+    m_consoleBuffer.reset(new Win32ConsoleBuffer);
+    setSmallFont(m_consoleBuffer->conout());
+    m_useMark = !detectWhetherMarkMovesCursor(m_console, *m_consoleBuffer);
     trace("Using %s syscommand to freeze console",
         m_useMark ? "MARK" : "SELECT_ALL");
-    m_console->moveWindow(SmallRect(0, 0, 1, 1));
-    m_console->resizeBuffer(Coord(initialCols, BUFFER_LINE_COUNT));
-    m_console->moveWindow(SmallRect(0, 0, initialCols, initialRows));
-    m_console->setCursorPosition(Coord(0, 0));
-    m_console->setTitle(m_currentTitle);
+    m_consoleBuffer->moveWindow(SmallRect(0, 0, 1, 1));
+    m_consoleBuffer->resizeBuffer(Coord(initialCols, BUFFER_LINE_COUNT));
+    m_consoleBuffer->moveWindow(SmallRect(0, 0, initialCols, initialRows));
+    m_consoleBuffer->setCursorPosition(Coord(0, 0));
+    m_console.setTitle(m_currentTitle);
 
     // For the sake of the color translation heuristic, set the console color
     // to LtGray-on-Black.
-    m_console->setTextAttribute(7);
-    m_console->clearAllLines(m_console->bufferInfo());
+    m_consoleBuffer->setTextAttribute(7);
+    m_consoleBuffer->clearAllLines(m_consoleBuffer->bufferInfo());
 
     m_controlPipe = &connectToControlPipe(controlPipeName);
     m_coninPipe = &createDataServerPipe(false, L"conin");
@@ -194,7 +188,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_terminal.reset(new Terminal(*m_conoutPipe));
     m_consoleInput.reset(new ConsoleInput(conin, *this));
 
-    resetConsoleTracking(Terminal::OmitClear, m_console->windowRect());
+    resetConsoleTracking(Terminal::OmitClear, m_consoleBuffer->windowRect());
 
     // Setup Ctrl-C handling.  First restore default handling of Ctrl-C.  This
     // attribute is inherited by child processes.  Then register a custom
@@ -571,7 +565,7 @@ void Agent::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
         const SmallRect origWindowRect = origInfo.windowRect();
 
         if (!m_directMode) {
-            m_console->clearLines(0, origWindowRect.Top, origInfo);
+            m_consoleBuffer->clearLines(0, origWindowRect.Top, origInfo);
             clearBufferLines(0, origWindowRect.Top, origInfo.wAttributes);
             if (m_syncRow != -1) {
                 createSyncMarker(m_syncRow);
@@ -603,17 +597,17 @@ void Agent::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
             tmpWindowRect = tmpWindowRect.ensureLineIncluded(
                 origInfo.cursorPosition().Y);
         }
-        m_console->moveWindow(tmpWindowRect);
+        m_consoleBuffer->moveWindow(tmpWindowRect);
 
         // Step 2: resize the buffer.
         unfreezeConsole();
-        m_console->resizeBuffer(finalBufferSize);
+        m_consoleBuffer->resizeBuffer(finalBufferSize);
     }
 
     // Step 3: expand the window to its full size.
     {
         freezeConsole();
-        const ConsoleScreenBufferInfo info = m_console->bufferInfo();
+        const ConsoleScreenBufferInfo info = m_consoleBuffer->bufferInfo();
         const bool cursorWasInWindow =
             info.cursorPosition().Y >= info.windowRect().Top &&
             info.cursorPosition().Y <= info.windowRect().Bottom;
@@ -648,7 +642,7 @@ void Agent::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
                 info.cursorPosition().Y);
         }
 
-        m_console->moveWindow(finalWindowRect);
+        m_consoleBuffer->moveWindow(finalWindowRect);
         m_dirtyWindowTop = finalWindowRect.Top;
     }
 }
@@ -672,7 +666,7 @@ void Agent::syncConsoleContentAndSize(bool forceResize)
     freezeConsole();
     syncConsoleTitle();
 
-    const ConsoleScreenBufferInfo info = m_console->bufferInfo();
+    const ConsoleScreenBufferInfo info = m_consoleBuffer->bufferInfo();
     m_consoleInput->setMouseWindowRect(info.windowRect());
 
     // If an app resizes the buffer height, then we enter "direct mode", where
@@ -705,7 +699,7 @@ void Agent::syncConsoleContentAndSize(bool forceResize)
 
 void Agent::syncConsoleTitle()
 {
-    std::wstring newTitle = m_console->title();
+    std::wstring newTitle = m_console.title();
     if (newTitle != m_currentTitle) {
         std::string command = std::string("\x1b]0;") +
                 wstringToUtf8String(newTitle) + "\x07";
@@ -728,7 +722,7 @@ void Agent::directScrapeOutput(const ConsoleScreenBufferInfo &info)
     const int w = scrapeRect.width();
     const int h = scrapeRect.height();
 
-    largeConsoleRead(m_readBuffer, *m_console, scrapeRect);
+    largeConsoleRead(m_readBuffer, *m_consoleBuffer, scrapeRect);
 
     bool sawModifiedLine = false;
     for (int line = 0; line < h; ++line) {
@@ -818,7 +812,7 @@ void Agent::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
                                       m_dirtyLineCount);
     ASSERT(firstReadLine >= 0 && stopReadLine > firstReadLine);
     largeConsoleRead(m_readBuffer,
-                     *m_console,
+                     *m_consoleBuffer,
                      SmallRect(0, firstReadLine,
                                std::min<SHORT>(info.bufferSize().X,
                                                MAX_CONSOLE_WIDTH),
@@ -875,18 +869,18 @@ void Agent::reopenConsole()
 {
     // Reopen CONOUT.  The application may have changed the active screen
     // buffer.  (See https://github.com/rprichard/winpty/issues/34)
-    m_console.reset(new Win32Console());
+    m_consoleBuffer.reset(new Win32ConsoleBuffer());
 }
 
 void Agent::freezeConsole()
 {
-    sendSysCommand(m_console->hwnd(), m_useMark ? SC_CONSOLE_MARK
-                                                : SC_CONSOLE_SELECT_ALL);
+    sendSysCommand(m_console.hwnd(), m_useMark ? SC_CONSOLE_MARK
+                                               : SC_CONSOLE_SELECT_ALL);
 }
 
 void Agent::unfreezeConsole()
 {
-    sendEscape(m_console->hwnd());
+    sendEscape(m_console.hwnd());
 }
 
 void Agent::syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN])
@@ -908,7 +902,7 @@ int Agent::findSyncMarker()
     CHAR_INFO column[BUFFER_LINE_COUNT];
     syncMarkerText(marker);
     SmallRect rect(0, 0, 1, m_syncRow + SYNC_MARKER_LEN);
-    m_console->read(rect, column);
+    m_consoleBuffer->read(rect, column);
     int i;
     for (i = m_syncRow; i >= 0; --i) {
         int j;
@@ -928,8 +922,8 @@ void Agent::createSyncMarker(int row)
 
     // Clear the lines around the marker to ensure that Windows 10's rewrapping
     // does not affect the marker.
-    m_console->clearLines(row - 1, SYNC_MARKER_LEN + 1,
-                          m_console->bufferInfo());
+    m_consoleBuffer->clearLines(row - 1, SYNC_MARKER_LEN + 1,
+                                m_consoleBuffer->bufferInfo());
 
     // Write a new marker.
     m_syncCounter++;
@@ -937,5 +931,5 @@ void Agent::createSyncMarker(int row)
     syncMarkerText(marker);
     m_syncRow = row;
     SmallRect markerRect(0, m_syncRow, 1, SYNC_MARKER_LEN);
-    m_console->write(markerRect, marker);
+    m_consoleBuffer->write(markerRect, marker);
 }

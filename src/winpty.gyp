@@ -79,6 +79,8 @@
                 'agent/UnicodeEncoding.h',
                 'agent/Win32Console.cc',
                 'agent/Win32Console.h',
+                'agent/Win32ConsoleBuffer.cc',
+                'agent/Win32ConsoleBuffer.h',
                 'agent/main.cc',
                 'shared/AgentMsg.h',
                 'shared/Buffer.h',

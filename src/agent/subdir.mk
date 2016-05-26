@@ -35,6 +35,7 @@ AGENT_OBJECTS = \
 	build/agent/agent/NamedPipe.o \
 	build/agent/agent/Terminal.o \
 	build/agent/agent/Win32Console.o \
+	build/agent/agent/Win32ConsoleBuffer.o \
 	build/agent/agent/main.o \
 	build/agent/shared/Buffer.o \
 	build/agent/shared/DebugClient.o \
