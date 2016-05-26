@@ -63,23 +63,6 @@ static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
     return FALSE;
 }
 
-static std::string wstringToUtf8String(const std::wstring &input)
-{
-    int mblen = WideCharToMultiByte(CP_UTF8, 0,
-                                    input.c_str(), input.size() + 1,
-                                    NULL, 0, NULL, NULL);
-    if (mblen <= 0) {
-        return std::string();
-    }
-    std::vector<char> tmp(mblen);
-    int mblen2 = WideCharToMultiByte(CP_UTF8, 0,
-                                     input.c_str(), input.size() + 1,
-                                     tmp.data(), tmp.size(),
-                                     NULL, NULL);
-    ASSERT(mblen2 == mblen);
-    return tmp.data();
-}
-
 template <typename T>
 T constrained(T min, T val, T max) {
     ASSERT(min <= max);
@@ -702,7 +685,7 @@ void Agent::syncConsoleTitle()
     std::wstring newTitle = m_console.title();
     if (newTitle != m_currentTitle) {
         std::string command = std::string("\x1b]0;") +
-                wstringToUtf8String(newTitle) + "\x07";
+                utf8FromWide(newTitle) + "\x07";
         m_conoutPipe->write(command.c_str());
         m_currentTitle = newTitle;
     }
