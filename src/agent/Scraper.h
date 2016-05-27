@@ -76,7 +76,7 @@ private:
 
 private:
     Win32Console &m_console;
-    Win32ConsoleBuffer *m_consoleBuffer;
+    Win32ConsoleBuffer *m_consoleBuffer = nullptr;
     std::unique_ptr<Terminal> m_terminal;
 
     int m_syncRow = -1;

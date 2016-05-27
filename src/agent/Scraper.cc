@@ -53,6 +53,8 @@ Scraper::Scraper(
     m_terminal(std::move(terminal)),
     m_ptySize(initialSize)
 {
+    m_consoleBuffer = &buffer;
+
     resetConsoleTracking(Terminal::OmitClear, buffer.windowRect());
 
     m_bufferData.resize(BUFFER_LINE_COUNT);
@@ -67,6 +69,8 @@ Scraper::Scraper(
     // to LtGray-on-Black.
     buffer.setTextAttribute(7);
     buffer.clearAllLines(m_consoleBuffer->bufferInfo());
+
+    m_consoleBuffer = nullptr;
 }
 
 Scraper::~Scraper()
