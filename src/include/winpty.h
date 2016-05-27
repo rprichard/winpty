@@ -139,6 +139,7 @@ WINPTY_API HANDLE winpty_agent_process(winpty_t *wp);
  * instantly. */
 WINPTY_API LPCWSTR winpty_conin_name(winpty_t *wp);
 WINPTY_API LPCWSTR winpty_conout_name(winpty_t *wp);
+WINPTY_API LPCWSTR winpty_conerr_name(winpty_t *wp);
 
 
 

@@ -72,6 +72,8 @@
                 'agent/LargeConsoleRead.cc',
                 'agent/NamedPipe.h',
                 'agent/NamedPipe.cc',
+                'agent/Scraper.h',
+                'agent/Scraper.cc',
                 'agent/SimplePool.h',
                 'agent/SmallRect.h',
                 'agent/Terminal.h',

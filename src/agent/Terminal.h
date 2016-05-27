@@ -34,12 +34,15 @@ class NamedPipe;
 class Terminal
 {
 public:
-    explicit Terminal(NamedPipe &output) : m_output(output) {}
+    explicit Terminal(NamedPipe &output, bool plainMode, bool outputColor)
+        : m_output(output), m_plainMode(plainMode), m_outputColor(outputColor)
+    {
+    }
+
     enum SendClearFlag { OmitClear, SendClear };
     void reset(SendClearFlag sendClearFirst, int64_t newLine);
     void sendLine(int64_t line, const CHAR_INFO *lineData, int width);
     void finishOutput(const std::pair<int, int64_t> &newCursorPos);
-    void setConsoleMode(int mode);
 
 private:
     void hideTerminalCursor();
@@ -51,8 +54,9 @@ private:
     bool m_cursorHidden = false;
     std::pair<int, int64_t> m_cursorPos;
     int m_remoteColor = -1;
-    bool m_consoleMode = false;
     std::string m_termLine;
+    bool m_plainMode = false;
+    bool m_outputColor = true; // TODO: Respect the m_outputColor flag.
 };
 
 #endif // TERMINAL_H

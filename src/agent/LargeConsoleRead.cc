@@ -23,7 +23,7 @@
 #include <stdlib.h>
 
 #include "../shared/WindowsVersion.h"
-#include "Agent.h"
+#include "Scraper.h"
 #include "Win32ConsoleBuffer.h"
 
 LargeConsoleReadBuffer::LargeConsoleReadBuffer() :

@@ -25,16 +25,34 @@
 #include "../shared/DebugClient.h"
 #include "../shared/WinptyAssert.h"
 
-Win32ConsoleBuffer::Win32ConsoleBuffer() {
-    m_conout = CreateFileW(L"CONOUT$",
-                           GENERIC_READ | GENERIC_WRITE,
-                           FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_EXISTING, 0, NULL);
-    ASSERT(m_conout != INVALID_HANDLE_VALUE);
+std::unique_ptr<Win32ConsoleBuffer> Win32ConsoleBuffer::openStdout() {
+    return std::unique_ptr<Win32ConsoleBuffer>(
+        new Win32ConsoleBuffer(GetStdHandle(STD_OUTPUT_HANDLE), false));
 }
 
-Win32ConsoleBuffer::~Win32ConsoleBuffer() {
-    CloseHandle(m_conout);
+std::unique_ptr<Win32ConsoleBuffer> Win32ConsoleBuffer::openConout() {
+    const HANDLE conout = CreateFileW(L"CONOUT$",
+                                      GENERIC_READ | GENERIC_WRITE,
+                                      FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                      NULL, OPEN_EXISTING, 0, NULL);
+    ASSERT(conout != INVALID_HANDLE_VALUE);
+    return std::unique_ptr<Win32ConsoleBuffer>(
+        new Win32ConsoleBuffer(conout, true));
+}
+
+std::unique_ptr<Win32ConsoleBuffer> Win32ConsoleBuffer::createErrorBuffer() {
+    SECURITY_ATTRIBUTES sa = {};
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+    const HANDLE conout =
+        CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE,
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                  &sa,
+                                  CONSOLE_TEXTMODE_BUFFER,
+                                  nullptr);
+    ASSERT(conout != INVALID_HANDLE_VALUE);
+    return std::unique_ptr<Win32ConsoleBuffer>(
+        new Win32ConsoleBuffer(conout, true));
 }
 
 HANDLE Win32ConsoleBuffer::conout() {

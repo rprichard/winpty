@@ -639,6 +639,9 @@ winpty_open(const winpty_config_t *cfg,
         auto packet = readPacket(*wp.get());
         wp->coninPipeName = packet.getWString();
         wp->conoutPipeName = packet.getWString();
+        if (cfg->flags & WINPTY_FLAG_CONERR) {
+            wp->conerrPipeName = packet.getWString();
+        }
         packet.assertEof();
 
         return wp.release();
@@ -671,6 +674,15 @@ WINPTY_API LPCWSTR winpty_conin_name(winpty_t *wp) {
 WINPTY_API LPCWSTR winpty_conout_name(winpty_t *wp) {
     ASSERT(wp != nullptr);
     return cstrFromWStringOrNull(wp->conoutPipeName);
+}
+
+WINPTY_API LPCWSTR winpty_conerr_name(winpty_t *wp) {
+    ASSERT(wp != nullptr);
+    if (wp->conerrPipeName.empty()) {
+        return nullptr;
+    } else {
+        return cstrFromWStringOrNull(wp->conerrPipeName);
+    }
 }
 
 

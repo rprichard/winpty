@@ -56,6 +56,7 @@ struct winpty_s {
     OwnedHandle ioEvent;
     std::wstring coninPipeName;
     std::wstring conoutPipeName;
+    std::wstring conerrPipeName;
 };
 
 struct winpty_spawn_config_s {

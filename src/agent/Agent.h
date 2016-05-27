@@ -26,29 +26,17 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
-#include "ConsoleLine.h"
-#include "Coord.h"
 #include "DsrSender.h"
 #include "EventLoop.h"
-#include "LargeConsoleRead.h"
-#include "SmallRect.h"
-#include "Terminal.h"
 #include "Win32Console.h"
 
 class ConsoleInput;
-class ConsoleScreenBufferInfo;
 class NamedPipe;
 class ReadBuffer;
+class Scraper;
 class WriteBuffer;
-
-// We must be able to issue a single ReadConsoleOutputW call of
-// MAX_CONSOLE_WIDTH characters, and a single read of approximately several
-// hundred fewer characters than BUFFER_LINE_COUNT.
-const int BUFFER_LINE_COUNT = 3000;
-const int MAX_CONSOLE_WIDTH = 2500;
-const int SYNC_MARKER_LEN = 16;
+class Win32ConsoleBuffer;
 
 class Agent : public EventLoop, public DsrSender
 {
@@ -63,8 +51,6 @@ public:
 private:
     NamedPipe &connectToControlPipe(LPCWSTR pipeName);
     NamedPipe &createDataServerPipe(bool write, const wchar_t *kind);
-    void resetConsoleTracking(
-        Terminal::SendClearFlag sendClear, const SmallRect &windowRect);
 
 private:
     void pollControlPipe();
@@ -73,54 +59,33 @@ private:
     void handleStartProcessPacket(ReadBuffer &packet);
     void handleSetSizePacket(ReadBuffer &packet);
     void pollConinPipe();
-    void pollConoutPipe();
 
 protected:
     virtual void onPollTimeout();
     virtual void onPipeIo(NamedPipe &namedPipe);
 
 private:
-    void markEntireWindowDirty(const SmallRect &windowRect);
-    void scanForDirtyLines(const SmallRect &windowRect);
-    void clearBufferLines(int firstRow, int count, WORD attributes);
-    void resizeImpl(const ConsoleScreenBufferInfo &origInfo);
+    void autoClosePipesForShutdown();
+    std::unique_ptr<Win32ConsoleBuffer> openPrimaryBuffer();
     void resizeWindow(int cols, int rows);
-    void syncConsoleContentAndSize(bool forceResize);
+    void scrapeBuffers();
     void syncConsoleTitle();
-    void directScrapeOutput(const ConsoleScreenBufferInfo &info);
-    void scrollingScrapeOutput(const ConsoleScreenBufferInfo &info);
-    void reopenConsole();
-    void freezeConsole();
-    void unfreezeConsole();
-    void syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN]);
-    int findSyncMarker();
-    void createSyncMarker(int row);
 
 private:
-    bool m_useMark = false;
+    const bool m_useConerr;
+    const bool m_plainMode;
     Win32Console m_console;
-    std::unique_ptr<Win32ConsoleBuffer> m_consoleBuffer;
+    std::unique_ptr<Scraper> m_primaryScraper;
+    std::unique_ptr<Scraper> m_errorScraper;
+    std::unique_ptr<Win32ConsoleBuffer> m_errorBuffer;
     NamedPipe *m_controlPipe = nullptr;
     NamedPipe *m_coninPipe = nullptr;
     NamedPipe *m_conoutPipe = nullptr;
-    bool m_closingConoutPipe = false;
-    std::unique_ptr<Terminal> m_terminal;
+    NamedPipe *m_conerrPipe = nullptr;
+    bool m_autoShutdown = false;
+    bool m_closingOutputPipes = false;
     std::unique_ptr<ConsoleInput> m_consoleInput;
     HANDLE m_childProcess = nullptr;
-    bool m_autoShutdown = false;
-
-    int m_syncRow = 0;
-    int m_syncCounter = 0;
-
-    bool m_directMode = false;
-    Coord m_ptySize;
-    int64_t m_scrapedLineCount = 0;
-    int64_t m_scrolledCount = 0;
-    int64_t m_maxBufferedLine = 0;
-    LargeConsoleReadBuffer m_readBuffer;
-    std::vector<ConsoleLine> m_bufferData;
-    int m_dirtyWindowTop = 0;
-    int m_dirtyLineCount = 0;
 
     // If the title is initialized to the empty string, then cmd.exe will
     // sometimes print this error:

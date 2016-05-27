@@ -50,7 +50,26 @@
 /*****************************************************************************
  * Configuration of a new agent. */
 
-#define WINPTY_FLAG_MASK 0ull
+/* Create a new screen buffer (connected to the "conerr" terminal pipe) and
+ * pass it to child processes as the STDERR handle.  This flag also prevents
+ * the agent from reopening CONOUT$ when it polls -- regardless of whether the
+ * active screen buffer changes, winpty continues to monitor the original
+ * primary screen buffer. */
+#define WINPTY_FLAG_CONERR              0x1ull
+
+/* Don't output escape sequences. */
+#define WINPTY_FLAG_PLAIN_OUTPUT        0x2ull
+
+/* Do output color escape sequences.  These escapes are output by default, but
+ * are suppressed with WINPTY_FLAG_PLAIN_OUTPUT.  Use this flag to reenable
+ * them. */
+#define WINPTY_FLAG_COLOR_ESCAPES       0x4ull
+
+#define WINPTY_FLAG_MASK (0ull \
+    | WINPTY_FLAG_CONERR \
+    | WINPTY_FLAG_PLAIN_OUTPUT \
+    | WINPTY_FLAG_COLOR_ESCAPES \
+)
 
 
 

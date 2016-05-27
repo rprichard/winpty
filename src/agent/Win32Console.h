@@ -29,14 +29,35 @@
 class Win32Console
 {
 public:
+    class FreezeGuard {
+    public:
+        FreezeGuard(Win32Console &console, bool frozen) :
+                m_console(console), m_previous(console.frozen()) {
+            m_console.setFrozen(frozen);
+        }
+        ~FreezeGuard() {
+            m_console.setFrozen(m_previous);
+        }
+        FreezeGuard(const FreezeGuard &other) = delete;
+        FreezeGuard &operator=(const FreezeGuard &other) = delete;
+    private:
+        Win32Console &m_console;
+        bool m_previous;
+    };
+
     Win32Console();
 
     HWND hwnd() { return m_hwnd; }
     std::wstring title();
     void setTitle(const std::wstring &title);
+    void setFreezeUsesMark(bool useMark) { m_freezeUsesMark = useMark; }
+    void setFrozen(bool frozen=true);
+    bool frozen() { return m_frozen; }
 
 private:
-    HWND m_hwnd;
+    HWND m_hwnd = nullptr;
+    bool m_frozen = false;
+    bool m_freezeUsesMark = false;
     std::vector<wchar_t> m_titleWorkBuf;
 };
 

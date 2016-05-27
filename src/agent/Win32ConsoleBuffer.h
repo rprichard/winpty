@@ -25,6 +25,8 @@
 
 #include <string.h>
 
+#include <memory>
+
 #include "Coord.h"
 #include "SmallRect.h"
 
@@ -41,9 +43,25 @@ public:
 };
 
 class Win32ConsoleBuffer {
+private:
+    Win32ConsoleBuffer(HANDLE conout, bool owned) :
+        m_conout(conout), m_owned(owned)
+    {
+    }
+
 public:
-    Win32ConsoleBuffer();
-    ~Win32ConsoleBuffer();
+    ~Win32ConsoleBuffer() {
+        if (m_owned) {
+            CloseHandle(m_conout);
+        }
+    }
+
+    static std::unique_ptr<Win32ConsoleBuffer> openStdout();
+    static std::unique_ptr<Win32ConsoleBuffer> openConout();
+    static std::unique_ptr<Win32ConsoleBuffer> createErrorBuffer();
+
+    Win32ConsoleBuffer(const Win32ConsoleBuffer &other) = delete;
+    Win32ConsoleBuffer &operator=(const Win32ConsoleBuffer &other) = delete;
 
     HANDLE conout();
     void clearLines(int row, int count, const ConsoleScreenBufferInfo &info);
@@ -67,7 +85,8 @@ public:
     void setTextAttribute(WORD attributes);
 
 private:
-    HANDLE m_conout;
+    HANDLE m_conout = nullptr;
+    bool m_owned = false;
 };
 
 #endif // AGENT_WIN32_CONSOLE_BUFFER_H

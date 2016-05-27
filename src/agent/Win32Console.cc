@@ -87,3 +87,21 @@ void Win32Console::setTitle(const std::wstring &title)
         trace("SetConsoleTitleW failed");
     }
 }
+
+void Win32Console::setFrozen(bool frozen) {
+    const int SC_CONSOLE_MARK = 0xFFF2;
+    const int SC_CONSOLE_SELECT_ALL = 0xFFF5;
+    if (frozen == m_frozen) {
+        // Do nothing.
+    } else if (frozen) {
+        // Enter selection mode by activating either Mark or SelectAll.
+        const int command = m_freezeUsesMark ? SC_CONSOLE_MARK
+                                             : SC_CONSOLE_SELECT_ALL;
+        SendMessage(m_hwnd, WM_SYSCOMMAND, command, 0);
+        m_frozen = true;
+    } else {
+        // Send Escape to cancel the selection.
+        SendMessage(m_hwnd, WM_CHAR, 27, 0x00010001);
+        m_frozen = false;
+    }
+}

@@ -33,6 +33,7 @@ AGENT_OBJECTS = \
 	build/agent/agent/InputMap.o \
 	build/agent/agent/LargeConsoleRead.o \
 	build/agent/agent/NamedPipe.o \
+	build/agent/agent/Scraper.o \
 	build/agent/agent/Terminal.o \
 	build/agent/agent/Win32Console.o \
 	build/agent/agent/Win32ConsoleBuffer.o \
