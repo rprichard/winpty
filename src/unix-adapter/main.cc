@@ -438,7 +438,7 @@ int main(int argc, char *argv[])
 
     winpty_config_t *agentCfg = winpty_config_new(0, NULL);
     assert(agentCfg != NULL);
-    winpty_config_set_initial_size(agentCfg, sz.ws_col, sz.ws_row, NULL);
+    winpty_config_set_initial_size(agentCfg, sz.ws_col, sz.ws_row);
 
     winpty_error_ptr_t openErr = NULL;
     winpty_t *wp = winpty_open(agentCfg, &openErr);

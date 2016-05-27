@@ -94,15 +94,13 @@ winpty_config_new(UINT64 agentFlags, winpty_error_ptr_t *err /*OPTIONAL*/);
 /* Free the cfg object after passing it to winpty_open. */
 WINPTY_API void winpty_config_free(winpty_config_t *cfg);
 
-WINPTY_API BOOL
-winpty_config_set_initial_size(winpty_config_t *cfg, int cols, int rows,
-                               winpty_error_ptr_t *err /*OPTIONAL*/);
+WINPTY_API void
+winpty_config_set_initial_size(winpty_config_t *cfg, int cols, int rows);
 
 /* Amount of time to wait for the agent to startup and to wait for any given
  * agent RPC request.  Must be greater than 0.  Can be INFINITE. */
-WINPTY_API BOOL
-winpty_config_set_agent_timeout(winpty_config_t *cfg, DWORD timeoutMs,
-                                winpty_error_ptr_t *err /*OPTIONAL*/);
+WINPTY_API void
+winpty_config_set_agent_timeout(winpty_config_t *cfg, DWORD timeoutMs);
 
 
 

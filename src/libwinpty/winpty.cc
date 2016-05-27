@@ -165,25 +165,17 @@ WINPTY_API void winpty_config_free(winpty_config_t *cfg) {
     delete cfg;
 }
 
-WINPTY_API BOOL
-winpty_config_set_initial_size(winpty_config_t *cfg, int cols, int rows,
-                               winpty_error_ptr_t *err /*OPTIONAL*/) {
-    API_TRY {
-        ASSERT(cfg != nullptr && cols > 0 && rows > 0);
-        cfg->cols = cols;
-        cfg->rows = rows;
-        return TRUE;
-    } API_CATCH(FALSE);
+WINPTY_API void
+winpty_config_set_initial_size(winpty_config_t *cfg, int cols, int rows) {
+    ASSERT(cfg != nullptr && cols > 0 && rows > 0);
+    cfg->cols = cols;
+    cfg->rows = rows;
 }
 
-WINPTY_API BOOL
-winpty_config_set_agent_timeout(winpty_config_t *cfg, DWORD timeoutMs,
-                                winpty_error_ptr_t *err /*OPTIONAL*/) {
-    API_TRY {
-        ASSERT(cfg != nullptr && timeoutMs > 0);
-        cfg->timeoutMs = timeoutMs;
-        return TRUE;
-    } API_CATCH(FALSE)
+WINPTY_API void
+winpty_config_set_agent_timeout(winpty_config_t *cfg, DWORD timeoutMs) {
+    ASSERT(cfg != nullptr && timeoutMs > 0);
+    cfg->timeoutMs = timeoutMs;
 }
 
 
