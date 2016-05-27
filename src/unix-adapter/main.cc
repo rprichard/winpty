@@ -37,6 +37,7 @@
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <winpty.h>
@@ -62,50 +63,99 @@ static WakeupFd &mainWakeup()
     return *g_mainWakeup;
 }
 
+struct SavedTermiosMode {
+    int count;
+    bool valid[3];
+    termios mode[3];
+};
+
 // Put the input terminal into non-canonical mode.
-static termios setRawTerminalMode()
+static SavedTermiosMode setRawTerminalMode(
+    bool allowNonTtys, bool setStdout, bool setStderr)
 {
-    if (!isatty(STDIN_FILENO)) {
-        fprintf(stderr, "input is not a tty\n");
-        exit(1);
-    }
-    if (!isatty(STDOUT_FILENO)) {
-        fprintf(stderr, "output is not a tty\n");
-        exit(1);
+    SavedTermiosMode ret;
+    const char *const kNames[3] = { "stdin", "stdout", "stderr" };
+
+    ret.valid[0] = true;
+    ret.valid[1] = setStdout;
+    ret.valid[2] = setStderr;
+
+    for (int i = 0; i < 3; ++i) {
+        if (!ret.valid[i]) {
+            continue;
+        }
+        if (!isatty(i)) {
+            ret.valid[i] = false;
+            if (!allowNonTtys) {
+                fprintf(stderr, "%s is not a tty\n", kNames[i]);
+                exit(1);
+            }
+        } else {
+            ret.valid[i] = true;
+            if (tcgetattr(i, &ret.mode[i]) < 0) {
+                perror("tcgetattr failed");
+                exit(1);
+            }
+        }
     }
 
-    termios buf;
-    if (tcgetattr(STDIN_FILENO, &buf) < 0) {
-        perror("tcgetattr failed");
-        exit(1);
+    if (ret.valid[STDIN_FILENO]) {
+        termios buf;
+        if (tcgetattr(STDIN_FILENO, &buf) < 0) {
+            perror("tcgetattr failed");
+            exit(1);
+        }
+        buf.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+        buf.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+        buf.c_cflag &= ~(CSIZE | PARENB);
+        buf.c_cflag |= CS8;
+        buf.c_cc[VMIN] = 1;  // blocking read
+        buf.c_cc[VTIME] = 0;
+        if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &buf) < 0) {
+            fprintf(stderr, "tcsetattr failed\n");
+            exit(1);
+        }
     }
-    termios saved = buf;
-    buf.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-    buf.c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
-    buf.c_cflag &= ~(CSIZE | PARENB);
-    buf.c_cflag |= CS8;
-    buf.c_oflag &= ~OPOST;
-    buf.c_cc[VMIN] = 1;  // blocking read
-    buf.c_cc[VTIME] = 0;
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &buf) < 0) {
-        fprintf(stderr, "tcsetattr failed\n");
-        exit(1);
+
+    for (int i = STDOUT_FILENO; i <= STDERR_FILENO; ++i) {
+        if (!ret.valid[i]) {
+            continue;
+        }
+        termios buf;
+        if (tcgetattr(i, &buf) < 0) {
+            perror("tcgetattr failed");
+            exit(1);
+        }
+        buf.c_cflag &= ~(CSIZE | PARENB);
+        buf.c_cflag |= CS8;
+        buf.c_oflag &= ~OPOST;
+        if (tcsetattr(i, TCSAFLUSH, &buf) < 0) {
+            fprintf(stderr, "tcsetattr failed\n");
+            exit(1);
+        }
     }
-    return saved;
+
+    return ret;
 }
 
-static void restoreTerminalMode(termios original)
+static void restoreTerminalMode(const SavedTermiosMode &original)
 {
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &original) < 0) {
-        perror("error restoring terminal mode");
-        exit(1);
+    for (int i = 0; i < 3; ++i) {
+        if (!original.valid[i]) {
+            continue;
+        }
+        if (tcsetattr(i, TCSAFLUSH, &original.mode[i]) < 0) {
+            perror("error restoring terminal mode");
+            exit(1);
+        }
     }
 }
 
-static void debugShowKey()
+static void debugShowKey(bool allowNonTtys)
 {
-    printf("\r\nPress any keys -- Ctrl-D exits\r\n\r\n");
-    const termios saved = setRawTerminalMode();
+    printf("\nPress any keys -- Ctrl-D exits\n\n");
+    const SavedTermiosMode saved =
+        setRawTerminalMode(allowNonTtys, false, false);
     char buf[128];
     while (true) {
         const ssize_t len = read(STDIN_FILENO, buf, sizeof(buf));
@@ -123,7 +173,8 @@ static void debugShowKey()
         }
         for (int i = 0; i < len; ++i) {
             unsigned char uch = buf[i];
-            printf("\t%3d %04o 0x%02x\r\n", uch, uch, uch);
+            printf("\t%3d %04o 0x%02x\n", uch, uch, uch);
+            fflush(stdout);
         }
         if (buf[0] == 4) {
             // Ctrl-D
@@ -335,11 +386,20 @@ static void usage(const char *program, int exitCode)
 struct Arguments {
     std::vector<std::string> childArgv;
     bool mouseInput;
+    bool testAllowNonTtys;
+    bool testConerr;
+    bool testPlainOutput;
+    bool testColorEscapes;
 };
 
 static void parseArguments(int argc, char *argv[], Arguments &out)
 {
     out.mouseInput = false;
+    out.testAllowNonTtys = false;
+    out.testConerr = false;
+    out.testPlainOutput = false;
+    out.testColorEscapes = false;
+    bool doShowKeys = false;
     const char *const program = argc >= 1 ? argv[0] : "<program>";
     int argi = 1;
     while (argi < argc) {
@@ -350,11 +410,18 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
             } else if (arg == "--mouse") {
                 out.mouseInput = true;
             } else if (arg == "--showkey") {
-                debugShowKey();
-                exit(0);
+                doShowKeys = true;
             } else if (arg == "--version") {
                 dumpVersionToStdout();
                 exit(0);
+            } else if (arg == "-Xallow-non-tty") {
+                out.testAllowNonTtys = true;
+            } else if (arg == "-Xconerr") {
+                out.testConerr = true;
+            } else if (arg == "-Xplain") {
+                out.testPlainOutput = true;
+            } else if (arg == "-Xcolor") {
+                out.testColorEscapes = true;
             } else if (arg == "--") {
                 break;
             } else {
@@ -369,6 +436,10 @@ static void parseArguments(int argc, char *argv[], Arguments &out)
     }
     for (; argi < argc; ++argi) {
         out.childArgv.push_back(argv[argi]);
+    }
+    if (doShowKeys) {
+        debugShowKey(out.testAllowNonTtys);
+        exit(0);
     }
     if (out.childArgv.size() == 0) {
         usage(program, 1);
@@ -433,10 +504,16 @@ int main(int argc, char *argv[])
 
     setupWin32Environment();
 
-    winsize sz;
+    winsize sz = { 0 };
+    sz.ws_col = 80;
+    sz.ws_row = 25;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
 
-    winpty_config_t *agentCfg = winpty_config_new(0, NULL);
+    DWORD agentFlags = 0;
+    if (args.testConerr)        { agentFlags |= WINPTY_FLAG_CONERR; }
+    if (args.testPlainOutput)   { agentFlags |= WINPTY_FLAG_PLAIN_OUTPUT; }
+    if (args.testColorEscapes)  { agentFlags |= WINPTY_FLAG_COLOR_ESCAPES; }
+    winpty_config_t *agentCfg = winpty_config_new(agentFlags, NULL);
     assert(agentCfg != NULL);
     winpty_config_set_initial_size(agentCfg, sz.ws_col, sz.ws_row);
 
@@ -450,14 +527,18 @@ int main(int argc, char *argv[])
     winpty_config_free(agentCfg);
     winpty_error_free(openErr);
 
-    const wchar_t *coninName = winpty_conin_name(wp);
-    const wchar_t *conoutName = winpty_conout_name(wp);
-    HANDLE conin =
-        CreateFileW(coninName, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-    HANDLE conout =
-        CreateFileW(conoutName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE conin = CreateFileW(winpty_conin_name(wp), GENERIC_WRITE, 0, NULL,
+                               OPEN_EXISTING, 0, NULL);
+    HANDLE conout = CreateFileW(winpty_conout_name(wp), GENERIC_READ, 0, NULL,
+                                OPEN_EXISTING, 0, NULL);
     assert(conin != INVALID_HANDLE_VALUE);
     assert(conout != INVALID_HANDLE_VALUE);
+    HANDLE conerr = NULL;
+    if (args.testConerr) {
+        conerr = CreateFileW(winpty_conerr_name(wp), GENERIC_READ, 0, NULL,
+                             OPEN_EXISTING, 0, NULL);
+        assert(conerr != INVALID_HANDLE_VALUE);
+    }
 
     HANDLE childHandle = NULL;
 
@@ -496,7 +577,8 @@ int main(int argc, char *argv[])
     }
 
     registerResizeSignalHandler();
-    termios mode = setRawTerminalMode();
+    SavedTermiosMode mode =
+        setRawTerminalMode(args.testAllowNonTtys, true, args.testConerr);
 
     if (args.mouseInput) {
         // Start by disabling UTF-8 coordinate mode (1005), just in case we
@@ -519,8 +601,12 @@ int main(int argc, char *argv[])
             CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
     }
 
-    InputHandler inputHandler(conin, mainWakeup());
-    OutputHandler outputHandler(conout, mainWakeup());
+    InputHandler inputHandler(conin, STDIN_FILENO, mainWakeup());
+    OutputHandler outputHandler(conout, STDOUT_FILENO, mainWakeup());
+    OutputHandler *errorHandler = NULL;
+    if (args.testConerr) {
+        errorHandler = new OutputHandler(conerr, STDERR_FILENO, mainWakeup());
+    }
 
     while (true) {
         fd_set readfds;
@@ -541,7 +627,8 @@ int main(int argc, char *argv[])
 
         // Check for an I/O handler shutting down (possibly indicating that the
         // child process has exited).
-        if (inputHandler.isComplete() || outputHandler.isComplete()) {
+        if (inputHandler.isComplete() || outputHandler.isComplete() ||
+                (errorHandler != NULL && errorHandler->isComplete())) {
             break;
         }
     }
@@ -555,6 +642,12 @@ int main(int argc, char *argv[])
     outputHandler.shutdown();
     CloseHandle(conin);
     CloseHandle(conout);
+
+    if (errorHandler != NULL) {
+        errorHandler->shutdown();
+        delete errorHandler;
+        CloseHandle(conerr);
+    }
 
     if (args.mouseInput) {
         // Reseting both encoding modes (1006 and 1015) is necessary, but

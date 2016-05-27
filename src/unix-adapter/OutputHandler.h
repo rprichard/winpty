@@ -27,10 +27,10 @@
 
 #include "WakeupFd.h"
 
-// Connect winpty CONOUT to Cygwin blocking STDOUT_FILENO.
+// Connect winpty CONOUT/CONERR to a Cygwin blocking fd.
 class OutputHandler {
 public:
-    OutputHandler(HANDLE conout, WakeupFd &completionWakeup);
+    OutputHandler(HANDLE conout, int outputfd, WakeupFd &completionWakeup);
     ~OutputHandler() { shutdown(); }
     bool isComplete() { return m_threadCompleted; }
     void shutdown();
@@ -43,6 +43,7 @@ private:
     void threadProc();
 
     HANDLE m_conout;
+    int m_outputfd;
     pthread_t m_thread;
     WakeupFd &m_completionWakeup;
     bool m_threadHasBeenJoined;

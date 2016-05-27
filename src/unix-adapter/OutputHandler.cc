@@ -32,13 +32,14 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
-OutputHandler::OutputHandler(HANDLE conout, WakeupFd &completionWakeup) :
+OutputHandler::OutputHandler(
+        HANDLE conout, int outputfd, WakeupFd &completionWakeup) :
     m_conout(conout),
+    m_outputfd(outputfd),
     m_completionWakeup(completionWakeup),
     m_threadHasBeenJoined(false),
     m_threadCompleted(0)
 {
-    assert(isatty(STDOUT_FILENO));
     pthread_create(&m_thread, NULL, OutputHandler::threadProcS, this);
 }
 
@@ -70,7 +71,7 @@ void OutputHandler::threadProc() {
             }
             break;
         }
-        if (!writeAll(STDOUT_FILENO, &buffer[0], numRead)) {
+        if (!writeAll(m_outputfd, &buffer[0], numRead)) {
             break;
         }
     }

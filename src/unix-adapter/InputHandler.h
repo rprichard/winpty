@@ -27,10 +27,10 @@
 
 #include "WakeupFd.h"
 
-// Connect Cygwin blocking tty STDIN_FILENO to winpty CONIN.
+// Connect a Cygwin blocking fd to winpty CONIN.
 class InputHandler {
 public:
-    InputHandler(HANDLE conin, WakeupFd &completionWakeup);
+    InputHandler(HANDLE conin, int inputfd, WakeupFd &completionWakeup);
     ~InputHandler() { shutdown(); }
     bool isComplete() { return m_threadCompleted; }
     void startShutdown() { m_shouldShutdown = 1; m_wakeup.set(); }
@@ -44,6 +44,7 @@ private:
     void threadProc();
 
     HANDLE m_conin;
+    int m_inputfd;
     pthread_t m_thread;
     WakeupFd &m_completionWakeup;
     WakeupFd m_wakeup;

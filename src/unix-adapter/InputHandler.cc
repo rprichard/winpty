@@ -33,14 +33,15 @@
 #include "Util.h"
 #include "WakeupFd.h"
 
-InputHandler::InputHandler(HANDLE conin, WakeupFd &completionWakeup) :
+InputHandler::InputHandler(
+        HANDLE conin, int inputfd, WakeupFd &completionWakeup) :
     m_conin(conin),
+    m_inputfd(inputfd),
     m_completionWakeup(completionWakeup),
     m_threadHasBeenJoined(false),
     m_shouldShutdown(0),
     m_threadCompleted(0)
 {
-    assert(isatty(STDIN_FILENO));
     pthread_create(&m_thread, NULL, InputHandler::threadProcS, this);
 }
 
@@ -67,16 +68,16 @@ void InputHandler::threadProc() {
 
         // Block until data arrives.
         {
-            const int max_fd = std::max(STDIN_FILENO, m_wakeup.fd());
-            FD_SET(STDIN_FILENO, &readfds);
+            const int max_fd = std::max(m_inputfd, m_wakeup.fd());
+            FD_SET(m_inputfd, &readfds);
             FD_SET(m_wakeup.fd(), &readfds);
             selectWrapper("InputHandler", max_fd + 1, &readfds);
-            if (!FD_ISSET(STDIN_FILENO, &readfds)) {
+            if (!FD_ISSET(m_inputfd, &readfds)) {
                 continue;
             }
         }
 
-        const int numRead = read(STDIN_FILENO, &buffer[0], buffer.size());
+        const int numRead = read(m_inputfd, &buffer[0], buffer.size());
         if (numRead == -1 && errno == EINTR) {
             // Apparently, this read is interrupted on Cygwin 1.7 by a SIGWINCH
             // signal even though I set the SA_RESTART flag on the handler.
