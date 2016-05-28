@@ -2,6 +2,7 @@
 
 #include "TestUtil.cc"
 #include "../src/shared/DebugClient.cc"
+#include "../src/shared/WinptyAssert.cc"
 
 int main(int argc, char *argv[]) {
     int col = atoi(argv[1]);
