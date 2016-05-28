@@ -272,6 +272,13 @@ void Scraper::syncConsoleContentAndSize(
     Win32Console::FreezeGuard guard(m_console, true);
 
     const ConsoleScreenBufferInfo info = m_consoleBuffer->bufferInfo();
+    BOOL cursorVisible = true;
+    CONSOLE_CURSOR_INFO cursorInfo = {};
+    if (!GetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursorInfo)) {
+        trace("GetConsoleCursorInfo failed");
+    } else {
+        cursorVisible = cursorInfo.bVisible;
+    }
 
     // If an app resizes the buffer height, then we enter "direct mode", where
     // we stop trying to track incremental console changes.
@@ -289,9 +296,9 @@ void Scraper::syncConsoleContentAndSize(
     }
 
     if (m_directMode) {
-        directScrapeOutput(info);
+        directScrapeOutput(info, cursorVisible);
     } else {
-        scrollingScrapeOutput(info);
+        scrollingScrapeOutput(info, cursorVisible);
     }
 
     if (forceResize) {
@@ -302,9 +309,9 @@ void Scraper::syncConsoleContentAndSize(
     }
 }
 
-void Scraper::directScrapeOutput(const ConsoleScreenBufferInfo &info)
+void Scraper::directScrapeOutput(const ConsoleScreenBufferInfo &info,
+                                 bool cursorVisible)
 {
-    const Coord cursor = info.cursorPosition();
     const SmallRect windowRect = info.windowRect();
 
     const SmallRect scrapeRect(
@@ -315,6 +322,15 @@ void Scraper::directScrapeOutput(const ConsoleScreenBufferInfo &info)
                         BUFFER_LINE_COUNT));
     const int w = scrapeRect.width();
     const int h = scrapeRect.height();
+
+    const Coord cursor = info.cursorPosition();
+    const int cursorColumn = !cursorVisible ? -1 :
+        constrained(0, cursor.X - scrapeRect.Left, w - 1);
+    const int cursorLine = !cursorVisible ? -1 :
+        constrained(0, cursor.Y - scrapeRect.Top, h - 1);
+    if (!cursorVisible) {
+        m_terminal->hideTerminalCursor();
+    }
 
     largeConsoleRead(m_readBuffer, *m_consoleBuffer, scrapeRect);
 
@@ -329,18 +345,19 @@ void Scraper::directScrapeOutput(const ConsoleScreenBufferInfo &info)
             sawModifiedLine = bufLine.detectChangeAndSetLine(curLine, w);
         }
         if (sawModifiedLine) {
-            //trace("sent line %d", line);
-            m_terminal->sendLine(line, curLine, w);
+            const int lineCursorColumn =
+                line == cursorLine ? cursorColumn : -1;
+            m_terminal->sendLine(line, curLine, w, lineCursorColumn);
         }
     }
 
-    m_terminal->finishOutput(
-        std::pair<int, int64_t>(
-            constrained(0, cursor.X - scrapeRect.Left, w - 1),
-            constrained(0, cursor.Y - scrapeRect.Top, h - 1)));
+    if (cursorVisible) {
+        m_terminal->showTerminalCursor(cursorColumn, cursorLine);
+    }
 }
 
-void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
+void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
+                                    bool cursorVisible)
 {
     const Coord cursor = info.cursorPosition();
     const SmallRect windowRect = info.windowRect();
@@ -422,6 +439,12 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
         std::min(m_dirtyLineCount, windowRect.top() + windowRect.height()) +
             m_scrolledCount;
 
+    const int64_t cursorLine = !cursorVisible ? -1 : cursor.Y + m_scrolledCount;
+    const int cursorColumn = !cursorVisible ? -1 : cursor.X;
+    if (!cursorVisible) {
+        m_terminal->hideTerminalCursor();
+    }
+
     bool sawModifiedLine = false;
 
     const int w = m_readBuffer.rect().width();
@@ -439,8 +462,9 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
             sawModifiedLine = bufLine.detectChangeAndSetLine(curLine, w);
         }
         if (sawModifiedLine) {
-            //trace("sent line %d", line);
-            m_terminal->sendLine(line, curLine, w);
+            const int lineCursorColumn =
+                line == cursorLine ? cursorColumn : -1;
+            m_terminal->sendLine(line, curLine, w, lineCursorColumn);
         }
     }
 
@@ -454,9 +478,9 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info)
         createSyncMarker(newSyncRow);
     }
 
-    m_terminal->finishOutput(
-        std::pair<int, int64_t>(cursor.X,
-                                cursor.Y + m_scrolledCount));
+    if (cursorVisible) {
+        m_terminal->showTerminalCursor(cursorColumn, cursorLine);
+    }
 }
 
 void Scraper::syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN])

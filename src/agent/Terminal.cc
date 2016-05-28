@@ -295,34 +295,81 @@ void Terminal::reset(SendClearFlag sendClearFirst, int64_t newLine)
         m_output.write(CSI"0m" CSI"1;1H" CSI"2J");
     }
     m_remoteLine = newLine;
+    m_remoteColumn = 0;
+    m_lineData.clear();
     m_cursorHidden = false;
-    m_cursorPos = std::pair<int, int64_t>(0, newLine);
     m_remoteColor = -1;
 }
 
-void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width)
+void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width,
+                        int cursorColumn)
 {
-    hideTerminalCursor();
+    ASSERT(width >= 1);
+
     moveTerminalToLine(line);
 
-    m_termLine.clear();
+    // If possible, see if we can append to what we've already output for this
+    // line.
+    if (m_lineDataValid) {
+        ASSERT(m_lineData.size() == static_cast<size_t>(m_remoteColumn));
+        if (m_remoteColumn > 0) {
+            // In normal mode, if m_lineData.size() equals `width`, then we
+            // will have trouble outputing the "erase rest of line" command,
+            // which must be output before reaching the end of the line.  In
+            // plain mode, we don't output that command, so we're OK with a
+            // full line.
+            bool okWidth = false;
+            if (m_plainMode) {
+                okWidth = static_cast<size_t>(width) >= m_lineData.size();
+            } else {
+                okWidth = static_cast<size_t>(width) > m_lineData.size();
+            }
+            if (!okWidth ||
+                    memcmp(m_lineData.data(), lineData,
+                           sizeof(CHAR_INFO) * m_lineData.size()) != 0) {
+                m_lineDataValid = false;
+            }
+        }
+    }
+    if (!m_lineDataValid) {
+        // We can't reuse, so we must reset this line.
+        hideTerminalCursor();
+        if (m_plainMode) {
+            // We can't backtrack, so repeat this line.
+            m_output.write("\r\n");
+        } else {
+            m_output.write("\r");
+        }
+        m_lineDataValid = true;
+        m_lineData.clear();
+        m_remoteColumn = 0;
+    }
+
+    std::string &termLine = m_termLineWorkingBuffer;
+    termLine.clear();
     size_t trimmedLineLength = 0;
+    int trimmedCellCount = m_lineData.size();
     bool alreadyErasedLine = false;
 
     int cellCount = 1;
-    for (int i = 0; i < width; i += cellCount) {
-        int color = lineData[i].Attributes & COLOR_ATTRIBUTE_MASK;
-        if (color != m_remoteColor) {
-            if (!m_plainMode) {
-                outputSetColor(m_termLine, color);
+    for (int i = m_lineData.size(); i < width; i += cellCount) {
+        if (m_outputColor) {
+            int color = lineData[i].Attributes & COLOR_ATTRIBUTE_MASK;
+            if (color != m_remoteColor) {
+                outputSetColor(termLine, color);
+                trimmedLineLength = termLine.size();
+                m_remoteColor = color;
+
+                // All the cells just up to this color change will be output.
+                trimmedCellCount = i;
             }
-            trimmedLineLength = m_termLine.size();
-            m_remoteColor = color;
         }
         unsigned int ch;
         scanUnicodeScalarValue(&lineData[i], width - i, cellCount, ch);
         if (ch == ' ') {
-            m_termLine.push_back(' ');
+            // Tentatively add this space character.  We'll only output it if
+            // we see something interesting after it.
+            termLine.push_back(' ');
         } else {
             if (i + cellCount == width) {
                 // We'd like to erase the line after outputting all non-blank
@@ -333,7 +380,7 @@ void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width)
                 // the line.  Work around this behavior by issuing the erase
                 // one character early in that case.
                 if (!m_plainMode) {
-                    m_termLine.append(CSI"0K"); // Erase from cursor to EOL
+                    termLine.append(CSI"0K"); // Erase from cursor to EOL
                 }
                 alreadyErasedLine = true;
             }
@@ -344,64 +391,97 @@ void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width)
                 enc[0] = '?';
                 enclen = 1;
             }
-            m_termLine.append(enc, enclen);
-            trimmedLineLength = m_termLine.size();
+            termLine.append(enc, enclen);
+            trimmedLineLength = termLine.size();
+
+            // All the cells up to and including this cell will be output.
+            trimmedCellCount = i + cellCount;
         }
     }
 
-    m_output.write(m_termLine.data(), trimmedLineLength);
+    if (cursorColumn != -1 && trimmedCellCount > cursorColumn) {
+        // The line content would run past the cursor, so hide it before we
+        // output.
+        hideTerminalCursor();
+    }
 
+    m_output.write(termLine.data(), trimmedLineLength);
     if (!alreadyErasedLine && !m_plainMode) {
         m_output.write(CSI"0K"); // Erase from cursor to EOL
     }
+
+    ASSERT(trimmedCellCount <= width);
+    m_lineData.insert(m_lineData.end(),
+                      &lineData[m_lineData.size()],
+                      &lineData[trimmedCellCount]);
+    m_remoteColumn = trimmedCellCount;
 }
 
-void Terminal::finishOutput(const std::pair<int, int64_t> &newCursorPos)
+void Terminal::showTerminalCursor(int column, int64_t line)
 {
-    if (newCursorPos != m_cursorPos)
-        hideTerminalCursor();
-    if (m_cursorHidden) {
-        moveTerminalToLine(newCursorPos.second);
-        char buffer[32];
-        winpty_snprintf(buffer, CSI"%dG" CSI"?25h", newCursorPos.first + 1);
-        if (!m_plainMode)
+    moveTerminalToLine(line);
+    if (!m_plainMode) {
+        if (m_remoteColumn != column) {
+            char buffer[32];
+            winpty_snprintf(buffer, CSI"%dG", column + 1);
             m_output.write(buffer);
-        m_cursorHidden = false;
+            m_lineDataValid = (column == 0);
+            m_lineData.clear();
+            m_remoteColumn = column;
+        }
+        if (m_cursorHidden) {
+            m_output.write(CSI"?25h");
+            m_cursorHidden = false;
+        }
     }
-    m_cursorPos = newCursorPos;
 }
 
 void Terminal::hideTerminalCursor()
 {
-    if (m_cursorHidden)
-        return;
-    if (!m_plainMode)
+    if (!m_plainMode) {
+        if (m_cursorHidden) {
+            return;
+        }
         m_output.write(CSI"?25l");
-    m_cursorHidden = true;
+        m_cursorHidden = true;
+    }
 }
 
 void Terminal::moveTerminalToLine(int64_t line)
 {
+    if (line == m_remoteLine) {
+        return;
+    }
+
     // Do not use CPL or CNL.  Konsole 2.5.4 does not support Cursor Previous
     // Line (CPL) -- there are "Undecodable sequence" errors.  gnome-terminal
     // 2.32.0 does handle it.  Cursor Next Line (CNL) does nothing if the
     // cursor is on the last line already.
 
+    hideTerminalCursor();
+
     if (line < m_remoteLine) {
-        // CUrsor Up (CUU)
-        char buffer[32];
-        winpty_snprintf(buffer, "\r" CSI"%dA",
-            static_cast<int>(m_remoteLine - line));
-        if (!m_plainMode)
+        if (m_plainMode) {
+            // We can't backtrack, so instead repeat the lines again.
+            m_output.write("\r\n");
+            m_remoteLine = line;
+        } else {
+            // Backtrack and overwrite previous lines.
+            // CUrsor Up (CUU)
+            char buffer[32];
+            winpty_snprintf(buffer, "\r" CSI"%uA",
+                static_cast<unsigned int>(m_remoteLine - line));
             m_output.write(buffer);
-        m_remoteLine = line;
+            m_remoteLine = line;
+        }
     } else if (line > m_remoteLine) {
         while (line > m_remoteLine) {
-            if (!m_plainMode)
-                m_output.write("\r\n");
+            m_output.write("\r\n");
             m_remoteLine++;
         }
-    } else {
-        m_output.write("\r");
     }
+
+    m_lineDataValid = true;
+    m_lineData.clear();
+    m_remoteColumn = 0;
 }

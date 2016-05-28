@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 #include <string>
-#include <utility>
+#include <vector>
 
 #include "Coord.h"
 
@@ -41,20 +41,23 @@ public:
 
     enum SendClearFlag { OmitClear, SendClear };
     void reset(SendClearFlag sendClearFirst, int64_t newLine);
-    void sendLine(int64_t line, const CHAR_INFO *lineData, int width);
-    void finishOutput(const std::pair<int, int64_t> &newCursorPos);
+    void sendLine(int64_t line, const CHAR_INFO *lineData, int width,
+                  int cursorColumn);
+    void showTerminalCursor(int column, int64_t line);
+    void hideTerminalCursor();
 
 private:
-    void hideTerminalCursor();
     void moveTerminalToLine(int64_t line);
 
 private:
     NamedPipe &m_output;
     int64_t m_remoteLine = 0;
+    int m_remoteColumn = 0;
+    bool m_lineDataValid = true;
+    std::vector<CHAR_INFO> m_lineData;
     bool m_cursorHidden = false;
-    std::pair<int, int64_t> m_cursorPos;
     int m_remoteColor = -1;
-    std::string m_termLine;
+    std::string m_termLineWorkingBuffer;
     bool m_plainMode = false;
     bool m_outputColor = true; // TODO: Respect the m_outputColor flag.
 };
