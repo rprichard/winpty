@@ -202,7 +202,7 @@ public:
         if (!m_finished) {
             // We're not usually that interested in CancelIo's return value.
             // In any case, we must not throw an exception in this dtor.
-            CancelIo(&m_over);
+            CancelIo(m_file);
             waitForCompletion();
         }
     }
