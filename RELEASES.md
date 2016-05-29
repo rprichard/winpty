@@ -2,6 +2,12 @@
 
 The winpty library has a new API that should be easier for embedding.
 
+Bug fixes:
+
+ * By default, `winpty.dll` avoids calling `SetProcessWindowStation` within
+   the calling process.
+   [#58](https://github.com/rprichard/winpty/issues/58)
+
 # Version 0.3.0 (2016-05-20)
 
 User-visible changes:

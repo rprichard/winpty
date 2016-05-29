@@ -65,10 +65,24 @@
  * them. */
 #define WINPTY_FLAG_COLOR_ESCAPES       0x4ull
 
+/* On XP and Vista, winpty needs to put the hidden console on a desktop in a
+ * service window station so that its polling does not interfere with other
+ * (visible) console windows.  To create this desktop, it must change the
+ * process' window station (i.e. SetProcessWindowStation) for the duration of
+ * the winpty_open call.  In theory, this change could interfere with the
+ * winpty client (e.g. other threads, spawning children), so winpty by default
+ * spawns a special agent process to create the hidden desktop.  Spawning
+ * processes on Windows is slow, though, so if
+ * WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION is set, winpty changes this
+ * process' window station instead.
+ * See https://github.com/rprichard/winpty/issues/58. */
+#define WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION 0x8ull
+
 #define WINPTY_FLAG_MASK (0ull \
     | WINPTY_FLAG_CONERR \
     | WINPTY_FLAG_PLAIN_OUTPUT \
     | WINPTY_FLAG_COLOR_ESCAPES \
+    | WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION \
 )
 
 

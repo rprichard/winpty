@@ -54,6 +54,7 @@ struct winpty_s {
     OwnedHandle controlPipe;
     DWORD agentTimeoutMs = 0;
     OwnedHandle ioEvent;
+    std::wstring spawnDesktopName;
     std::wstring coninPipeName;
     std::wstring conoutPipeName;
     std::wstring conerrPipeName;

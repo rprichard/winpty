@@ -24,6 +24,7 @@ $(eval $(call def_mingw_target,agent,-DWINPTY_AGENT_ASSERT))
 
 AGENT_OBJECTS = \
 	build/agent/agent/Agent.o \
+	build/agent/agent/AgentCreateDesktop.o \
 	build/agent/agent/ConsoleFont.o \
 	build/agent/agent/ConsoleInput.o \
 	build/agent/agent/ConsoleLine.o \
@@ -38,6 +39,7 @@ AGENT_OBJECTS = \
 	build/agent/agent/Win32Console.o \
 	build/agent/agent/Win32ConsoleBuffer.o \
 	build/agent/agent/main.o \
+	build/agent/shared/BackgroundDesktop.o \
 	build/agent/shared/Buffer.o \
 	build/agent/shared/DebugClient.o \
 	build/agent/shared/GenRandom.o \

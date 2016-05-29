@@ -23,15 +23,18 @@
 #include <string.h>
 #include <wchar.h>
 
-#include "Agent.h"
-#include "DebugShowInput.h"
 #include "../shared/StringUtil.h"
 #include "../shared/WindowsVersion.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/WinptyVersion.h"
 
+#include "Agent.h"
+#include "AgentCreateDesktop.h"
+#include "DebugShowInput.h"
+
 const char USAGE[] =
 "Usage: %ls controlPipeName flags cols rows\n"
+"Usage: %ls controlPipeName --create-desktop\n"
 "\n"
 "Ordinarily, this program is launched by winpty.dll and is not directly\n"
 "useful to winpty users.  However, it also has options intended for\n"
@@ -77,8 +80,13 @@ int main() {
         return 0;
     }
 
+    if (argc == 3 && !wcscmp(argv[2], L"--create-desktop")) {
+        handleCreateDesktop(argv[1]);
+        return 0;
+    }
+
     if (argc != 5) {
-        fprintf(stderr, USAGE, argv[0], argv[0]);
+        fprintf(stderr, USAGE, argv[0], argv[0], argv[0]);
         return 1;
     }
 

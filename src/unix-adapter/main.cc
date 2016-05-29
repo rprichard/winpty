@@ -509,7 +509,7 @@ int main(int argc, char *argv[])
     sz.ws_row = 25;
     ioctl(STDIN_FILENO, TIOCGWINSZ, &sz);
 
-    DWORD agentFlags = 0;
+    DWORD agentFlags = WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION;
     if (args.testConerr)        { agentFlags |= WINPTY_FLAG_CONERR; }
     if (args.testPlainOutput)   { agentFlags |= WINPTY_FLAG_PLAIN_OUTPUT; }
     if (args.testColorEscapes)  { agentFlags |= WINPTY_FLAG_COLOR_ESCAPES; }
