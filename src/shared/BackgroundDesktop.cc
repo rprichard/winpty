@@ -20,6 +20,8 @@
 
 #include "BackgroundDesktop.h"
 
+#include <memory>
+
 #include "DebugClient.h"
 #include "StringUtil.h"
 #include "WinptyException.h"
