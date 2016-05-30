@@ -41,40 +41,6 @@
 #define MAPVK_VK_TO_VSC 0
 #endif
 
-// Note regarding ENABLE_EXTENDED_FLAGS
-//
-// There is a complicated interaction between the ENABLE_EXTENDED_FLAGS flag
-// and the ENABLE_QUICK_EDIT_MODE and ENABLE_INSERT_MODE flags (presumably for
-// backwards compatibility?).  I studied the behavior on Windows 7 and Windows
-// 10, with both the old and new consoles, and I didn't see any differences
-// between versions.  Here's what I seemed to observe:
-//
-//  - The console has three flags internally:
-//     - QuickEdit
-//     - InsertMode
-//     - ExtendedFlags
-//
-//  - SetConsoleMode behaves as such:
-//       ExtendedFlags = mode & (ENABLE_QUICK_EDIT_MODE | ENABLE_INSERT_MODE | ENABLE_EXTENDED_FLAGS)
-//       if (ExtendedFlags) { QuickEdit = mode & ENABLE_QUICK_EDIT_MODE }
-//       if (ExtendedFlags) { InsertMode = mode & ENABLE_INSERT_MODE }
-//
-//  - Setting QuickEdit or InsertMode from the properties dialog GUI does not
-//    affect the ExtendedFlags setting -- it simply toggles the one flag.
-//
-//  - GetConsoleMode behaves as such:
-//       if (ExtendedFlags) {
-//          result |= ENABLE_EXTENDED_FLAGS;
-//          if (QuickEdit) { result |= ENABLE_QUICK_EDIT_MODE }
-//          if (InsertMode) { result |= ENABLE_INSERT_MODE }
-//       }
-//
-// Effectively, the ExtendedFlags flags controls whether the other two flags
-// are visible/controlled by the user application.  If they aren't visible,
-// though, there is no way for the user application to make them visible,
-// except by overwriting their value!  Calling SetConsoleMode with just
-// ENABLE_EXTENDED_FLAGS would clear the extended flags we want to read.
-
 namespace {
 
 struct MouseRecord {
@@ -266,6 +232,7 @@ ConsoleInput::ConsoleInput(HANDLE conin, int mouseMode, DsrSender &dsrSender) :
     //    then we must choose the InsertMode setting.  I don't *think* this
     //    case happens, though, because a new console always has ExtendedFlags
     //    ON.
+    // See misc/EnableExtendedFlags.txt.
     DWORD mode = 0;
     if (!GetConsoleMode(conin, &mode)) {
         trace("Agent startup: GetConsoleMode failed");
@@ -360,7 +327,14 @@ bool ConsoleInput::updateMouseInputFlags(bool forceTrace)
 
     // Return whether the agent should activate the terminal's mouse mode.
     if (m_mouseMode == WINPTY_MOUSE_MODE_AUTO) {
-        return m_mouseInputEnabled && !m_quickEditEnabled;
+        // Some programs (e.g. Cygwin command-line programs like bash.exe and
+        // python2.7.exe) turn off ENABLE_EXTENDED_FLAGS and turn on
+        // ENABLE_MOUSE_INPUT, but do not turn off QuickEdit mode and do not
+        // actually care about mouse input.  Only enable the terminal mouse
+        // mode if ENABLE_EXTENDED_FLAGS is on.  See
+        // misc/EnableExtendedFlags.txt.
+        return m_mouseInputEnabled && !m_quickEditEnabled &&
+                m_enableExtendedEnabled;
     } else if (m_mouseMode == WINPTY_MOUSE_MODE_FORCE) {
         return true;
     } else {

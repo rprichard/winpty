@@ -143,8 +143,8 @@ void debugShowInput(bool enableMouse) {
         // If ENABLE_EXTENDED_FLAGS wasn't originally in the console mode, then
         // we have no way of knowning whether QuickEdit or InsertMode are
         // currently enabled.  Enable them both (eventually), because they're
-        // sensible defaults.  This case shouldn't happen typically.  See the
-        // large ENABLE_EXTENDED_FLAGS comment block in ConsoleInput.cc.
+        // sensible defaults.  This case shouldn't happen typically.  See
+        // misc/EnableExtendedFlags.txt.
         origConsoleMode |= ENABLE_EXTENDED_FLAGS;
         origConsoleMode |= ENABLE_QUICK_EDIT_MODE;
         origConsoleMode |= ENABLE_INSERT_MODE;
