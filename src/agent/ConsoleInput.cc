@@ -272,10 +272,10 @@ ConsoleInput::ConsoleInput(HANDLE conin, int mouseMode, DsrSender &dsrSender) :
     } else {
         mode |= ENABLE_EXTENDED_FLAGS;
         mode |= ENABLE_INSERT_MODE;
-        if (m_mouseMode == WINPTY_MOUSE_MODE_FORCE) {
-            mode &= ~ENABLE_QUICK_EDIT_MODE;
-        } else {
+        if (m_mouseMode == WINPTY_MOUSE_MODE_AUTO) {
             mode |= ENABLE_QUICK_EDIT_MODE;
+        } else {
+            mode &= ~ENABLE_QUICK_EDIT_MODE;
         }
         if (!SetConsoleMode(conin, mode)) {
             trace("Agent startup: SetConsoleMode failed");

@@ -85,7 +85,7 @@
     | WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION \
 )
 
-/* QuickEdit mode is initially enabled, and the agent does not send mouse
+/* QuickEdit mode is initially disabled, and the agent does not send mouse
  * mode sequences to the terminal.  If it receives mouse input, though, it
  * still writes MOUSE_EVENT_RECORD values into CONIN. */
 #define WINPTY_MOUSE_MODE_NONE          0
