@@ -33,7 +33,7 @@
 #include "DebugShowInput.h"
 
 const char USAGE[] =
-"Usage: %ls controlPipeName flags cols rows\n"
+"Usage: %ls controlPipeName flags mouseMode cols rows\n"
 "Usage: %ls controlPipeName --create-desktop\n"
 "\n"
 "Ordinarily, this program is launched by winpty.dll and is not directly\n"
@@ -85,7 +85,7 @@ int main() {
         return 0;
     }
 
-    if (argc != 5) {
+    if (argc != 6) {
         fprintf(stderr, USAGE, argv[0], argv[0], argv[0]);
         return 1;
     }
@@ -93,7 +93,8 @@ int main() {
     Agent agent(argv[1],
                 winpty_atoi64(utf8FromWide(argv[2]).c_str()),
                 atoi(utf8FromWide(argv[3]).c_str()),
-                atoi(utf8FromWide(argv[4]).c_str()));
+                atoi(utf8FromWide(argv[4]).c_str()),
+                atoi(utf8FromWide(argv[5]).c_str()));
     agent.run();
 
     // The Agent destructor shouldn't return, but if it does, exit

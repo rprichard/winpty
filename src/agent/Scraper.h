@@ -58,6 +58,7 @@ public:
                       ConsoleScreenBufferInfo &finalInfoOut);
     void scrapeBuffer(Win32ConsoleBuffer &buffer,
                       ConsoleScreenBufferInfo &finalInfoOut);
+    Terminal &terminal() { return *m_terminal; }
 
 private:
     void resetConsoleTracking(

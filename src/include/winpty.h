@@ -97,6 +97,10 @@ WINPTY_API void winpty_config_free(winpty_config_t *cfg);
 WINPTY_API void
 winpty_config_set_initial_size(winpty_config_t *cfg, int cols, int rows);
 
+/* Set the mouse mode to one of the WINPTY_MOUSE_MODE_xxx constants. */
+WINPTY_API void
+winpty_config_set_mouse_mode(winpty_config_t *cfg, int mouseMode);
+
 /* Amount of time to wait for the agent to startup and to wait for any given
  * agent RPC request.  Must be greater than 0.  Can be INFINITE. */
 WINPTY_API void

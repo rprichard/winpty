@@ -26,17 +26,54 @@
 #include <algorithm>
 #include <string>
 
-#include "DebugShowInput.h"
-#include "DefaultInputMap.h"
-#include "DsrSender.h"
-#include "Win32Console.h"
+#include "../include/winpty_constants.h"
+
 #include "../shared/DebugClient.h"
 #include "../shared/StringBuilder.h"
 #include "../shared/UnixCtrlChars.h"
 
+#include "DebugShowInput.h"
+#include "DefaultInputMap.h"
+#include "DsrSender.h"
+#include "Win32Console.h"
+
 #ifndef MAPVK_VK_TO_VSC
 #define MAPVK_VK_TO_VSC 0
 #endif
+
+// Note regarding ENABLE_EXTENDED_FLAGS
+//
+// There is a complicated interaction between the ENABLE_EXTENDED_FLAGS flag
+// and the ENABLE_QUICK_EDIT_MODE and ENABLE_INSERT_MODE flags (presumably for
+// backwards compatibility?).  I studied the behavior on Windows 7 and Windows
+// 10, with both the old and new consoles, and I didn't see any differences
+// between versions.  Here's what I seemed to observe:
+//
+//  - The console has three flags internally:
+//     - QuickEdit
+//     - InsertMode
+//     - ExtendedFlags
+//
+//  - SetConsoleMode behaves as such:
+//       ExtendedFlags = mode & (ENABLE_QUICK_EDIT_MODE | ENABLE_INSERT_MODE | ENABLE_EXTENDED_FLAGS)
+//       if (ExtendedFlags) { QuickEdit = mode & ENABLE_QUICK_EDIT_MODE }
+//       if (ExtendedFlags) { InsertMode = mode & ENABLE_INSERT_MODE }
+//
+//  - Setting QuickEdit or InsertMode from the properties dialog GUI does not
+//    affect the ExtendedFlags setting -- it simply toggles the one flag.
+//
+//  - GetConsoleMode behaves as such:
+//       if (ExtendedFlags) {
+//          result |= ENABLE_EXTENDED_FLAGS;
+//          if (QuickEdit) { result |= ENABLE_QUICK_EDIT_MODE }
+//          if (InsertMode) { result |= ENABLE_INSERT_MODE }
+//       }
+//
+// Effectively, the ExtendedFlags flags controls whether the other two flags
+// are visible/controlled by the user application.  If they aren't visible,
+// though, there is no way for the user application to make them visible,
+// except by overwriting their value!  Calling SetConsoleMode with just
+// ENABLE_EXTENDED_FLAGS would clear the extended flags we want to read.
 
 namespace {
 
@@ -209,14 +246,42 @@ static int utf8CharLength(char firstByte)
 
 } // anonymous namespace
 
-ConsoleInput::ConsoleInput(HANDLE conin, DsrSender &dsrSender) :
+ConsoleInput::ConsoleInput(HANDLE conin, int mouseMode, DsrSender &dsrSender) :
     m_conin(conin),
+    m_mouseMode(mouseMode),
     m_dsrSender(dsrSender)
 {
     addDefaultEntriesToInputMap(m_inputMap);
     if (hasDebugFlag("dump_input_map")) {
         m_inputMap.dumpInputMap();
     }
+
+    // Configure Quick Edit mode according to the mouse mode.  Enable
+    // InsertMode for two reasons:
+    //  - If it's OFF, it's difficult for the user to turn it ON.  The
+    //    properties dialog is inaccesible.  winpty still faithfully handles
+    //    the Insert key, which toggles between the insertion and overwrite
+    //    modes.
+    //  - When we modify the QuickEdit setting, if ExtendedFlags is OFF,
+    //    then we must choose the InsertMode setting.  I don't *think* this
+    //    case happens, though, because a new console always has ExtendedFlags
+    //    ON.
+    DWORD mode = 0;
+    if (!GetConsoleMode(conin, &mode)) {
+        trace("Agent startup: GetConsoleMode failed");
+    } else {
+        mode |= ENABLE_EXTENDED_FLAGS;
+        mode |= ENABLE_INSERT_MODE;
+        if (m_mouseMode == WINPTY_MOUSE_MODE_FORCE) {
+            mode &= ~ENABLE_QUICK_EDIT_MODE;
+        } else {
+            mode |= ENABLE_QUICK_EDIT_MODE;
+        }
+        if (!SetConsoleMode(conin, mode)) {
+            trace("Agent startup: SetConsoleMode failed");
+        }
+    }
+
     updateMouseInputFlags(true);
 }
 
@@ -274,20 +339,33 @@ void ConsoleInput::flushIncompleteEscapeCode()
     }
 }
 
-void ConsoleInput::updateMouseInputFlags(bool forceTrace)
+bool ConsoleInput::updateMouseInputFlags(bool forceTrace)
 {
     const DWORD mode = inputConsoleMode();
+    const bool newFlagEE = mode & ENABLE_EXTENDED_FLAGS;
     const bool newFlagMI = mode & ENABLE_MOUSE_INPUT;
     const bool newFlagQE = mode & ENABLE_QUICK_EDIT_MODE;
     if (forceTrace ||
+            newFlagEE != m_enableExtendedEnabled ||
             newFlagMI != m_mouseInputEnabled ||
             newFlagQE != m_quickEditEnabled) {
-        trace("CONIN mode: ENABLE_MOUSE_INPUT=%s ENABLE_QUICK_EDIT_MODE=%s",
-            newFlagMI ? "enabled" : "disabled",
-            newFlagQE ? "enabled" : "disabled");
+        trace("CONIN mouse modes: ENABLE_EXTENDED_FLAGS=%s, ENABLE_MOUSE_INPUT=%s ENABLE_QUICK_EDIT_MODE=%s",
+            newFlagEE ? "on" : "off",
+            newFlagMI ? "on" : "off",
+            newFlagQE ? "on" : "off");
     }
+    m_enableExtendedEnabled = newFlagEE;
     m_mouseInputEnabled = newFlagMI;
     m_quickEditEnabled = newFlagQE;
+
+    // Return whether the agent should activate the terminal's mouse mode.
+    if (m_mouseMode == WINPTY_MOUSE_MODE_AUTO) {
+        return m_mouseInputEnabled && !m_quickEditEnabled;
+    } else if (m_mouseMode == WINPTY_MOUSE_MODE_FORCE) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void ConsoleInput::doWrite(bool isEof)

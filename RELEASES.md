@@ -2,6 +2,15 @@
 
 The winpty library has a new API that should be easier for embedding.
 
+User-visible changes:
+
+ * winpty now automatically puts the terminal into mouse mode when it detects
+   that the console has left QuickEdit mode.  The `--mouse` option still forces
+   the terminal into mouse mode.  In principle, an option could be added to
+   suppress terminal mode, but hopefully it won't be necessary.  There is a
+   script in the `misc` subdirectory, `misc/ConinMode.ps1`, that can change
+   the QuickEdit mode from the command-line.
+
 Bug fixes:
 
  * By default, `winpty.dll` avoids calling `SetProcessWindowStation` within

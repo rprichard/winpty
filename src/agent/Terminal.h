@@ -49,6 +49,9 @@ public:
 private:
     void moveTerminalToLine(int64_t line);
 
+public:
+    void enableMouseMode(bool enabled);
+
 private:
     NamedPipe &m_output;
     int64_t m_remoteLine = 0;
@@ -60,6 +63,7 @@ private:
     std::string m_termLineWorkingBuffer;
     bool m_plainMode = false;
     bool m_outputColor = true; // TODO: Respect the m_outputColor flag.
+    bool m_mouseModeEnabled = false;
 };
 
 #endif // TERMINAL_H

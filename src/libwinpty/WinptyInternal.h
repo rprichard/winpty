@@ -45,6 +45,7 @@ struct winpty_config_s {
     uint64_t flags = 0;
     int cols = 80;
     int rows = 25;
+    int mouseMode = WINPTY_MOUSE_MODE_AUTO;
     DWORD timeoutMs = 30000;
 };
 

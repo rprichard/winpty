@@ -137,7 +137,21 @@ void debugShowInput(bool enableMouse) {
                         "is STDIN a console handle?\n");
         exit(1);
     }
-    DWORD newConsoleMode = origConsoleMode;
+    DWORD newConsoleMode = 0;
+    if (enableMouse && !(origConsoleMode & ENABLE_EXTENDED_FLAGS)) {
+        // We need to disable QuickEdit mode, because it blocks mouse events.
+        // If ENABLE_EXTENDED_FLAGS wasn't originally in the console mode, then
+        // we have no way of knowning whether QuickEdit or InsertMode are
+        // currently enabled.  Enable them both (eventually), because they're
+        // sensible defaults.  This case shouldn't happen typically.  See the
+        // large ENABLE_EXTENDED_FLAGS comment block in ConsoleInput.cc.
+        origConsoleMode |= ENABLE_EXTENDED_FLAGS;
+        origConsoleMode |= ENABLE_QUICK_EDIT_MODE;
+        origConsoleMode |= ENABLE_INSERT_MODE;
+        newConsoleMode = origConsoleMode;
+    } else {
+        newConsoleMode = origConsoleMode;
+    }
     newConsoleMode &= ~ENABLE_PROCESSED_INPUT;
     newConsoleMode &= ~ENABLE_LINE_INPUT;
     newConsoleMode &= ~ENABLE_ECHO_INPUT;

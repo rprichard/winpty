@@ -38,11 +38,11 @@ class DsrSender;
 class ConsoleInput
 {
 public:
-    ConsoleInput(HANDLE conin, DsrSender &dsrSender);
+    ConsoleInput(HANDLE conin, int mouseMode, DsrSender &dsrSender);
     void writeInput(const std::string &input);
     void flushIncompleteEscapeCode();
     void setMouseWindowRect(SmallRect val) { m_mouseWindowRect = val; }
-    void updateMouseInputFlags(bool forceTrace=false);
+    bool updateMouseInputFlags(bool forceTrace=false);
 
 private:
     void doWrite(bool isEof);
@@ -70,6 +70,7 @@ private:
 
 private:
     HANDLE m_conin = nullptr;
+    int m_mouseMode = 0;
     DsrSender &m_dsrSender;
     bool m_dsrSent = false;
     std::string m_byteQueue;
@@ -82,6 +83,7 @@ private:
         DWORD tick = 0;
         bool released = false;
     } m_doubleClick;
+    bool m_enableExtendedEnabled = false;
     bool m_mouseInputEnabled = false;
     bool m_quickEditEnabled = false;
     SmallRect m_mouseWindowRect;

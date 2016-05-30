@@ -485,3 +485,37 @@ void Terminal::moveTerminalToLine(int64_t line)
     m_lineData.clear();
     m_remoteColumn = 0;
 }
+
+void Terminal::enableMouseMode(bool enabled)
+{
+    if (m_mouseModeEnabled == enabled || m_plainMode) {
+        return;
+    }
+    m_mouseModeEnabled = enabled;
+    if (enabled) {
+        // Start by disabling UTF-8 coordinate mode (1005), just in case we
+        // have a terminal that does not support 1006/1015 modes, and 1005
+        // happens to be enabled.  The UTF-8 coordinates can't be unambiguously
+        // decoded.
+        //
+        // Enable basic mouse support first (1000), then try to switch to
+        // button-move mode (1002), then try full mouse-move mode (1003).
+        // Terminals that don't support a mode will be stuck at the highest
+        // mode they do support.
+        //
+        // Enable encoding mode 1015 first, then try to switch to 1006.  On
+        // some terminals, both modes will be enabled, but 1006 will have
+        // priority.  On other terminals, 1006 wins because it's listed last.
+        //
+        // See misc/MouseInputNotes.txt for details.
+        m_output.write(
+            CSI"?1005l"
+            CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
+    } else {
+        // Resetting both encoding modes (1006 and 1015) is necessary, but
+        // apparently we only need to use reset on one of the 100[023] modes.
+        // Doing both doesn't hurt.
+        m_output.write(
+            CSI"?1006l" CSI"?1015l" CSI"?1003l" CSI"?1002l" CSI"?1000l");
+    }
+}

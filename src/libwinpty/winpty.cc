@@ -174,6 +174,14 @@ winpty_config_set_initial_size(winpty_config_t *cfg, int cols, int rows) {
 }
 
 WINPTY_API void
+winpty_config_set_mouse_mode(winpty_config_t *cfg, int mouseMode) {
+    ASSERT(cfg != nullptr &&
+        mouseMode >= WINPTY_MOUSE_MODE_NONE &&
+        mouseMode <= WINPTY_MOUSE_MODE_FORCE);
+    cfg->mouseMode = mouseMode;
+}
+
+WINPTY_API void
 winpty_config_set_agent_timeout(winpty_config_t *cfg, DWORD timeoutMs) {
     ASSERT(cfg != nullptr && timeoutMs > 0);
     cfg->timeoutMs = timeoutMs;
@@ -638,6 +646,7 @@ winpty_open(const winpty_config_t *cfg,
         const auto params =
             (WStringBuilder(128)
                 << cfg->flags << L' '
+                << cfg->mouseMode << L' '
                 << cfg->cols << L' '
                 << cfg->rows).str_moved();
         auto wp = createAgentSession(cfg, desktopName, params,

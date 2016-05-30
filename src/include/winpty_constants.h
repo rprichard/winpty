@@ -85,6 +85,22 @@
     | WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION \
 )
 
+/* QuickEdit mode is initially enabled, and the agent does not send mouse
+ * mode sequences to the terminal.  If it receives mouse input, though, it
+ * still writes MOUSE_EVENT_RECORD values into CONIN. */
+#define WINPTY_MOUSE_MODE_NONE          0
+
+/* QuickEdit mode is initially enabled.  As CONIN enters or leaves mouse
+ * input mode (i.e. where ENABLE_MOUSE_INPUT is on and ENABLE_QUICK_EDIT_MODE
+ * is off), the agent enables or disables mouse input on the terminal.
+ *
+ * This is the default mode. */
+#define WINPTY_MOUSE_MODE_AUTO          1
+
+/* QuickEdit mode is initially disabled, and the agent enables the terminal's
+ * mouse input mode.  It does not disable terminal mouse mode (until exit). */
+#define WINPTY_MOUSE_MODE_FORCE         2
+
 
 
 /*****************************************************************************

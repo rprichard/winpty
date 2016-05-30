@@ -123,10 +123,12 @@ static int64_t int64FromHandle(HANDLE h) {
 
 Agent::Agent(LPCWSTR controlPipeName,
              uint64_t agentFlags,
+             int mouseMode,
              int initialCols,
              int initialRows) :
     m_useConerr(agentFlags & WINPTY_FLAG_CONERR),
-    m_plainMode(agentFlags & WINPTY_FLAG_PLAIN_OUTPUT)
+    m_plainMode(agentFlags & WINPTY_FLAG_PLAIN_OUTPUT),
+    m_mouseMode(mouseMode)
 {
     trace("Agent::Agent entered");
 
@@ -181,7 +183,7 @@ Agent::Agent(LPCWSTR controlPipeName,
     m_console.setTitle(m_currentTitle);
 
     const HANDLE conin = GetStdHandle(STD_INPUT_HANDLE);
-    m_consoleInput.reset(new ConsoleInput(conin, *this));
+    m_consoleInput.reset(new ConsoleInput(conin, m_mouseMode, *this));
 
     // Setup Ctrl-C handling.  First restore default handling of Ctrl-C.  This
     // attribute is inherited by child processes.  Then register a custom
@@ -189,19 +191,6 @@ Agent::Agent(LPCWSTR controlPipeName,
     // agent calls GenerateConsoleCtrlEvent.
     SetConsoleCtrlHandler(NULL, FALSE);
     SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
-
-    // Disable Quick Edit mode.  The user has little control over winpty's
-    // console, and I think it's better to default it off for the sake of
-    // programs that care about mouse input.
-    DWORD mode = 0;
-    if (!GetConsoleMode(conin, &mode)) {
-        trace("Agent startup: GetConsoleMode failed");
-    } else {
-        mode &= ~ENABLE_QUICK_EDIT_MODE;
-        if (!SetConsoleMode(conin, mode)) {
-            trace("Agent startup: SetConsoleMode failed");
-        }
-    }
 
     setPollInterval(25);
 }
@@ -221,7 +210,7 @@ Agent::~Agent()
 // bytes before it are complete keypresses.
 void Agent::sendDsr()
 {
-    if (!m_plainMode) {
+    if (!m_plainMode && !m_conoutPipe->isClosed()) {
         m_conoutPipe->write("\x1B[6n");
     }
 }
@@ -429,7 +418,7 @@ void Agent::pollConinPipe()
 void Agent::onPollTimeout()
 {
     // Check the mouse input flag so we can output a trace message.
-    m_consoleInput->updateMouseInputFlags();
+    const bool enableMouseMode = m_consoleInput->updateMouseInputFlags();
 
     // Give the ConsoleInput object a chance to flush input from an incomplete
     // escape sequence (e.g. pressing ESC).
@@ -456,6 +445,11 @@ void Agent::onPollTimeout()
         syncConsoleTitle();
         scrapeBuffers();
     }
+
+    // We must ensure that we disable mouse mode before closing the CONOUT
+    // pipe, so update the mouse mode here.
+    m_primaryScraper->terminal().enableMouseMode(
+        enableMouseMode && !m_closingOutputPipes);
 
     autoClosePipesForShutdown();
 }

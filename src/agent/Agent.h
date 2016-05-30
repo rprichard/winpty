@@ -43,6 +43,7 @@ class Agent : public EventLoop, public DsrSender
 public:
     Agent(LPCWSTR controlPipeName,
           uint64_t agentFlags,
+          int mouseMode,
           int initialCols,
           int initialRows);
     virtual ~Agent();
@@ -74,6 +75,7 @@ private:
 private:
     const bool m_useConerr;
     const bool m_plainMode;
+    const int m_mouseMode;
     Win32Console m_console;
     std::unique_ptr<Scraper> m_primaryScraper;
     std::unique_ptr<Scraper> m_errorScraper;
