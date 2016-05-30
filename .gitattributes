@@ -4,6 +4,7 @@
 *.gyp           text
 *.gypi          text
 *.h             text
+*.ps1           text eol=crlf
 *.rst           text
 *.sh            text
 *.txt           text
