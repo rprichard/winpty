@@ -125,7 +125,7 @@ install-doc :
 	mkdir -p $(PREFIX)/share/doc/winpty
 	install -m 644 -p LICENSE $(PREFIX)/share/doc/winpty
 	install -m 644 -p README.md $(PREFIX)/share/doc/winpty
-	install -m 644 -p RELEASES.md $(PREFIX)/share/doc/winpty
+	install -m 644 -p RELEASES*.md $(PREFIX)/share/doc/winpty
 
 .PHONY : install-include
 install-include :
