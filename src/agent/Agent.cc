@@ -228,7 +228,7 @@ NamedPipe &Agent::createDataServerPipe(bool write, const wchar_t *kind)
 {
     const auto name =
         (WStringBuilder(128)
-            << L"\\\\.\\pipe\\winpty-data-"
+            << L"\\\\.\\pipe\\winpty-"
             << kind << L'-'
             << GenRandom().uniqueName()).str_moved();
     NamedPipe &pipe = createNamedPipe();
