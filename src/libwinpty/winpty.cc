@@ -820,40 +820,50 @@ winpty_spawn(winpty_t *wp,
 
         // Receive reply.
         auto reply = readPacket(*wp);
-        const auto success = reply.getInt32();
-        const DWORD lastError = reply.getInt32();
-        const HANDLE process = handleFromInt64(reply.getInt64());
-        const HANDLE thread = handleFromInt64(reply.getInt64());
-        reply.assertEof();
+        const auto result = static_cast<StartProcessResult>(reply.getInt32());
+        if (result == StartProcessResult::PipesStillOpen) {
+            const auto pipeList = reply.getWString();
+            reply.assertEof();
 
-        // TODO: Maybe this is good enough, but there are code paths that leak
-        // handles...
-        if (process_handle != nullptr && process != nullptr) {
-            if (!DuplicateHandle(wp->agentProcess.get(), process,
-                    GetCurrentProcess(),
-                    process_handle, 0, FALSE,
-                    DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS)) {
-                // TODO: Shut down the winpty instance?  This code path is never supposed to happen...
-                throwWindowsError(L"DuplicateHandle of process handle");
-            }
-        }
-        if (thread_handle != nullptr && thread != nullptr) {
-            if (!DuplicateHandle(wp->agentProcess.get(), thread,
-                    GetCurrentProcess(),
-                    thread_handle, 0, FALSE,
-                    DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS)) {
-                // TODO: Shut down the winpty instance?  This code path is never supposed to happen...
-                throwWindowsError(L"DuplicateHandle of thread handle");
-            }
-        }
+            throwWinptyException(
+                (L"All I/O pipes must be connected before calling "
+                 L"winpty_spawn. These pipes are still connecting: " +
+                 pipeList).c_str());
+        } else if (result == StartProcessResult::CreateProcessFailed) {
+            const DWORD lastError = reply.getInt32();
+            reply.assertEof();
 
-        if (!success) {
             // TODO: include an error number
             if (create_process_error != nullptr) {
                 *create_process_error = lastError;
             }
             throw LibWinptyException(WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED,
                 L"CreateProcess failed");
+        } else {
+            const HANDLE process = handleFromInt64(reply.getInt64());
+            const HANDLE thread = handleFromInt64(reply.getInt64());
+            reply.assertEof();
+
+            // TODO: Maybe this is good enough, but there are code paths that leak
+            // handles...
+            if (process_handle != nullptr && process != nullptr) {
+                if (!DuplicateHandle(wp->agentProcess.get(), process,
+                        GetCurrentProcess(),
+                        process_handle, 0, FALSE,
+                        DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS)) {
+                    // TODO: Shut down the winpty instance?  This code path is never supposed to happen...
+                    throwWindowsError(L"DuplicateHandle of process handle");
+                }
+            }
+            if (thread_handle != nullptr && thread != nullptr) {
+                if (!DuplicateHandle(wp->agentProcess.get(), thread,
+                        GetCurrentProcess(),
+                        thread_handle, 0, FALSE,
+                        DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS)) {
+                    // TODO: Shut down the winpty instance?  This code path is never supposed to happen...
+                    throwWindowsError(L"DuplicateHandle of thread handle");
+                }
+            }
         }
         return TRUE;
     } API_CATCH(FALSE)

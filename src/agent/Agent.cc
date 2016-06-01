@@ -333,6 +333,34 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
     const auto desktop = packet.getWString();
     packet.assertEof();
 
+    // Ensure that all I/O pipes are connected.  At least the output pipes
+    // must be connected eventually, or data will back up (and eventually, if
+    // it's ever implemented, the console may become frozen indefinitely).
+    // Connecting the output pipes late is racy if auto-shutdown is enabled,
+    // because the pipe could be closed before it's opened.
+    //
+    // Return a friendly error back to libwinpty for the sake of programmers
+    // integrating with winpty.
+    {
+        std::wstring pipeList;
+        for (NamedPipe *pipe : { m_coninPipe, m_conoutPipe, m_conerrPipe }) {
+            if (pipe != nullptr && pipe->isConnecting()) {
+                if (!pipeList.empty()) {
+                    pipeList.append(L", ");
+                }
+                pipeList.append(pipe->name());
+            }
+        }
+        if (!pipeList.empty()) {
+            auto reply = newPacket();
+            reply.putInt32(
+                static_cast<int32_t>(StartProcessResult::PipesStillOpen));
+            reply.putWString(pipeList);
+            writePacket(reply);
+            return;
+        }
+    }
+
     auto cmdlineV = vectorWithNulFromString(cmdline);
     auto desktopV = vectorWithNulFromString(desktop);
     auto envV = vectorFromString(env);
@@ -366,10 +394,10 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
           (success ? "success" : "fail"),
           static_cast<unsigned int>(pi.dwProcessId));
 
-    int64_t replyProcess = 0;
-    int64_t replyThread = 0;
-
+    auto reply = newPacket();
     if (success) {
+        int64_t replyProcess = 0;
+        int64_t replyThread = 0;
         if (wantProcessHandle) {
             replyProcess = int64FromHandle(duplicateHandle(pi.hProcess));
         }
@@ -379,14 +407,13 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
         CloseHandle(pi.hThread);
         m_childProcess = pi.hProcess;
         m_autoShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN);
+        reply.putInt32(static_cast<int32_t>(StartProcessResult::ProcessCreated));
+        reply.putInt64(replyProcess);
+        reply.putInt64(replyThread);
+    } else {
+        reply.putInt32(static_cast<int32_t>(StartProcessResult::CreateProcessFailed));
+        reply.putInt32(lastError);
     }
-
-    // Write reply.
-    auto reply = newPacket();
-    reply.putInt32(success);
-    reply.putInt32(lastError);
-    reply.putInt64(replyProcess);
-    reply.putInt64(replyThread);
     writePacket(reply);
 }
 
