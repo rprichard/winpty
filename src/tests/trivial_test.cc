@@ -86,9 +86,13 @@ static void parentTest() {
     assert(pty != nullptr);
     winpty_config_free(agentCfg);
 
+    HANDLE conin = CreateFileW(
+        winpty_conin_name(pty),
+        GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
     HANDLE conout = CreateFileW(
         winpty_conout_name(pty),
         GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    assert(conin != INVALID_HANDLE_VALUE);
     assert(conout != INVALID_HANDLE_VALUE);
 
     auto spawnCfg = winpty_spawn_config_new(
@@ -109,6 +113,8 @@ static void parentTest() {
     DWORD exitCode = 0;
     assert(GetExitCodeProcess(process, &exitCode) && exitCode == 42);
     CloseHandle(process);
+    CloseHandle(conin);
+    CloseHandle(conout);
     assert(content == expectedContent);
     winpty_free(pty);
 }
