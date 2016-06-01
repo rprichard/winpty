@@ -218,7 +218,7 @@ createPipeSecurityDescriptorOwnerFullControl() {
         Sid localSystem;
         Sid builtinAdmins;
         Sid owner;
-        std::array<EXPLICIT_ACCESSW, 3> daclEntries;
+        std::array<EXPLICIT_ACCESSW, 3> daclEntries = {};
         Acl dacl;
         SecurityDescriptor value;
     };
@@ -258,7 +258,7 @@ createPipeSecurityDescriptorOwnerFullControlEveryoneWrite() {
         Sid builtinAdmins;
         Sid owner;
         Sid everyone;
-        std::array<EXPLICIT_ACCESSW, 4> daclEntries;
+        std::array<EXPLICIT_ACCESSW, 4> daclEntries = {};
         Acl dacl;
         SecurityDescriptor value;
     };

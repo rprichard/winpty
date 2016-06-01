@@ -16,6 +16,8 @@ Bug fixes:
  * By default, `winpty.dll` avoids calling `SetProcessWindowStation` within
    the calling process.
    [#58](https://github.com/rprichard/winpty/issues/58)
+ * Fixed an uninitialized memory bug that could have crashed winpty.
+   [#80](https://github.com/rprichard/winpty/issues/80)
 
 # Version 0.3.0 (2016-05-20)
 
