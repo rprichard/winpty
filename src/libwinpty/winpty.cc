@@ -821,15 +821,7 @@ winpty_spawn(winpty_t *wp,
         // Receive reply.
         auto reply = readPacket(*wp);
         const auto result = static_cast<StartProcessResult>(reply.getInt32());
-        if (result == StartProcessResult::PipesStillOpen) {
-            const auto pipeList = reply.getWString();
-            reply.assertEof();
-
-            throwWinptyException(
-                (L"All I/O pipes must be connected before calling "
-                 L"winpty_spawn. These pipes are still connecting: " +
-                 pipeList).c_str());
-        } else if (result == StartProcessResult::CreateProcessFailed) {
+        if (result == StartProcessResult::CreateProcessFailed) {
             const DWORD lastError = reply.getInt32();
             reply.assertEof();
 
@@ -839,7 +831,7 @@ winpty_spawn(winpty_t *wp,
             }
             throw LibWinptyException(WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED,
                 L"CreateProcess failed");
-        } else {
+        } else if (result == StartProcessResult::ProcessCreated) {
             const HANDLE process = handleFromInt64(reply.getInt64());
             const HANDLE thread = handleFromInt64(reply.getInt64());
             reply.assertEof();
@@ -864,6 +856,8 @@ winpty_spawn(winpty_t *wp,
                     throwWindowsError(L"DuplicateHandle of thread handle");
                 }
             }
+        } else {
+            ASSERT(false && "Invalid StartProcessResult");
         }
         return TRUE;
     } API_CATCH(FALSE)

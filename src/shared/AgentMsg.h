@@ -32,7 +32,6 @@ struct AgentMsg
 enum class StartProcessResult {
     CreateProcessFailed,
     ProcessCreated,
-    PipesStillOpen,
 };
 
 #endif // WINPTY_SHARED_AGENT_MSG_H

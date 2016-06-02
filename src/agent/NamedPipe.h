@@ -105,6 +105,7 @@ public:
     std::string readAllToString();
     void closePipe();
     bool isClosed() { return m_handle == nullptr; }
+    bool isConnected() { return !isClosed() && !isConnecting(); }
     bool isConnecting() { return m_connectEvent.get() != nullptr; }
 
 private:

@@ -333,34 +333,6 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
     const auto desktop = packet.getWString();
     packet.assertEof();
 
-    // Ensure that all I/O pipes are connected.  At least the output pipes
-    // must be connected eventually, or data will back up (and eventually, if
-    // it's ever implemented, the console may become frozen indefinitely).
-    // Connecting the output pipes late is racy if auto-shutdown is enabled,
-    // because the pipe could be closed before it's opened.
-    //
-    // Return a friendly error back to libwinpty for the sake of programmers
-    // integrating with winpty.
-    {
-        std::wstring pipeList;
-        for (NamedPipe *pipe : { m_coninPipe, m_conoutPipe, m_conerrPipe }) {
-            if (pipe != nullptr && pipe->isConnecting()) {
-                if (!pipeList.empty()) {
-                    pipeList.append(L", ");
-                }
-                pipeList.append(pipe->name());
-            }
-        }
-        if (!pipeList.empty()) {
-            auto reply = newPacket();
-            reply.putInt32(
-                static_cast<int32_t>(StartProcessResult::PipesStillOpen));
-            reply.putWString(pipeList);
-            writePacket(reply);
-            return;
-        }
-    }
-
     auto cmdlineV = vectorWithNulFromString(cmdline);
     auto desktopV = vectorWithNulFromString(desktop);
     auto envV = vectorFromString(env);
@@ -485,13 +457,16 @@ void Agent::onPollTimeout()
 void Agent::autoClosePipesForShutdown()
 {
     if (m_closingOutputPipes) {
-        if (!m_conoutPipe->isClosed() &&
+        // We don't want to close a pipe before it's connected!  If we do, the
+        // libwinpty client may try to connect to a non-existent pipe.  This
+        // case is important for short-lived programs.
+        if (m_conoutPipe->isConnected() &&
                 m_conoutPipe->bytesToSend() == 0) {
             trace("Closing CONOUT pipe (auto-shutdown)");
             m_conoutPipe->closePipe();
         }
         if (m_conerrPipe != nullptr &&
-                !m_conerrPipe->isClosed() &&
+                m_conerrPipe->isConnected() &&
                 m_conerrPipe->bytesToSend() == 0) {
             trace("Closing CONERR pipe (auto-shutdown)");
             m_conerrPipe->closePipe();

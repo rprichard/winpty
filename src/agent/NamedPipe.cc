@@ -167,6 +167,7 @@ void NamedPipe::InputWorker::completeIo(DWORD size)
 bool NamedPipe::InputWorker::shouldIssueIo(DWORD *size, bool *isRead)
 {
     *isRead = true;
+    ASSERT(!m_namedPipe.isConnecting());
     if (m_namedPipe.isClosed()) {
         return false;
     } else if (m_namedPipe.m_inQueue.size() < m_namedPipe.readBufferSize()) {
