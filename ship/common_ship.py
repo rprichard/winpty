@@ -37,12 +37,22 @@ def mkdir(path):
     if not os.path.isdir(path):
         os.makedirs(path)
 
-def requireExe(name):
+def requireExe(name, guesses):
+    if find_executable(name) is None:
+        for guess in guesses:
+            if os.path.exists(guess):
+                newDir = os.path.dirname(guess)
+                print "Adding " + newDir + " to Path to provide " + name
+                os.environ["Path"] = newDir + ";" + os.environ["Path"]
     ret = find_executable(name)
     if ret is None:
         sys.exit("Error: required EXE is missing from Path: " + name)
     return ret
 
-requireExe("git.exe")
+requireExe("git.exe", [
+    "C:\\Program Files\\Git\\cmd\\git.exe",
+    "C:\\Program Files (x86)\\Git\\cmd\\git.exe"
+])
+
 commitHash = subprocess.check_output(["git.exe", "rev-parse", "HEAD"]).decode().strip()
 defaultPathEnviron = "C:\\Windows\\System32;C:\\Windows"

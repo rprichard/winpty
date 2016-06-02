@@ -23,10 +23,6 @@
 #
 # Run with native CPython 2.7.
 #
-# These programs must be in your Path:
-#  - 7z.exe
-#  - git.exe
-#
 # This script looks for MSVC using a version-specific environment variable,
 # such as VS140COMNTOOLS for MSVC 2015.
 #
@@ -40,7 +36,10 @@ import subprocess
 import sys
 
 os.chdir(common_ship.topDir)
-ZIP_TOOL = common_ship.requireExe("7z.exe")
+ZIP_TOOL = common_ship.requireExe("7z.exe", [
+    "C:\\Program Files\\7-Zip\7z.exe",
+    "C:\\Program Files (x86)\\7-Zip\7z.exe",
+])
 
 MSVC_VERSION_TABLE = {
     "2015" : {
@@ -97,23 +96,21 @@ def build(arch, packageDir, xp=False):
     archInfo = ARCH_TABLE[arch]
     versionInfo = MSVC_VERSION_TABLE[ARGS.msvc_version]
 
-    subprocess.check_call([
-        sys.executable,
-        "../build-gyp/gyp_main.py",
-        "winpty.gyp",
-        "-I", "configurations.gypi",
-        "-G", "msvs_version=" + versionInfo["gyp_version"],
-        "-D", "VERSION_SUFFIX=__none__"] +
-        (["-D", "WINPTY_MSBUILD_TOOLSET=" + versionInfo["xp_toolset"]] if xp else []),
-        cwd="src")
     devCmdPath = os.path.join(os.environ[versionInfo["common_tools_env"]], "VsDevCmd.bat")
     if not os.path.isfile(devCmdPath):
         sys.exit("Error: MSVC environment script missing: " + devCmdPath)
-    subprocess.check_call(
-        '"' + devCmdPath + '" && ' +
-        "msbuild winpty.sln /m /p:Platform=" + ARCH_TABLE[arch]["msvc_platform"],
-        shell=True,
-        cwd="src")
+
+    newEnv = os.environ.copy()
+    newEnv["Path"] = os.path.dirname(sys.executable) + ";" + common_ship.defaultPathEnviron
+    commandLine = (
+        '"' + devCmdPath + '" && '
+        " vcbuild.bat" +
+        " --gyp-msvs-version " + versionInfo["gyp_version"] +
+        " --version-suffix __none__" +
+        " --msvc-platform " + archInfo["msvc_platform"]
+    )
+
+    subprocess.check_call(commandLine, shell=True, env=newEnv)
 
     archPackageDir = os.path.join(packageDir, arch)
     if xp:
