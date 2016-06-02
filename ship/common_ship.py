@@ -18,7 +18,7 @@ with open(topDir + "/VERSION.txt", "rt") as f:
 
 def writeBuildInfo():
     with open(topDir + "/BUILD_INFO.txt", "w") as f:
-        f.write("VERSION_SUFFIX=\n")
+        f.write("VERSION_SUFFIX=__none__\n")
         f.write("COMMIT_HASH=" + commitHash + "\n")
 
 def rmrf(patterns):

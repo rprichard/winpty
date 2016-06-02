@@ -102,7 +102,8 @@ def build(arch, packageDir, xp=False):
         "../build-gyp/gyp_main.py",
         "winpty.gyp",
         "-I", "configurations.gypi",
-        "-G", "msvs_version=" + versionInfo["gyp_version"]] +
+        "-G", "msvs_version=" + versionInfo["gyp_version"],
+        "-D", "VERSION_SUFFIX=__none__"] +
         (["-D", "WINPTY_MSBUILD_TOOLSET=" + versionInfo["xp_toolset"]] if xp else []),
         cwd="src")
     devCmdPath = os.path.join(os.environ[versionInfo["common_tools_env"]], "VsDevCmd.bat")

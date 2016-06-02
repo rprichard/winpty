@@ -21,20 +21,29 @@
 #include "WinptyVersion.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "DebugClient.h"
 
 #define XSTRINGIFY(x) #x
 #define STRINGIFY(x) XSTRINGIFY(x)
 
+static const char *versionSuffix() {
+    const char *ret = STRINGIFY(WINPTY_VERSION_SUFFIX);
+    if (!strcmp(ret, "__none__")) {
+        return "";
+    }
+    return ret;
+}
+
 void dumpVersionToStdout() {
-    printf("winpty version %s%s\n", STRINGIFY(WINPTY_VERSION), STRINGIFY(WINPTY_VERSION_SUFFIX));
+    printf("winpty version %s%s\n", STRINGIFY(WINPTY_VERSION), versionSuffix());
     printf("commit %s\n", STRINGIFY(WINPTY_COMMIT_HASH));
 }
 
 void dumpVersionToTrace() {
     trace("winpty version %s%s (commit %s)",
         STRINGIFY(WINPTY_VERSION),
-        STRINGIFY(WINPTY_VERSION_SUFFIX),
+        versionSuffix(),
         STRINGIFY(WINPTY_COMMIT_HASH));
 }
