@@ -145,8 +145,8 @@ install : \
 clean :
 	rm -fr build
 
-.PHONY : clean-msvs
-clean-msvs :
+.PHONY : clean-msvc
+clean-msvc :
 	rm -fr src/Default src/Release src/.vs
 	rm -f src/*.vcxproj src/*.vcxproj.filters src/*.sln src/*.sdf
 

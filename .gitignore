@@ -2,10 +2,12 @@
 *.suo
 *.vcxproj
 *.vcxproj.filters
+*.pyc
 winpty.sdf
 winpty.opensdf
 /config.mk
 /build
+/build-gyp
 /ship/packages
 /src/Default
 /src/Release

@@ -21,29 +21,22 @@
 # IN THE SOFTWARE.
 
 #
-# Run with native CPython 2 on a 64-bit computer.  The pip package, "pefile",
-# must be installed.
+# Run with native CPython 2.7 on a 64-bit computer.
 #
 # Each of the targets in BUILD_TARGETS must be installed to the default
 # location.  Each target must have the appropriate MinGW and non-MinGW
 # compilers installed, as well as make and tar.
 #
 
+import common_ship
+
+import multiprocessing
 import os
 import shutil
 import subprocess
+import sys
 
-# Ensure that we're in the root directory.
-if not os.path.exists("VERSION.txt"):
-    os.chdir("..")
-with open("VERSION.txt", "rt") as f:
-    VERSION = f.read().strip()
-
-# Check other environment considerations
-if os.name != "nt":
-    sys.exit("Error: ship.py should run in a native CPython.")
-if os.environ.get("SHELL") is not None:
-    sys.exit("Error: ship.py should run outside a Cygwin environment.")
+os.chdir(common_ship.topDir)
 
 def dllVersion(path):
     version = subprocess.check_output(
@@ -53,7 +46,7 @@ def dllVersion(path):
 
 # Determine other build parameters.
 print "Determining Cygwin/MSYS2 DLL versions..."
-COMMIT_HASH = subprocess.check_output(["git.exe", "rev-parse", "HEAD"]).decode().strip()
+sys.stdout.flush()
 BUILD_TARGETS = [
     {
         "name": "msys",
@@ -79,20 +72,15 @@ BUILD_TARGETS = [
     },
 ]
 
-def writeBuildInfo():
-    with open("BUILD_INFO.txt", "w") as f:
-        f.write("VERSION_SUFFIX=\n")
-        f.write("COMMIT_HASH=" + COMMIT_HASH + "\n")
-
 def buildTarget(target):
-    packageName = "winpty-" + VERSION + "-" + target["name"]
+    packageName = "winpty-" + common_ship.winptyVersion + "-" + target["name"]
     oldPath = os.environ["PATH"]
-    os.environ["PATH"] = target["path"] + ";" + oldPath
+    os.environ["PATH"] = target["path"] + ";" + common_ship.defaultPathEnviron
     subprocess.check_call(["sh.exe", "configure"])
     subprocess.check_call(["make.exe", "clean"])
     makeBinary = target.get("make_binary", "make.exe")
     buildArgs = [makeBinary, "USE_PCH=0", "all", "tests"]
-    buildArgs += ["-j8"]
+    buildArgs += ["-j%d" % multiprocessing.cpu_count()]
     subprocess.check_call(buildArgs)
     subprocess.check_call(["build\\trivial_test.exe"])
     subprocess.check_call([makeBinary, "USE_PCH=0", "PREFIX=ship/packages/" + packageName, "install"])
@@ -104,12 +92,12 @@ def buildTarget(target):
 
 def main():
     try:
-        writeBuildInfo()
+        common_ship.writeBuildInfo()
         if os.path.exists("ship\\packages"):
             shutil.rmtree("ship\\packages")
         oldPath = os.environ["PATH"]
         for t in BUILD_TARGETS:
-            os.environ["PATH"] = t["path"] + ";" + oldPath
+            os.environ["PATH"] = t["path"] + ";" + common_ship.defaultPathEnviron
             subprocess.check_output(["tar.exe", "--help"])
             subprocess.check_output(["make.exe", "--help"])
         for t in BUILD_TARGETS:
