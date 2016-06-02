@@ -85,6 +85,7 @@ private:
     NamedPipe *m_conoutPipe = nullptr;
     NamedPipe *m_conerrPipe = nullptr;
     bool m_autoShutdown = false;
+    bool m_exitAfterShutdown = false;
     bool m_closingOutputPipes = false;
     std::unique_ptr<ConsoleInput> m_consoleInput;
     HANDLE m_childProcess = nullptr;

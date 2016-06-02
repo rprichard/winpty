@@ -114,9 +114,18 @@
  * return EOF.) */
 #define WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN 1ull
 
+/* After the agent shuts down output, and after all output has been written
+ * into the pipe(s), exit the agent by closing the console.  If there any
+ * surviving processes still attached to the console, they are killed.
+ *
+ * Note: With this flag, an RPC call (e.g. winpty_set_size) issued after the
+ * agent exits will fail with an I/O or dead-agent error. */
+#define WINPTY_SPAWN_FLAG_EXIT_AFTER_SHUTDOWN 2ull
+
 /* All the spawn flags. */
 #define WINPTY_SPAWN_FLAG_MASK (0ull \
     | WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN \
+    | WINPTY_SPAWN_FLAG_EXIT_AFTER_SHUTDOWN \
 )
 
 

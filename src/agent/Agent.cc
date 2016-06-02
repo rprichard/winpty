@@ -197,7 +197,7 @@ Agent::Agent(LPCWSTR controlPipeName,
 
 Agent::~Agent()
 {
-    trace("Agent exiting...");
+    trace("Agent::~Agent entered");
     agentShutdown();
     if (m_childProcess != NULL) {
         CloseHandle(m_childProcess);
@@ -258,7 +258,7 @@ void Agent::onPipeIo(NamedPipe &namedPipe)
 void Agent::pollControlPipe()
 {
     if (m_controlPipe->isClosed()) {
-        trace("Agent shutting down");
+        trace("Agent exiting (control pipe is closed)");
         shutdown();
         return;
     }
@@ -407,6 +407,7 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
         CloseHandle(pi.hThread);
         m_childProcess = pi.hProcess;
         m_autoShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN);
+        m_exitAfterShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_EXIT_AFTER_SHUTDOWN);
         reply.putInt32(static_cast<int32_t>(StartProcessResult::ProcessCreated));
         reply.putInt64(replyProcess);
         reply.putInt64(replyThread);
@@ -494,6 +495,12 @@ void Agent::autoClosePipesForShutdown()
                 m_conerrPipe->bytesToSend() == 0) {
             trace("Closing CONERR pipe (auto-shutdown)");
             m_conerrPipe->closePipe();
+        }
+        if (m_exitAfterShutdown &&
+                m_conoutPipe->isClosed() &&
+                (m_conerrPipe == nullptr || m_conerrPipe->isClosed())) {
+            trace("Agent exiting (exit-after-shutdown)");
+            shutdown();
         }
     }
 }
