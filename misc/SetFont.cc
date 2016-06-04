@@ -5,7 +5,6 @@
 #include <string>
 
 #include "TestUtil.cc"
-#include "../src/shared/DebugClient.cc"
 
 #define COUNT_OF(array) (sizeof(array) / sizeof((array)[0]))
 

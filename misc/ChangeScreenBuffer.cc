@@ -7,7 +7,6 @@
 #include <io.h>
 #include <cassert>
 
-#include "../src/shared/DebugClient.cc"
 #include "TestUtil.cc"
 
 int main()

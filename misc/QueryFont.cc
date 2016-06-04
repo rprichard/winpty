@@ -4,7 +4,6 @@
 #include <wchar.h>
 
 #include "TestUtil.cc"
-#include "../src/shared/DebugClient.cc"
 
 static void queryCurrentConsoleFont(HANDLE conout, BOOL max) {
     CONSOLE_FONT_INFO info = {0};

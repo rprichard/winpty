@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "TestUtil.cc"
-#include "../src/shared/DebugClient.cc"
 
 #define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
 

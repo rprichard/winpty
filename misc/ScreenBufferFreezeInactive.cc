@@ -9,10 +9,6 @@
 #include <string>
 
 #include "TestUtil.cc"
-#include "../src/shared/TimeMeasurement.h"
-
-#include "../src/shared/DebugClient.cc"
-#include "../src/shared/WinptyAssert.cc"
 
 const int SC_CONSOLE_MARK = 0xFFF2;
 const int SC_CONSOLE_SELECT_ALL = 0xFFF5;

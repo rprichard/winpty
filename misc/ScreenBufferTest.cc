@@ -52,7 +52,6 @@
 #include <string.h>
 
 #include "TestUtil.cc"
-#include "../src/shared/DebugClient.cc"
 
 const char *g_prefix = "";
 
