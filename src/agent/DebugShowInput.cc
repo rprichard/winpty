@@ -129,7 +129,7 @@ std::string mouseEventToString(const MOUSE_EVENT_RECORD &mer) {
     return sb.str_moved();
 }
 
-void debugShowInput(bool enableMouse) {
+void debugShowInput(bool enableMouse, bool escapeInput) {
     HANDLE conin = GetStdHandle(STD_INPUT_HANDLE);
     DWORD origConsoleMode = 0;
     if (!GetConsoleMode(conin, &origConsoleMode)) {
@@ -137,21 +137,19 @@ void debugShowInput(bool enableMouse) {
                         "is STDIN a console handle?\n");
         exit(1);
     }
-    DWORD newConsoleMode = 0;
-    if (enableMouse && !(origConsoleMode & ENABLE_EXTENDED_FLAGS)) {
+    DWORD restoreConsoleMode = origConsoleMode;
+    if (enableMouse && !(restoreConsoleMode & ENABLE_EXTENDED_FLAGS)) {
         // We need to disable QuickEdit mode, because it blocks mouse events.
         // If ENABLE_EXTENDED_FLAGS wasn't originally in the console mode, then
         // we have no way of knowning whether QuickEdit or InsertMode are
         // currently enabled.  Enable them both (eventually), because they're
         // sensible defaults.  This case shouldn't happen typically.  See
         // misc/EnableExtendedFlags.txt.
-        origConsoleMode |= ENABLE_EXTENDED_FLAGS;
-        origConsoleMode |= ENABLE_QUICK_EDIT_MODE;
-        origConsoleMode |= ENABLE_INSERT_MODE;
-        newConsoleMode = origConsoleMode;
-    } else {
-        newConsoleMode = origConsoleMode;
+        restoreConsoleMode |= ENABLE_EXTENDED_FLAGS;
+        restoreConsoleMode |= ENABLE_QUICK_EDIT_MODE;
+        restoreConsoleMode |= ENABLE_INSERT_MODE;
     }
+    DWORD newConsoleMode = restoreConsoleMode;
     newConsoleMode &= ~ENABLE_PROCESSED_INPUT;
     newConsoleMode &= ~ENABLE_LINE_INPUT;
     newConsoleMode &= ~ENABLE_ECHO_INPUT;
@@ -162,8 +160,23 @@ void debugShowInput(bool enableMouse) {
     } else {
         newConsoleMode &= ~ENABLE_MOUSE_INPUT;
     }
+    if (escapeInput) {
+        // As of this writing (2016-06-05), Microsoft has shipped two preview
+        // builds of Windows 10 (14316 and 14342) that include a new "Windows
+        // Subsystem for Linux" that runs Ubuntu in a new subsystem.  Running
+        // bash in this subsystem requires the non-legacy console mode, and the
+        // console input buffer is put into a special mode where escape
+        // sequences are written into the console input buffer.  This mode is
+        // enabled with the 0x200 flag, which is as-yet undocumented.
+        // See https://github.com/rprichard/winpty/issues/82.
+        newConsoleMode |= 0x200;
+    }
     if (!SetConsoleMode(conin, newConsoleMode)) {
-        fprintf(stderr, "Error: could not set console mode\n");
+        fprintf(stderr, "Error: could not set console mode "
+            "(0x%x -> 0x%x -> 0x%x)\n",
+            static_cast<unsigned int>(origConsoleMode),
+            static_cast<unsigned int>(newConsoleMode),
+            static_cast<unsigned int>(restoreConsoleMode));
         exit(1);
     }
     printf("\nPress any keys -- Ctrl-D exits\n\n");
@@ -214,5 +227,5 @@ void debugShowInput(bool enableMouse) {
         fwrite(str.data(), 1, str.size(), stdout);
         fflush(stdout);
     }
-    SetConsoleMode(conin, origConsoleMode);
+    SetConsoleMode(conin, restoreConsoleMode);
 }

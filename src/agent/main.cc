@@ -43,9 +43,12 @@ const char USAGE[] =
 "Usage: %ls [options]\n"
 "\n"
 "Options:\n"
-"  --show-input     Dump INPUT_RECORDs from the console input buffer\n"
-"  --show-input --with-mouse\n"
-"                   Include MOUSE_INPUT_RECORDs in the dump output\n"
+"  --show-input [--with-mouse] [--escape-input]\n"
+"                   Dump INPUT_RECORDs from the console input buffer\n"
+"                   --with-mouse: Include MOUSE_INPUT_RECORDs in the dump\n"
+"                       output\n"
+"                   --escape-input: Direct the new Windows 10 console to use\n"
+"                       escape sequences for input\n"
 "  --version        Print the winpty version\n";
 
 static uint64_t winpty_atoi64(const char *str) {
@@ -70,13 +73,21 @@ int main() {
         return 0;
     }
 
-    if (argc == 2 && !wcscmp(argv[1], L"--show-input")) {
-        debugShowInput(false);
-        return 0;
-    } else if (argc == 3 &&
-            !wcscmp(argv[1], L"--show-input") &&
-            !wcscmp(argv[2], L"--with-mouse")) {
-        debugShowInput(true);
+    if (argc >= 2 && !wcscmp(argv[1], L"--show-input")) {
+        bool withMouse = false;
+        bool escapeInput = false;
+        for (int i = 2; i < argc; ++i) {
+            if (!wcscmp(argv[i], L"--with-mouse")) {
+                withMouse = true;
+            } else if (!wcscmp(argv[i], L"--escape-input")) {
+                escapeInput = true;
+            } else {
+                fprintf(stderr, "Unrecognized --show-input option: %ls\n",
+                    argv[i]);
+                return 1;
+            }
+        }
+        debugShowInput(withMouse, escapeInput);
         return 0;
     }
 

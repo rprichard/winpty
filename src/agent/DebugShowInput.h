@@ -27,6 +27,6 @@
 
 std::string controlKeyStatePrefix(DWORD controlKeyState);
 std::string mouseEventToString(const MOUSE_EVENT_RECORD &mer);
-void debugShowInput(bool enableMouse);
+void debugShowInput(bool enableMouse, bool escapeInput);
 
 #endif // AGENT_DEBUG_SHOW_INPUT_H
