@@ -23,6 +23,8 @@
 
 #include <windows.h>
 
+#include <string>
+
 #include "DebugClient.h"
 #include "WinptyAssert.h"
 #include "WinptyException.h"
