@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
 
     BOOL ret = MoveWindow(hwnd, x, y, w, h, TRUE);
     trace("MoveWindow: ret=%d", ret);
-    printf("MoveWindow: ret=%d", ret);
+    printf("MoveWindow: ret=%d\n", ret);
 
     return 0;
 }
