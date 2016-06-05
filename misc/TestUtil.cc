@@ -161,3 +161,12 @@ static std::string narrowString(const std::wstring &input)
     assert(mblen2 == mblen);
     return std::string(tmp.data(), tmp.size());
 }
+
+HANDLE openConout() {
+    const HANDLE conout = CreateFileW(L"CONOUT$",
+                                      GENERIC_READ | GENERIC_WRITE,
+                                      FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                      NULL, OPEN_EXISTING, 0, NULL);
+    ASSERT(conout != INVALID_HANDLE_VALUE);
+    return conout;
+}
