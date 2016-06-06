@@ -14,28 +14,12 @@ const wchar_t kNSimSun[] = { 0x65b0, 0x5b8b, 0x4f53, 0 }; // Simplified Chinese
 const wchar_t kMingLight[] = { 0x7d30, 0x660e, 0x9ad4, 0 }; // Traditional Chinese
 const wchar_t kGulimChe[] = { 0xad74, 0xb9bc, 0xccb4, 0 }; // Korean
 
-// Attempt to set the console font to the given facename and pixel size.
-// These APIs should exist on Vista and up.
-static void setConsoleFont(const wchar_t *faceName, int pixelSize)
-{
-    CONSOLE_FONT_INFOEX fontex = {0};
-    fontex.cbSize = sizeof(fontex);
-    fontex.FontWeight = 400;
-    fontex.dwFontSize.Y = pixelSize;
-    wcsncpy(fontex.FaceName, faceName, COUNT_OF(fontex.FaceName));
-    fontex.nFont = 34;
-    BOOL ret = SetCurrentConsoleFontEx(
-        GetStdHandle(STD_OUTPUT_HANDLE),
-        FALSE,
-        &fontex);
-    cprintf(L"SetCurrentConsoleFontEx returned %d\n", ret);
-}
-
 int main() {
     setlocale(LC_ALL, "");
     wchar_t *cmdline = GetCommandLineW();
     int argc = 0;
     wchar_t **argv = CommandLineToArgvW(cmdline, &argc);
+    const HANDLE conout = openConout();
 
     if (argc == 1) {
         cprintf(L"Usage:\n");
@@ -69,7 +53,6 @@ int main() {
         if (proc == NULL) {
             cprintf(L"Couldn't get address of SetConsoleFont\n");
         } else {
-            const HANDLE conout = GetStdHandle(STD_OUTPUT_HANDLE);
             BOOL ret = reinterpret_cast<BOOL WINAPI(*)(HANDLE, DWORD)>(proc)(
                     conout, index);
             cprintf(L"SetFont returned %d\n", ret);
@@ -153,7 +136,7 @@ int main() {
         fontex.FaceName);
 
     BOOL ret = SetCurrentConsoleFontEx(
-        GetStdHandle(STD_OUTPUT_HANDLE),
+        conout,
         FALSE,
         &fontex);
     cprintf(L"SetCurrentConsoleFontEx returned %d\n", ret);
