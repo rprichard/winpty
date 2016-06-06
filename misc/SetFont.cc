@@ -8,6 +8,12 @@
 
 #define COUNT_OF(array) (sizeof(array) / sizeof((array)[0]))
 
+// See https://en.wikipedia.org/wiki/List_of_CJK_fonts
+const wchar_t kMSGothic[] = { 0xff2d, 0xff33, 0x0020, 0x30b4, 0x30b7, 0x30c3, 0x30af, 0 }; // Japanese
+const wchar_t kNSimSun[] = { 0x65b0, 0x5b8b, 0x4f53, 0 }; // Simplified Chinese
+const wchar_t kMingLight[] = { 0x7d30, 0x660e, 0x9ad4, 0 }; // Traditional Chinese
+const wchar_t kGulimChe[] = { 0xad74, 0xb9bc, 0xccb4, 0 }; // Korean
+
 // Attempt to set the console font to the given facename and pixel size.
 // These APIs should exist on Vista and up.
 static void setConsoleFont(const wchar_t *faceName, int pixelSize)
@@ -40,8 +46,10 @@ int main() {
         cprintf(L"  -idx INDEX\n");
         cprintf(L"  -w WIDTH\n");
         cprintf(L"  -h HEIGHT\n");
+        cprintf(L"  -family (0xNN|NN)\n");
         cprintf(L"  -weight (normal|bold|NNN)\n");
         cprintf(L"  -face FACENAME\n");
+        cprintf(L"  -face-{gothic|simsun|minglight|gulimche) [JP,CN-sim,CN-tra,KR]\n");
         cprintf(L"  -tt\n");
         cprintf(L"  -vec\n");
         cprintf(L"  -vp\n");
@@ -97,6 +105,9 @@ int main() {
             } else if (arg == L"-face") {
                 wcsncpy(fontex.FaceName, next.c_str(), COUNT_OF(fontex.FaceName));
                 ++i; continue;
+            } else if (arg == L"-family") {
+                fontex.FontFamily = strtol(narrowString(next).c_str(), nullptr, 0);
+                ++i; continue;
             }
         }
         if (arg == L"-tt") {
@@ -120,11 +131,13 @@ int main() {
         } else if (arg == L"-decorative") {
             fontex.FontFamily = (fontex.FontFamily & ~0xF0) | FF_DECORATIVE;
         } else if (arg == L"-face-gothic") {
-            // ＭＳ ゴシック
-            const wchar_t gothicFace[] = {
-                0xFF2D, 0xFF33, 0x20, 0x30B4, 0x30B7, 0x30C3, 0x30AF, 0x0
-            };
-            wcsncpy(fontex.FaceName, gothicFace, COUNT_OF(fontex.FaceName));
+            wcsncpy(fontex.FaceName, kMSGothic, COUNT_OF(fontex.FaceName));
+        } else if (arg == L"-face-simsun") {
+            wcsncpy(fontex.FaceName, kNSimSun, COUNT_OF(fontex.FaceName));
+        } else if (arg == L"-face-minglight") {
+            wcsncpy(fontex.FaceName, kMingLight, COUNT_OF(fontex.FaceName));
+        } else if (arg == L"-face-gulimche") {
+            wcsncpy(fontex.FaceName, kGulimChe, COUNT_OF(fontex.FaceName));
         } else {
             cprintf(L"Unrecognized argument: %ls\n", arg.c_str());
             exit(1);
