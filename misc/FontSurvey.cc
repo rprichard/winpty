@@ -44,13 +44,12 @@ std::vector<bool> condense(const std::vector<CHAR_INFO> &buf) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        printf("Usage: %s \"arguments for SetFont.exe\" EXPECTED_WIDTHS\n", argv[0]);
+    if (argc != 2) {
+        printf("Usage: %s \"arguments for SetFont.exe\"\n", argv[0]);
         return 1;
     }
 
     const char *setFontArgs = argv[1];
-    std::string expectedWidths = argv[2];
 
     const wchar_t testLine[] = { 0xA2, 0xA3, 0x2014, 0x3044, 0x30FC, 0x4000, 0 };
     const HANDLE conout = openConout();
@@ -86,9 +85,15 @@ int main(int argc, char *argv[]) {
         }
         char size[16];
         sprintf(size, "%d,%d", infoex.dwFontSize.X, infoex.dwFontSize.Y);
-        trace("Size %3d: %-7s %-4s (%s)", h, size,
-            (widthsStr == expectedWidths ? "GOOD" : "BAD"),
-            widthsStr.c_str());
+        const char *status = "";
+        if (widthsStr == "HHFFFF") {
+            status = "GOOD";
+        } else if (widthsStr == "HHHFFF") {
+            status = "OK";
+        } else {
+            status = "BAD";
+        }
+        trace("Size %3d: %-7s %-4s (%s)", h, size, status, widthsStr.c_str());
     }
     sprintf(setFontCmd, ".\\SetFont.exe -face-simsun -h 14 -family 0x36");
     system(setFontCmd);
