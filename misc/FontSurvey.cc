@@ -95,6 +95,6 @@ int main(int argc, char *argv[]) {
         }
         trace("Size %3d: %-7s %-4s (%s)", h, size, status, widthsStr.c_str());
     }
-    sprintf(setFontCmd, ".\\SetFont.exe -face-simsun -h 14 -family 0x36");
+    sprintf(setFontCmd, ".\\SetFont.exe %s -h 14", setFontArgs);
     system(setFontCmd);
 }
