@@ -1,13 +1,20 @@
 Issues:
 
  - Starting with the 14342 build, changing the font using
-   SetCurrentConsoleFontEx does affect the window size.  e.g. The content
+   SetCurrentConsoleFontEx does not affect the window size.  e.g. The content
    itself will resize/redraw, but the window neither shrinks nor expands.
    Presumably this is an oversight?  It's almost a convenience; if a program
    is going to resize the window anyway, then it's nice that the window size
    contraints don't get in the way.  Ordinarily, changing the font doesn't just
    change the window size in pixels--it can also change the size as measured in
    rows and columns.
+
+ - (Aside: in the 14342 build, there is also a bug with wmic.exe.  Open a console
+   with more than 300 lines of screen buffer, then fill those lines with, e.g.,
+   dir /s.  Then run wmic.exe.  You won't be able to see the wmic.exe prompt.
+   If you query the screen buffer info somehow, you'll notice that the srWindow
+   is not contained within the dwSize.  This breaks winpty's scraping, because
+   it's invalid.)
 
  - In build 14316, with the Japanese locale, with the 437 code page, attempting
    to set the Consolas font instead sets the Terminal (raster) font.  It seems
