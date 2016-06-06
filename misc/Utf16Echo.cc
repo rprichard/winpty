@@ -28,9 +28,9 @@ int main(int argc, char *argv[]) {
 
     // Read it back.
     std::vector<CHAR_INFO> readBuffer(dataToWrite.size() * 2);
-    COORD bufSize = {readBuffer.size(), 1};
+    COORD bufSize = {static_cast<short>(readBuffer.size()), 1};
     COORD bufCoord = {0, 0};
-    SMALL_RECT topLeft = {0, 0, readBuffer.size() - 1, 0};
+    SMALL_RECT topLeft = {0, 0, static_cast<short>(readBuffer.size() - 1), 0};
     ret = ReadConsoleOutputW(
             GetStdHandle(STD_OUTPUT_HANDLE), readBuffer.data(),
             bufSize, bufCoord, &topLeft);
