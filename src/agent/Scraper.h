@@ -83,7 +83,7 @@ private:
     std::unique_ptr<Terminal> m_terminal;
 
     int m_syncRow = -1;
-    int m_syncCounter = 0;
+    unsigned int m_syncCounter = 0;
 
     bool m_directMode = false;
     Coord m_ptySize;

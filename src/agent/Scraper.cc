@@ -369,7 +369,7 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
         if (markerRow == -1) {
             // Something has happened.  Reset the terminal.
             trace("Sync marker has disappeared -- resetting the terminal"
-                  " (m_syncCounter=%d)",
+                  " (m_syncCounter=%u)",
                   m_syncCounter);
             resetConsoleTracking(Terminal::SendClear, windowRect);
         } else if (markerRow != m_syncRow) {
@@ -395,7 +395,7 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
             // happen, but the CMD/PowerShell CLS command will move the window
             // to the top as part of clearing everything else in the console.
             trace("Window moved upward -- resetting the terminal"
-                  " (m_syncCounter=%d)",
+                  " (m_syncCounter=%u)",
                   m_syncCounter);
             resetConsoleTracking(Terminal::SendClear, windowRect);
         }
