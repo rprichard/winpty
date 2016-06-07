@@ -27,11 +27,14 @@
 
 #include <algorithm>
 #include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include "../shared/DebugClient.h"
 #include "../shared/OsModule.h"
 #include "../shared/StringUtil.h"
+#include "../shared/WindowsVersion.h"
 #include "../shared/WinptyAssert.h"
 #include "../shared/winpty_snprintf.h"
 
@@ -40,121 +43,212 @@ namespace {
 #define COUNT_OF(x) (sizeof(x) / sizeof((x)[0]))
 
 // See https://en.wikipedia.org/wiki/List_of_CJK_fonts
-const wchar_t kMSGothic[] = { 0xff2d, 0xff33, 0x0020, 0x30b4, 0x30b7, 0x30c3, 0x30af, 0 }; // Japanese
-const wchar_t kNSimSun[] = { 0x65b0, 0x5b8b, 0x4f53, 0 }; // Simplified Chinese
-const wchar_t kMingLight[] = { 0x7d30, 0x660e, 0x9ad4, 0 }; // Traditional Chinese
-const wchar_t kGulimChe[] = { 0xad74, 0xb9bc, 0xccb4, 0 }; // Korean
+const wchar_t kLucidaConsole[] = L"Lucida Console";
+const wchar_t kMSGothic[] = { 0xff2d, 0xff33, 0x0020, 0x30b4, 0x30b7, 0x30c3, 0x30af, 0 }; // 932, Japanese
+const wchar_t kNSimSun[] = { 0x65b0, 0x5b8b, 0x4f53, 0 }; // 936, Chinese Simplified
+const wchar_t kGulimChe[] = { 0xad74, 0xb9bc, 0xccb4, 0 }; // 949, Korean
+const wchar_t kMingLight[] = { 0x7d30, 0x660e, 0x9ad4, 0 }; // 950, Chinese Traditional
 
-struct Font {
-    int codePage;
-    const wchar_t *faceName;
-    int pxSize;
+struct FontSize {
+    int size;
+    int width;
 };
 
-const Font kFonts[] = {
-    // MS Gothic double-width handling seems to be broken with console versions
-    // prior to Windows 10 (including Windows 10's legacy mode), and it's
-    // especially broken in Windows 8 and 8.1.  AFAICT, MS Gothic at size 9
-    // avoids problems in Windows 7 and minimizes problems in 8/8.1.
-    //
-    // Test by running: misc/Utf16Echo A2 A3 2014 3044 30FC 4000
-    //
-    // The first three codepoints are always rendered as half-width with the
-    // Windows Japanese fonts.  (Of these, the first two must be half-width,
-    // but U+2014 could be either.)  The last three are rendered as full-width,
-    // and they are East_Asian_Width=Wide.
-    //
-    // Windows 7 fails by modeling all codepoints as full-width with font
-    // sizes 14 and above.
-    //
-    // Windows 8 gets U+00A2, U+00A3, U+2014, U+30FC, and U+4000 wrong, but
-    // using a point size not listed in the console properties dialog
-    // (e.g. "9") is less wrong:
-    //
-    //             |        code point               |
-    //  font       | 00A2 00A3 2014 3044 30FC 4000   | cell size
-    // ------------+---------------------------------+----------
-    //  8          |  F    F    F    F    H    H     |   4x8
-    //  9          |  F    F    F    F    F    F     |   5x9
-    //  16         |  F    F    F    F    H    H     |   8x16
-    // raster 6x13 |  H    H    H    F    F    H(*)  |   6x13
-    //
-    // (*) The Raster Font renders U+4000 as a white box (i.e. an unsupported
-    // character).
-    //
-    { 932, kMSGothic, 9 },
+struct Font {
+    const wchar_t *face;
+    int size;
+};
 
-    // kNSimSun: I verified that `misc/Utf16Echo A2 A3 2014 3044 30FC 4000`
-    // did something sensible with Windows 8.  It *did* with the listed font
-    // sizes, but not with unlisted sizes.  Listed sizes:
-    //  - 6 ==> 3x7px
-    //  - 8 ==> 4x9px
-    //  - 10 ==> 5x11px
-    //  - 12 ==> 6x14px
-    //  - 14 ==> 7x16px
-    //  - 16 ==> 8x18px
-    //  ...
-    //  - 36 ==> 18x41px
-    //  - 72 ==> 36x82px
-    // U+2014 is modeled and rendered as full-width.
-    { 936, kNSimSun, 8 },
+// Ideographs in East Asian languages take two columns rather than one.
+// In the console screen buffer, a "full-width" character will occupy two
+// cells of the buffer, the first with attribute 0x100 and the second with
+// attribute 0x200.
+//
+// Windows does not correctly identify code points as double-width in all
+// configurations.  It depends heavily on the code page, the font facename,
+// and (somehow) even the font size.  In the 437 code page (MS-DOS), for
+// example, no codepoints are interpreted as double-width.  When the console
+// is in an East Asian code page (932, 936, 949, or 950), then sometimes
+// selecting a "Western" facename like "Lucida Console" or "Consolas" doesn't
+// register, or if the font *can* be chosen, then the console doesn't handle
+// double-width correctly.  I tested the double-width handling by writing
+// several code points with WriteConsole and checking whether one or two cells
+// were filled.
+//
+// In the Japanese code page (932), Microsoft's default font is MS Gothic.
+// MS Gothic double-width handling seems to be broken with console versions
+// prior to Windows 10 (including Windows 10's legacy mode), and it's
+// especially broken in Windows 8 and 8.1.
+//
+// Test by running: misc/Utf16Echo A2 A3 2014 3044 30FC 4000
+//
+// The first three codepoints are always rendered as half-width with the
+// Windows Japanese fonts.  (Of these, the first two must be half-width,
+// but U+2014 could be either.)  The last three are rendered as full-width,
+// and they are East_Asian_Width=Wide.
+//
+// Windows 7 fails by modeling all codepoints as full-width with font
+// sizes 22 and above.
+//
+// Windows 8 gets U+00A2, U+00A3, U+2014, U+30FC, and U+4000 wrong, but
+// using a point size not listed in the console properties dialog
+// (e.g. "9") is less wrong:
+//
+//             |        code point               |
+//  font       | 00A2 00A3 2014 3044 30FC 4000   | cell size
+// ------------+---------------------------------+----------
+//  8          |  F    F    F    F    H    H     |   4x8
+//  9          |  F    F    F    F    F    F     |   5x9
+//  16         |  F    F    F    F    H    H     |   8x16
+// raster 6x13 |  H    H    H    F    F    H(*)  |   6x13
+//
+// (*) The Raster Font renders U+4000 as a white box (i.e. an unsupported
+// character).
+//
 
-    // kMingLight: I verified that `misc/Utf16Echo A2 A3 2014 3044 30FC 4000`
-    // did something sensible with Windows 8.  It *did* with the listed font
-    // sizes, but not with unlisted sizes.  Listed sizes:
-    //  - 6 => 3x7px
-    //  - 8 => 4x10px
-    //  - 10 => 5x12px
-    //  - 12 => 6x14px
-    //  - 14 => 7x17px
-    //  - 16 => 8x19px
-    //  ...
-    //  - 36 => 18x43px
-    //  - 72 => 36x86px
-    // U+2014 is modeled and rendered as full-width.
-    { 950, kMingLight, 8 },
+// See:
+//  - misc/Font-Report-June2016 directory for per-size details
+//  - misc/font-notes.txt
+//  - misc/Utf16Echo.cc, misc/FontSurvey.cc, misc/SetFont.cc, misc/GetFont.cc
 
-    // kGulimChe: I verified that `misc/Utf16Echo A2 A3 2014 3044 30FC 4000`
-    // did something sensible with Windows 8.  It *did* with the listed font
-    // sizes, but not with unlisted sizes.  Listed sizes:
-    //  - 6 ==> 3x7px
-    //  - 8 ==> 4x9px
-    //  - 10 ==> 5x11px
-    //  - 12 ==> 6x14px
-    //  - 14 ==> 7x16px
-    //  - 16 ==> 8x18px
-    //  ...
-    //  - 36 ==> 18x41px
-    //  - 72 ==> 36x83px
-    { 949, kGulimChe, 8 },
+const FontSize kLucidaFontSizes[] = {
+    { 2, 1 },
+    { 4, 2 },
+    { 5, 3 },
+    { 6, 4 },
+    { 8, 5 },
+    { 10, 6 },
+    { 12, 7 },
+    { 14, 8 },
+    { 16, 10 },
+    { 18, 11 },
+    { 20, 12 },
+    { 36, 22 },
+    { 48, 29 },
+    { 60, 36 },
+    { 72, 43 },
+};
 
-    // Listed sizes:
-    //  - 5 ==> 2x5px
-    //  - 6 ==> 3x6px
-    //  - 7 ==> 3x6px
-    //  - 8 ==> 4x8px
-    //  - 10 ==> 5x10px
-    //  - 12 ==> 6x12px
-    //  - 14 ==> 7x14px
-    //  - 16 ==> 8x16px
-    //  ...
-    //  - 36 ==> 17x36px
-    //  - 72 ==> 34x72px
-    { 0, L"Consolas", 8 },
+// Japanese.  Used on Vista and Windows 7.
+const FontSize k932GothicVista[] = {
+    { 2, 1 },
+    { 4, 2 },
+    { 6, 3 },
+    { 8, 4 },
+    { 10, 5 },
+    { 12, 6 },
+    { 13, 7 },
+    { 15, 8 },
+    { 17, 9 },
+    { 19, 10 },
+    { 21, 11 },
+    // All larger fonts are more broken w.r.t. full-size East Asian characters.
+};
 
-    // Listed sizes:
-    //  - 5 ==> 3x5px
-    //  - 6 ==> 4x6px
-    //  - 7 ==> 4x7px
-    //  - 8 ==> 5x8px
-    //  - 10 ==> 6x10px
-    //  - 12 ==> 7x12px
-    //  - 14 ==> 8x14px
-    //  - 16 ==> 10x16px
-    //  ...
-    //  - 36 ==> 22x36px
-    //  - 72 ==> 43x72px
-    { 0, L"Lucida Console", 6 },
+// Japanese.  Used on Windows 8, 8.1, and the legacy 10 console.
+const FontSize k932GothicWin8[] = {
+    // All of these characters are broken w.r.t. full-size East Asian
+    // characters, but they're equally broken.
+    { 3, 2 },
+    { 5, 3 },
+    { 7, 4 },
+    { 9, 5 },
+    { 11, 6 },
+    { 13, 7 },
+    { 15, 8 },
+    { 17, 9 },
+    { 20, 10 },
+    { 22, 11 },
+    { 24, 12 },
+    // include extra-large fonts for small terminals
+    { 36, 18 },
+    { 48, 24 },
+    { 60, 30 },
+    { 72, 36 },
+};
+
+// Japanese.  Used on the new Windows 10 console.
+const FontSize k932GothicWin10[] = {
+    { 2, 1 },
+    { 4, 2 },
+    { 6, 3 },
+    { 8, 4 },
+    { 10, 5 },
+    { 12, 6 },
+    { 14, 7 },
+    { 16, 8 },
+    { 18, 9 },
+    { 20, 10 },
+    { 22, 11 },
+    { 24, 12 },
+    // include extra-large fonts for small terminals
+    { 36, 18 },
+    { 48, 24 },
+    { 60, 30 },
+    { 72, 36 },
+};
+
+// Chinese Simplified.
+const FontSize k936SimSun[] = {
+    { 2, 1 },
+    { 4, 2 },
+    { 6, 3 },
+    { 8, 4 },
+    { 10, 5 },
+    { 12, 6 },
+    { 14, 7 },
+    { 16, 8 },
+    { 18, 9 },
+    { 20, 10 },
+    { 22, 11 },
+    { 24, 12 },
+    // include extra-large fonts for small terminals
+    { 36, 18 },
+    { 48, 24 },
+    { 60, 30 },
+    { 72, 36 },
+};
+
+// Korean.
+const FontSize k949GulimChe[] = {
+    { 2, 1 },
+    { 4, 2 },
+    { 6, 3 },
+    { 8, 4 },
+    { 10, 5 },
+    { 12, 6 },
+    { 14, 7 },
+    { 16, 8 },
+    { 18, 9 },
+    { 20, 10 },
+    { 22, 11 },
+    { 24, 12 },
+    // include extra-large fonts for small terminals
+    { 36, 18 },
+    { 48, 24 },
+    { 60, 30 },
+    { 72, 36 },
+};
+
+// Chinese Traditional.
+const FontSize k950MingLight[] = {
+    { 2, 1 },
+    { 4, 2 },
+    { 6, 3 },
+    { 8, 4 },
+    { 10, 5 },
+    { 12, 6 },
+    { 14, 7 },
+    { 16, 8 },
+    { 18, 9 },
+    { 20, 10 },
+    { 22, 11 },
+    { 24, 12 },
+    // include extra-large fonts for small terminals
+    { 36, 18 },
+    { 48, 24 },
+    { 60, 30 },
+    { 72, 36 },
 };
 
 // Some of these types and functions are missing from the MinGW headers.
@@ -422,15 +516,109 @@ static bool setFontVista(
     return true;
 }
 
-static void setSmallFontVista(VistaFontAPI &api, HANDLE conout) {
-    int codePage = GetConsoleOutputCP();
-    for (size_t i = 0; i < COUNT_OF(kFonts); ++i) {
-        if (kFonts[i].codePage == 0 || kFonts[i].codePage == codePage) {
-            if (setFontVista(api, conout,
-                             kFonts[i].faceName, kFonts[i].pxSize)) {
-                trace("setSmallFontVista: success");
-                return;
+static Font selectSmallFont(int codePage, int columns, bool isNewW10) {
+    // Iterate over a set of font sizes according to the code page, and select
+    // one.
+
+    const wchar_t *face = nullptr;
+    const FontSize *table = nullptr;
+    size_t tableSize = 0;
+
+    switch (codePage) {
+        case 932: // Japanese
+            face = kMSGothic;
+            if (isNewW10) {
+                table = k932GothicWin10;
+                tableSize = COUNT_OF(k932GothicWin10);
+            } else if (isAtLeastWindows8()) {
+                table = k932GothicWin8;
+                tableSize = COUNT_OF(k932GothicWin8);
+            } else {
+                table = k932GothicVista;
+                tableSize = COUNT_OF(k932GothicVista);
             }
+            break;
+        case 936: // Chinese Simplified
+            face = kNSimSun;
+            table = k936SimSun;
+            tableSize = COUNT_OF(k936SimSun);
+            break;
+        case 949: // Korean
+            face = kGulimChe;
+            table = k949GulimChe;
+            tableSize = COUNT_OF(k949GulimChe);
+            break;
+        case 950: // Chinese Traditional
+            face = kMingLight;
+            table = k950MingLight;
+            tableSize = COUNT_OF(k950MingLight);
+            break;
+        default:
+            face = kLucidaConsole;
+            table = kLucidaFontSizes;
+            tableSize = COUNT_OF(kLucidaFontSizes);
+            break;
+    }
+
+    size_t bestIndex = static_cast<size_t>(-1);
+    std::tuple<int, int> bestScore = std::make_tuple(-1, -1);
+
+    // We might want to pick the smallest possible font, because we don't know
+    // how large the monitor is (and the monitor size can change).  We might
+    // want to pick a larger font to accommodate console programs that resize
+    // the console on their own, like DOS edit.com, which tends to resize the
+    // console to 80 columns.
+
+    for (size_t i = 0; i < tableSize; ++i) {
+        const int width = table[i].width * columns;
+
+        // In general, we'd like to pick a font size where cutting the number
+        // of columns in half doesn't immediately violate the minimum width
+        // constraint.  (e.g. To run DOS edit.com, a user might resize their
+        // terminal to ~100 columns so it's big enough to show the 80 columns
+        // post-resize.)  To achieve this, give priority to fonts that allow
+        // this halving.  We don't want to encourage *very* large fonts,
+        // though, so disable the effect as the number of columns scales from
+        // 80 to 40.
+        const int halfColumns = std::min(columns, std::max(40, columns / 2));
+        const int halfWidth = table[i].width * halfColumns;
+
+        std::tuple<int, int> thisScore = std::make_tuple(-1, -1);
+        if (width >= 160 && halfWidth >= 160) {
+            // Both sizes are good.  Prefer the smaller fonts.
+            thisScore = std::make_tuple(2, -width);
+        } else if (width >= 160) {
+            // Prefer the smaller fonts.
+            thisScore = std::make_tuple(1, -width);
+        } else {
+            // Otherwise, prefer the largest font in our table.
+            thisScore = std::make_tuple(0, width);
+        }
+        if (thisScore > bestScore) {
+            bestIndex = i;
+            bestScore = thisScore;
+        }
+    }
+
+    ASSERT(bestIndex != static_cast<size_t>(-1));
+    return Font { face, table[bestIndex].size };
+}
+
+static void setSmallFontVista(VistaFontAPI &api, HANDLE conout,
+                              int columns, bool isNewW10) {
+    int codePage = GetConsoleOutputCP();
+    const auto font = selectSmallFont(codePage, columns, isNewW10);
+    if (setFontVista(api, conout, font.face, font.size)) {
+        trace("setSmallFontVista: success");
+        return;
+    }
+    if (codePage == 932 || codePage == 936 ||
+            codePage == 949 || codePage == 950) {
+        trace("setSmallFontVista: falling back to default codepage font instead");
+        const auto fontFB = selectSmallFont(0, columns, isNewW10);
+        if (setFontVista(api, conout, fontFB.face, fontFB.size)) {
+            trace("setSmallFontVista: fallback was successful");
+            return;
         }
     }
     trace("setSmallFontVista: failure");
@@ -486,15 +674,17 @@ static void setSmallFontXP(UndocumentedXPFontAPI &api, HANDLE conout) {
 // maximize the possible size of the console in rows*cols, try to configure
 // the console with a small font.  Unfortunately, we cannot make the font *too*
 // small, because there is also a minimum window size in pixels.
-void setSmallFont(HANDLE conout) {
-    trace("setSmallFont: attempting to set a small font (CP=%u OutputCP=%u)",
+void setSmallFont(HANDLE conout, int columns, bool isNewW10) {
+    trace("setSmallFont: attempting to set a small font for %d columns "
+        "(CP=%u OutputCP=%u)",
+        columns,
         static_cast<unsigned>(GetConsoleCP()),
         static_cast<unsigned>(GetConsoleOutputCP()));
     VistaFontAPI vista;
     if (vista.valid()) {
         dumpVistaFont(vista, conout, "previous font: ");
         dumpFontTable(conout, "previous font table: ");
-        setSmallFontVista(vista, conout);
+        setSmallFontVista(vista, conout, columns, isNewW10);
         dumpVistaFont(vista, conout, "new font: ");
         dumpFontTable(conout, "new font table: ");
         return;

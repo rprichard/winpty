@@ -23,6 +23,6 @@
 
 #include <windows.h>
 
-void setSmallFont(HANDLE conout);
+void setSmallFont(HANDLE conout, int columns, bool isNewW10);
 
 #endif // CONSOLEFONT_H

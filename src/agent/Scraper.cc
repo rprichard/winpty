@@ -59,10 +59,26 @@ Scraper::Scraper(
 
     m_bufferData.resize(BUFFER_LINE_COUNT);
 
-    setSmallFont(buffer.conout());
+    // Setup the initial screen buffer and window size.
+    //
+    // Use SetConsoleWindowInfo to shrink the console window as much as
+    // possible -- to a 1x1 cell at the top-left.  This call always succeeds.
+    // Prior to the new Windows 10 console, it also actually resizes the GUI
+    // window to 1x1 cell.  Nevertheless, even though the GUI window can
+    // therefore be narrower than its minimum, calling
+    // SetConsoleScreenBufferSize with a 1x1 size still fails.
+    //
+    // While the small font intends to support large buffers, a user could
+    // still hit a limit imposed by their monitor width, so cap the new window
+    // size to GetLargestConsoleWindowSize().
+    setSmallFont(buffer.conout(), initialSize.X, m_console.isNewW10());
     buffer.moveWindow(SmallRect(0, 0, 1, 1));
     buffer.resizeBuffer(Coord(initialSize.X, BUFFER_LINE_COUNT));
-    buffer.moveWindow(SmallRect(0, 0, initialSize.X, initialSize.Y));
+    const auto largest = GetLargestConsoleWindowSize(buffer.conout());
+    buffer.moveWindow(SmallRect(
+        0, 0,
+        std::min(initialSize.X, largest.X),
+        std::min(initialSize.Y, largest.Y)));
     buffer.setCursorPosition(Coord(0, 0));
 
     // For the sake of the color translation heuristic, set the console color
@@ -159,11 +175,18 @@ void Scraper::clearBufferLines(
     }
 }
 
+static bool cursorInWindow(const ConsoleScreenBufferInfo &info)
+{
+    return info.dwCursorPosition.Y >= info.srWindow.Top &&
+           info.dwCursorPosition.Y <= info.srWindow.Bottom;
+}
+
 void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
 {
     ASSERT(m_console.frozen());
     const int cols = m_ptySize.X;
     const int rows = m_ptySize.Y;
+    Coord finalBufferSize;
 
     {
         //
@@ -188,7 +211,7 @@ void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
             }
         }
 
-        const Coord finalBufferSize(
+        finalBufferSize = Coord(
             cols,
             // If there was previously no scrollback (e.g. a full-screen app
             // in direct mode) and we're reducing the window height, then
@@ -196,44 +219,62 @@ void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
             (origWindowRect.height() == origBufferSize.Y)
                 ? rows
                 : std::max<int>(rows, origBufferSize.Y));
-        const bool cursorWasInWindow =
-            origInfo.cursorPosition().Y >= origWindowRect.Top &&
-            origInfo.cursorPosition().Y <= origWindowRect.Bottom;
 
-        // Step 1: move the window.
-        const int tmpWindowWidth = std::min(origBufferSize.X, finalBufferSize.X);
-        const int tmpWindowHeight = std::min<int>(origBufferSize.Y, rows);
+        // Reset the console font size.  We need to do this before shrinking
+        // the window, because we might need to make the font bigger to permit
+        // a smaller window width.  Making the font smaller could expand the
+        // screen buffer, which would hang the conhost process in the
+        // Windows 10 (10240 build) if the console selection is in progress, so
+        // unfreeze it first.
+        m_console.setFrozen(false);
+        setSmallFont(m_consoleBuffer->conout(), cols, m_console.isNewW10());
+    }
+
+    // We try to make the font small enough so that the entire screen buffer
+    // fits on the monitor, but it can't be guaranteed.
+    const auto largest =
+        GetLargestConsoleWindowSize(m_consoleBuffer->conout());
+    const short visibleCols = std::min<short>(cols, largest.X);
+    const short visibleRows = std::min<short>(rows, largest.Y);
+
+    {
+        // Make the window small enough.  We want the console frozen during
+        // this step so we don't accidentally move the window above the cursor.
+        m_console.setFrozen(true);
+        const auto info = m_consoleBuffer->bufferInfo();
+        const auto &bufferSize = info.dwSize;
+        const int tmpWindowWidth = std::min(bufferSize.X, visibleCols);
+        const int tmpWindowHeight = std::min(bufferSize.Y, visibleRows);
         SmallRect tmpWindowRect(
             0,
-            std::min<int>(origBufferSize.Y - tmpWindowHeight,
-                          origWindowRect.Top),
+            std::min<int>(bufferSize.Y - tmpWindowHeight,
+                          info.windowRect().Top),
             tmpWindowWidth,
             tmpWindowHeight);
-        if (cursorWasInWindow) {
+        if (cursorInWindow(info)) {
             tmpWindowRect = tmpWindowRect.ensureLineIncluded(
-                origInfo.cursorPosition().Y);
+                info.cursorPosition().Y);
         }
         m_consoleBuffer->moveWindow(tmpWindowRect);
+    }
 
-        // Step 2: resize the buffer.
+    {
+        // Resize the buffer to the final desired size.
         m_console.setFrozen(false);
         m_consoleBuffer->resizeBuffer(finalBufferSize);
     }
 
-    // Step 3: expand the window to its full size.
     {
+        // Expand the window to its full size.
         m_console.setFrozen(true);
         const ConsoleScreenBufferInfo info = m_consoleBuffer->bufferInfo();
-        const bool cursorWasInWindow =
-            info.cursorPosition().Y >= info.windowRect().Top &&
-            info.cursorPosition().Y <= info.windowRect().Bottom;
 
         SmallRect finalWindowRect(
             0,
-            std::min<int>(info.bufferSize().Y - rows,
+            std::min<int>(info.bufferSize().Y - visibleRows,
                           info.windowRect().Top),
-            cols,
-            rows);
+            visibleCols,
+            visibleRows);
 
         //
         // Once a line in the screen buffer is "dirty", it should stay visible
@@ -248,12 +289,12 @@ void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
             // unfrozen, so that the *top* of the window is now below the
             // dirtiest tracked line.
             finalWindowRect = SmallRect(
-                0, m_dirtyLineCount - rows,
-                cols, rows);
+                0, m_dirtyLineCount - visibleRows,
+                visibleCols, visibleRows);
         }
 
         // Highest priority constraint: ensure that the cursor remains visible.
-        if (cursorWasInWindow) {
+        if (cursorInWindow(info)) {
             finalWindowRect = finalWindowRect.ensureLineIncluded(
                 info.cursorPosition().Y);
         }

@@ -42,6 +42,7 @@
 #include "../shared/WindowsVersion.h"
 #include "../shared/WinptyAssert.h"
 
+#include "ConsoleFont.h"
 #include "ConsoleInput.h"
 #include "NamedPipe.h"
 #include "Scraper.h"
@@ -59,39 +60,48 @@ static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
     return FALSE;
 }
 
-// In versions of the Windows console before Windows 10, the SelectAll and
-// Mark commands both run quickly, but Mark changes the cursor position read
-// by GetConsoleScreenBufferInfo.  Therefore, use SelectAll to be less
-// intrusive.
+// We can detect the new Windows 10 console by observing the effect of the
+// Mark command.  In older consoles, Mark temporarily moves the cursor to the
+// top-left of the console window.  In the new console, the cursor isn't
+// initially moved.
 //
-// Starting with the new Windows 10 console, the Mark command no longer moves
-// the cursor, and SelectAll uses a lot of CPU time.  Therefore, use Mark.
-//
-// The Windows 10 legacy-mode console behaves the same way as previous console
-// versions, so detect which syscommand to use by testing whether Mark changes
-// the cursor position.
-static void initConsoleFreezeMethod(
+// We might like to use Mark to freeze the console, but we can't, because when
+// the Mark command ends, the console moves the cursor back to its starting
+// point, even if the console application has moved it in the meantime.
+static void detectNewWindows10Console(
         Win32Console &console, Win32ConsoleBuffer &buffer)
 {
-    const ConsoleScreenBufferInfo info = buffer.bufferInfo();
+    ConsoleScreenBufferInfo info = buffer.bufferInfo();
 
-    // Make sure the buffer and window aren't 1x1.  (Is that even possible?)
-    buffer.resizeBuffer(Coord(
-        std::max<int>(2, info.dwSize.X),
-        std::max<int>(2, info.dwSize.Y)));
-    buffer.moveWindow(SmallRect(0, 0, 2, 2));
-    const Coord initialPosition(1, 1);
-    buffer.setCursorPosition(initialPosition);
+    // Make sure the window isn't 1x1.
+    if (info.srWindow.Left == info.srWindow.Right &&
+            info.srWindow.Top == info.srWindow.Bottom) {
+        // Make sure the buffer isn't 1x1.
+        if (info.dwSize.X == 1 && info.dwSize.Y == 1) {
+            setSmallFont(buffer.conout(), 80, false);
+            buffer.resizeBuffer(Coord(80, 25));
+            info = buffer.bufferInfo();
+        }
+        buffer.moveWindow(SmallRect(0, 0, 2, 1));
+        info = buffer.bufferInfo();
+        ASSERT(info.srWindow.Right > info.srWindow.Left &&
+            "Could not expand console window from 1x1");
+    }
 
     // Test whether MARK moves the cursor.
+    const Coord initialPosition(info.srWindow.Right, info.srWindow.Bottom);
+    buffer.setCursorPosition(initialPosition);
     ASSERT(!console.frozen());
     console.setFreezeUsesMark(true);
     console.setFrozen(true);
-    const bool useMark = (buffer.cursorPosition() == initialPosition);
+    const bool isNewW10 = (buffer.cursorPosition() == initialPosition);
     console.setFrozen(false);
-    trace("Using %s syscommand to freeze console",
-        useMark ? "MARK" : "SELECT_ALL");
-    console.setFreezeUsesMark(useMark);
+    buffer.setCursorPosition(Coord(0, 0));
+
+    trace("Attempting to detect new Windows 10 console using MARK: %s",
+        isNewW10 ? "detected" : "not detected");
+    console.setFreezeUsesMark(false);
+    console.setNewW10(isNewW10);
 }
 
 static inline WriteBuffer newPacket() {
@@ -141,7 +151,7 @@ Agent::Agent(LPCWSTR controlPipeName,
         m_errorBuffer = Win32ConsoleBuffer::createErrorBuffer();
     }
 
-    initConsoleFreezeMethod(m_console, *primaryBuffer);
+    detectNewWindows10Console(m_console, *primaryBuffer);
 
     m_controlPipe = &connectToControlPipe(controlPipeName);
     m_coninPipe = &createDataServerPipe(false, L"conin");

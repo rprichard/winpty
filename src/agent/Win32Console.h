@@ -51,6 +51,8 @@ public:
     std::wstring title();
     void setTitle(const std::wstring &title);
     void setFreezeUsesMark(bool useMark) { m_freezeUsesMark = useMark; }
+    void setNewW10(bool isNewW10) { m_isNewW10 = isNewW10; }
+    bool isNewW10() { return m_isNewW10; }
     void setFrozen(bool frozen=true);
     bool frozen() { return m_frozen; }
 
@@ -58,6 +60,7 @@ private:
     HWND m_hwnd = nullptr;
     bool m_frozen = false;
     bool m_freezeUsesMark = false;
+    bool m_isNewW10 = false;
     std::vector<wchar_t> m_titleWorkBuf;
 };
 
