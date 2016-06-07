@@ -38,6 +38,13 @@ Win7
         SetFont.exe -face Consolas -h 16 -tt                unreliable
         SetFont.exe -face Consolas -h 16 -family 0x36       works
 
+Win10 Build 10586
+    New console
+        Japanese locale / 437 code page:
+            SetFont.exe -face Consolas -h 16                    works
+            SetFont.exe -face Consolas -h 16 -tt                selects Terminal instead
+            SetFont.exe -face Consolas -h 16 -family 0x36       works
+
 Win10 Build 14316
     Old console
         English locale / 437 code page:
