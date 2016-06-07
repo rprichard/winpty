@@ -18,6 +18,9 @@ Bug fixes:
    [#58](https://github.com/rprichard/winpty/issues/58)
  * Fixed an uninitialized memory bug that could have crashed winpty.
    [#80](https://github.com/rprichard/winpty/issues/80)
+ * winpty now works better with very large and very small terminal windows.
+   It resizes the console font according to the number of columns.
+   [#61](https://github.com/rprichard/winpty/issues/61)
 
 # Version 0.3.0 (2016-05-20)
 
