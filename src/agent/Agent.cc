@@ -71,18 +71,29 @@ static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
 static void detectNewWindows10Console(
         Win32Console &console, Win32ConsoleBuffer &buffer)
 {
+    if (!isAtLeastWindows8()) {
+        return;
+    }
+
     ConsoleScreenBufferInfo info = buffer.bufferInfo();
 
-    // Make sure the window isn't 1x1.
+    // Make sure the window isn't 1x1.  AFAIK, this should never happen
+    // accidentally.  It is difficult to make it happen deliberately.
     if (info.srWindow.Left == info.srWindow.Right &&
             info.srWindow.Top == info.srWindow.Bottom) {
-        // Make sure the buffer isn't 1x1.
-        if (info.dwSize.X == 1 && info.dwSize.Y == 1) {
-            setSmallFont(buffer.conout(), 80, false);
-            buffer.resizeBuffer(Coord(80, 25));
-            info = buffer.bufferInfo();
-        }
+        trace("detectNewWindows10Console: Initial console window was 1x1 -- "
+              "expanding for test");
+        setSmallFont(buffer.conout(), 400, false);
+        buffer.moveWindow(SmallRect(0, 0, 1, 1));
+        buffer.resizeBuffer(Coord(400, 1));
         buffer.moveWindow(SmallRect(0, 0, 2, 1));
+        // This use of GetLargestConsoleWindowSize ought to be unnecessary
+        // given the behavior I've seen from moveWindow(0, 0, 1, 1), but
+        // I'd like to be especially sure, considering that this code will
+        // rarely be tested.
+        const auto largest = GetLargestConsoleWindowSize(buffer.conout());
+        buffer.moveWindow(
+            SmallRect(0, 0, std::min(largest.X, buffer.bufferSize().X), 1));
         info = buffer.bufferInfo();
         ASSERT(info.srWindow.Right > info.srWindow.Left &&
             "Could not expand console window from 1x1");
