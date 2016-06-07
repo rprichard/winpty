@@ -50,13 +50,14 @@ const wchar_t kGulimChe[] = { 0xad74, 0xb9bc, 0xccb4, 0 }; // 949, Korean
 const wchar_t kMingLight[] = { 0x7d30, 0x660e, 0x9ad4, 0 }; // 950, Chinese Traditional
 
 struct FontSize {
-    int size;
+    short size;
     int width;
 };
 
 struct Font {
-    const wchar_t *face;
-    int size;
+    const wchar_t *faceName;
+    unsigned int family;
+    short size;
 };
 
 // Ideographs in East Asian languages take two columns rather than one.
@@ -485,13 +486,13 @@ static void dumpXPFont(XPFontAPI &api, HANDLE conout, const char *prefix) {
 static bool setFontVista(
         VistaFontAPI &api,
         HANDLE conout,
-        const wchar_t *faceName,
-        int pxSize) {
-    AGENT_CONSOLE_FONT_INFOEX infoex = {0};
+        const Font &font) {
+    AGENT_CONSOLE_FONT_INFOEX infoex = {};
     infoex.cbSize = sizeof(AGENT_CONSOLE_FONT_INFOEX);
-    infoex.dwFontSize.Y = pxSize;
+    infoex.dwFontSize.Y = font.size;
+    infoex.FontFamily = font.family;
     infoex.FontWeight = 400;
-    winpty_wcsncpy_nul(infoex.FaceName, faceName);
+    winpty_wcsncpy_nul(infoex.FaceName, font.faceName);
     dumpFontInfoEx(infoex, "setFontVista: setting font to: ");
     if (!api.SetCurrentConsoleFontEx()(conout, FALSE, &infoex)) {
         trace("setFontVista: SetCurrentConsoleFontEx call failed");
@@ -503,7 +504,8 @@ static bool setFontVista(
         trace("setFontVista: GetCurrentConsoleFontEx call failed");
         return false;
     }
-    if (wcsncmp(infoex.FaceName, faceName, COUNT_OF(infoex.FaceName)) != 0) {
+    if (wcsncmp(infoex.FaceName, font.faceName,
+            COUNT_OF(infoex.FaceName)) != 0) {
         trace("setFontVista: face name was not set");
         dumpFontInfoEx(infoex, "setFontVista: post-call font: ");
         return false;
@@ -520,13 +522,15 @@ static Font selectSmallFont(int codePage, int columns, bool isNewW10) {
     // Iterate over a set of font sizes according to the code page, and select
     // one.
 
-    const wchar_t *face = nullptr;
+    const wchar_t *faceName = nullptr;
+    unsigned int fontFamily = 0;
     const FontSize *table = nullptr;
     size_t tableSize = 0;
 
     switch (codePage) {
         case 932: // Japanese
-            face = kMSGothic;
+            faceName = kMSGothic;
+            fontFamily = 0x36;
             if (isNewW10) {
                 table = k932GothicWin10;
                 tableSize = COUNT_OF(k932GothicWin10);
@@ -539,22 +543,26 @@ static Font selectSmallFont(int codePage, int columns, bool isNewW10) {
             }
             break;
         case 936: // Chinese Simplified
-            face = kNSimSun;
+            faceName = kNSimSun;
+            fontFamily = 0x36;
             table = k936SimSun;
             tableSize = COUNT_OF(k936SimSun);
             break;
         case 949: // Korean
-            face = kGulimChe;
+            faceName = kGulimChe;
+            fontFamily = 0x36;
             table = k949GulimChe;
             tableSize = COUNT_OF(k949GulimChe);
             break;
         case 950: // Chinese Traditional
-            face = kMingLight;
+            faceName = kMingLight;
+            fontFamily = 0x36;
             table = k950MingLight;
             tableSize = COUNT_OF(k950MingLight);
             break;
         default:
-            face = kLucidaConsole;
+            faceName = kLucidaConsole;
+            fontFamily = 0x36;
             table = kLucidaFontSizes;
             tableSize = COUNT_OF(kLucidaFontSizes);
             break;
@@ -601,14 +609,14 @@ static Font selectSmallFont(int codePage, int columns, bool isNewW10) {
     }
 
     ASSERT(bestIndex != static_cast<size_t>(-1));
-    return Font { face, table[bestIndex].size };
+    return Font { faceName, fontFamily, table[bestIndex].size };
 }
 
 static void setSmallFontVista(VistaFontAPI &api, HANDLE conout,
                               int columns, bool isNewW10) {
     int codePage = GetConsoleOutputCP();
     const auto font = selectSmallFont(codePage, columns, isNewW10);
-    if (setFontVista(api, conout, font.face, font.size)) {
+    if (setFontVista(api, conout, font)) {
         trace("setSmallFontVista: success");
         return;
     }
@@ -616,7 +624,7 @@ static void setSmallFontVista(VistaFontAPI &api, HANDLE conout,
             codePage == 949 || codePage == 950) {
         trace("setSmallFontVista: falling back to default codepage font instead");
         const auto fontFB = selectSmallFont(0, columns, isNewW10);
-        if (setFontVista(api, conout, fontFB.face, fontFB.size)) {
+        if (setFontVista(api, conout, fontFB)) {
             trace("setSmallFontVista: fallback was successful");
             return;
         }
