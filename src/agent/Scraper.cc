@@ -73,7 +73,7 @@ Scraper::Scraper(
     // size to GetLargestConsoleWindowSize().
     setSmallFont(buffer.conout(), initialSize.X, m_console.isNewW10());
     buffer.moveWindow(SmallRect(0, 0, 1, 1));
-    buffer.resizeBuffer(Coord(initialSize.X, BUFFER_LINE_COUNT));
+    buffer.resizeBufferRange(Coord(initialSize.X, BUFFER_LINE_COUNT));
     const auto largest = GetLargestConsoleWindowSize(buffer.conout());
     buffer.moveWindow(SmallRect(
         0, 0,
@@ -261,7 +261,7 @@ void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
     {
         // Resize the buffer to the final desired size.
         m_console.setFrozen(false);
-        m_consoleBuffer->resizeBuffer(finalBufferSize);
+        m_consoleBuffer->resizeBufferRange(finalBufferSize);
     }
 
     {

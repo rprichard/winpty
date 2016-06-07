@@ -100,10 +100,39 @@ SmallRect Win32ConsoleBuffer::windowRect() {
     return bufferInfo().windowRect();
 }
 
+bool Win32ConsoleBuffer::resizeBufferRange(const Coord &initialSize,
+                                           Coord &finalSize) {
+    if (SetConsoleScreenBufferSize(m_conout, initialSize)) {
+        finalSize = initialSize;
+        return true;
+    }
+    // The font might be too small to accommodate a very narrow console window.
+    // In that case, rather than simply give up, it's better to try wider
+    // buffer sizes until the call succeeds.
+    Coord size = initialSize;
+    while (size.X < 20) {
+        size.X++;
+        if (SetConsoleScreenBufferSize(m_conout, size)) {
+            finalSize = size;
+            trace("SetConsoleScreenBufferSize: initial size (%d,%d) failed, "
+                  "but wider size (%d,%d) succeeded",
+                  initialSize.X, initialSize.Y,
+                  finalSize.X, finalSize.Y);
+            return true;
+        }
+    }
+    trace("SetConsoleScreenBufferSize failed: "
+          "tried (%d,%d) through (%d,%d)",
+          initialSize.X, initialSize.Y,
+          size.X, size.Y);
+    return false;
+}
+
 void Win32ConsoleBuffer::resizeBuffer(const Coord &size) {
     // TODO: error handling
     if (!SetConsoleScreenBufferSize(m_conout, size)) {
-        trace("SetConsoleScreenBufferSize failed");
+        trace("SetConsoleScreenBufferSize failed: size=(%d,%d)",
+              size.X, size.Y);
     }
 }
 

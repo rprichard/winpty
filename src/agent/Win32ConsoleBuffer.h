@@ -72,6 +72,11 @@ public:
     Coord bufferSize();
     SmallRect windowRect();
     void resizeBuffer(const Coord &size);
+    bool resizeBufferRange(const Coord &initialSize, Coord &finalSize);
+    bool resizeBufferRange(const Coord &initialSize) {
+        Coord dummy;
+        return resizeBufferRange(initialSize, dummy);
+    }
     void moveWindow(const SmallRect &rect);
 
     // Cursor.
