@@ -23,6 +23,7 @@
 #include <windows.h>
 
 #include "../shared/DebugClient.h"
+#include "../shared/StringBuilder.h"
 #include "../shared/WinptyAssert.h"
 
 std::unique_ptr<Win32ConsoleBuffer> Win32ConsoleBuffer::openStdout() {
@@ -127,9 +128,24 @@ void Win32ConsoleBuffer::setCursorPosition(const Coord &coord) {
 void Win32ConsoleBuffer::read(const SmallRect &rect, CHAR_INFO *data) {
     // TODO: error handling
     SmallRect tmp(rect);
-    if (!ReadConsoleOutputW(m_conout, data, rect.size(), Coord(), &tmp)) {
-        trace("ReadConsoleOutput failed [x:%d,y:%d,w:%d,h:%d]",
-              rect.Left, rect.Top, rect.width(), rect.height());
+    if (!ReadConsoleOutputW(m_conout, data, rect.size(), Coord(), &tmp) &&
+            isTracingEnabled()) {
+        StringBuilder sb(256);
+        auto outStruct = [&](const SMALL_RECT &sr) {
+            sb << "{L=" << sr.Left << ",T=" << sr.Top
+               << ",R=" << sr.Right << ",B=" << sr.Bottom << '}';
+        };
+        sb << "Win32ConsoleBuffer::read: ReadConsoleOutput failed: readRegion=";
+        outStruct(rect);
+        CONSOLE_SCREEN_BUFFER_INFO info = {};
+        if (GetConsoleScreenBufferInfo(m_conout, &info)) {
+            sb << ", dwSize=(" << info.dwSize.X << ',' << info.dwSize.Y
+               << "), srWindow=";
+            outStruct(info.srWindow);
+        } else {
+            sb << ", GetConsoleScreenBufferInfo also failed";
+        }
+        trace("%s", sb.c_str());
     }
 }
 
