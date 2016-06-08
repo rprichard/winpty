@@ -4,7 +4,7 @@ setlocal
 cd %~dp0..
 set Path=C:\Python27;C:\Program Files\Git\cmd;%Path%
 
-call "%VS140COMNTOOLS%\VsDevCmd.bat"
+call "%VS140COMNTOOLS%\VsDevCmd.bat" || goto :fail
 
 rmdir /s/q build-libpty 2>NUL
 mkdir build-libpty\win
