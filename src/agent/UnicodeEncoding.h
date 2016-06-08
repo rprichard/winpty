@@ -32,6 +32,11 @@ static inline int encodeUtf8(char *out, unsigned int code) {
         out[1] = ((code >> 0) & 0x3F) | 0x80;
         return 2;
     } else if (code < 0x10000) {
+        if (code >= 0xD800 && code <= 0xDFFF) {
+            // The code points 0xD800 to 0xDFFF are reserved for UTF-16
+            // surrogate pairs and do not have an encoding in UTF-8.
+            return 0;
+        }
         out[0] = ((code >> 12) & 0x0F) | 0xE0;
         out[1] = ((code >>  6) & 0x3F) | 0x80;
         out[2] = ((code >>  0) & 0x3F) | 0x80;
@@ -48,10 +53,15 @@ static inline int encodeUtf8(char *out, unsigned int code) {
     }
 }
 
-// Encode the Unicode codepoint with UTF-8.  The buffer must be at least 2
+// Encode the Unicode codepoint with UTF-16.  The buffer must be at least 2
 // elements in size.
 static inline int encodeUtf16(wchar_t *out, unsigned int code) {
     if (code < 0x10000) {
+        if (code >= 0xD800 && code <= 0xDFFF) {
+            // The code points 0xD800 to 0xDFFF are reserved for UTF-16
+            // surrogate pairs and do not have an encoding in UTF-16.
+            return 0;
+        }
         out[0] = code;
         return 1;
     } else if (code < 0x110000) {

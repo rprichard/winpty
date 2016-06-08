@@ -36,21 +36,22 @@ static void correctness()
     wchar_t wch[2];
     for (unsigned int code = 0; code < 0x110000; ++code) {
 
-        if (code >= 0xD800 && code <= 0xDFFF) {
-            // Skip the surrogate pair codepoints.  WideCharToMultiByte doesn't
-            // encode them.
-            continue;
-        }
+        // Surrogate pair reserved region.
+        const bool isReserved = (code >= 0xD800 && code <= 0xDFFF);
 
         int mblen1 = encodeUtf8(mbstr1, code);
-        if (mblen1 <= 0) {
+        if (isReserved ? mblen1 != 0 : mblen1 <= 0) {
             printf("Error: 0x%04X: mblen1=%d\n", code, mblen1);
             continue;
         }
 
         int wlen = encodeUtf16(wch, code);
-        if (wlen <= 0) {
+        if (isReserved ? wlen != 0 : wlen <= 0) {
             printf("Error: 0x%04X: wlen=%d\n", code, wlen);
+            continue;
+        }
+
+        if (isReserved) {
             continue;
         }
 
