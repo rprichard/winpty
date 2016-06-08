@@ -355,8 +355,8 @@ void ConsoleInput::doWrite(bool isEof)
     }
     m_byteQueue.erase(0, idx);
     DWORD actual = 0;
-    if (!WriteConsoleInput(m_conin, records.data(), records.size(), &actual)) {
-        trace("WriteConsoleInput failed");
+    if (!WriteConsoleInputW(m_conin, records.data(), records.size(), &actual)) {
+        trace("WriteConsoleInputW failed");
     }
 }
 

@@ -76,7 +76,7 @@ struct ModuleNotFound : WinptyException {
 // Throws WinptyException on error.
 std::wstring getSystemDirectory() {
     wchar_t systemDirectory[MAX_PATH];
-    const UINT size = GetSystemDirectory(systemDirectory, MAX_PATH);
+    const UINT size = GetSystemDirectoryW(systemDirectory, MAX_PATH);
     if (size == 0) {
         throwWindowsError(L"GetSystemDirectory failed");
     } else if (size >= MAX_PATH) {
