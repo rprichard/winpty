@@ -58,6 +58,8 @@
                 'agent/ConsoleFont.h',
                 'agent/ConsoleInput.cc',
                 'agent/ConsoleInput.h',
+                'agent/ConsoleInputReencoding.cc',
+                'agent/ConsoleInputReencoding.h',
                 'agent/ConsoleLine.cc',
                 'agent/ConsoleLine.h',
                 'agent/Coord.h',

@@ -438,8 +438,8 @@ void Agent::pollConinPipe()
 
 void Agent::onPollTimeout()
 {
-    // Check the mouse input flag so we can output a trace message.
-    const bool enableMouseMode = m_consoleInput->updateMouseInputFlags();
+    m_consoleInput->updateInputFlags();
+    const bool enableMouseMode = m_consoleInput->shouldActivateTerminalMouse();
 
     // Give the ConsoleInput object a chance to flush input from an incomplete
     // escape sequence (e.g. pressing ESC).

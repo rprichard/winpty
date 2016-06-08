@@ -32,6 +32,7 @@
 #include "../shared/StringBuilder.h"
 #include "../shared/UnixCtrlChars.h"
 
+#include "ConsoleInputReencoding.h"
 #include "DebugShowInput.h"
 #include "DefaultInputMap.h"
 #include "DsrSender.h"
@@ -227,7 +228,7 @@ ConsoleInput::ConsoleInput(HANDLE conin, int mouseMode, DsrSender &dsrSender) :
         }
     }
 
-    updateMouseInputFlags(true);
+    updateInputFlags(true);
 }
 
 void ConsoleInput::writeInput(const std::string &input)
@@ -284,25 +285,32 @@ void ConsoleInput::flushIncompleteEscapeCode()
     }
 }
 
-bool ConsoleInput::updateMouseInputFlags(bool forceTrace)
+void ConsoleInput::updateInputFlags(bool forceTrace)
 {
     const DWORD mode = inputConsoleMode();
     const bool newFlagEE = mode & ENABLE_EXTENDED_FLAGS;
     const bool newFlagMI = mode & ENABLE_MOUSE_INPUT;
     const bool newFlagQE = mode & ENABLE_QUICK_EDIT_MODE;
+    const bool newFlagEI = mode & 0x200;
     if (forceTrace ||
             newFlagEE != m_enableExtendedEnabled ||
             newFlagMI != m_mouseInputEnabled ||
-            newFlagQE != m_quickEditEnabled) {
-        trace("CONIN mouse modes: ENABLE_EXTENDED_FLAGS=%s, ENABLE_MOUSE_INPUT=%s ENABLE_QUICK_EDIT_MODE=%s",
+            newFlagQE != m_quickEditEnabled ||
+            newFlagEI != m_escapeInputEnabled) {
+        trace("CONIN modes: Extended=%s, MouseInput=%s QuickEdit=%s EscapeInput=%s",
             newFlagEE ? "on" : "off",
             newFlagMI ? "on" : "off",
-            newFlagQE ? "on" : "off");
+            newFlagQE ? "on" : "off",
+            newFlagEI ? "on" : "off");
     }
     m_enableExtendedEnabled = newFlagEE;
     m_mouseInputEnabled = newFlagMI;
     m_quickEditEnabled = newFlagQE;
+    m_escapeInputEnabled = newFlagEI;
+}
 
+bool ConsoleInput::shouldActivateTerminalMouse()
+{
     // Return whether the agent should activate the terminal's mouse mode.
     if (m_mouseMode == WINPTY_MOUSE_MODE_AUTO) {
         // Some programs (e.g. Cygwin command-line programs like bash.exe and
@@ -606,12 +614,16 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
         stepKeyState |= SHIFT_PRESSED;
         appendInputRecord(records, TRUE, VK_SHIFT, 0, stepKeyState);
     }
-    if (ctrl && alt) {
-        // This behavior seems arbitrary, but it's what I see in the Windows 7
-        // console.
-        codePoint = 0;
+    if (m_escapeInputEnabled) {
+        reencodeEscapedKeyPress(records, virtualKey, codePoint, stepKeyState);
+    } else {
+        if (ctrl && alt) {
+            // This behavior seems arbitrary, but it's what I see in the
+            // Windows 7 console.
+            codePoint = 0;
+        }
+        appendCPInputRecords(records, TRUE, virtualKey, codePoint, stepKeyState);
     }
-    appendCPInputRecords(records, TRUE, virtualKey, codePoint, stepKeyState);
     if (alt) {
         // This behavior seems arbitrary, but it's what I see in the Windows 7
         // console.
@@ -713,11 +725,10 @@ void ConsoleInput::appendCPInputRecords(std::vector<INPUT_RECORD> &records,
 void ConsoleInput::appendInputRecord(std::vector<INPUT_RECORD> &records,
                                      BOOL keyDown,
                                      uint16_t virtualKey,
-                                     uint16_t utf16Char,
+                                     wchar_t utf16Char,
                                      uint16_t keyState)
 {
-    INPUT_RECORD ir;
-    memset(&ir, 0, sizeof(ir));
+    INPUT_RECORD ir = {};
     ir.EventType = KEY_EVENT;
     ir.Event.KeyEvent.bKeyDown = keyDown;
     ir.Event.KeyEvent.wRepeatCount = 1;

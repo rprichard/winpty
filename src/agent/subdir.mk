@@ -27,6 +27,7 @@ AGENT_OBJECTS = \
 	build/agent/agent/AgentCreateDesktop.o \
 	build/agent/agent/ConsoleFont.o \
 	build/agent/agent/ConsoleInput.o \
+	build/agent/agent/ConsoleInputReencoding.o \
 	build/agent/agent/ConsoleLine.o \
 	build/agent/agent/DebugShowInput.o \
 	build/agent/agent/DefaultInputMap.o \

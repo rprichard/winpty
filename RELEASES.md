@@ -10,6 +10,9 @@ User-visible changes:
    suppress terminal mode, but hopefully it won't be necessary.  There is a
    script in the `misc` subdirectory, `misc/ConinMode.ps1`, that can change
    the QuickEdit mode from the command-line.
+ * winpty now passes keyboard escapes to `bash.exe` in the Windows Subsystem
+   for Linux.
+   [#82](https://github.com/rprichard/winpty/issues/82)
 
 Bug fixes:
 

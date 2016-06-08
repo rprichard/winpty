@@ -42,7 +42,8 @@ public:
     void writeInput(const std::string &input);
     void flushIncompleteEscapeCode();
     void setMouseWindowRect(SmallRect val) { m_mouseWindowRect = val; }
-    bool updateMouseInputFlags(bool forceTrace=false);
+    void updateInputFlags(bool forceTrace=false);
+    bool shouldActivateTerminalMouse();
 
 private:
     void doWrite(bool isEof);
@@ -61,16 +62,20 @@ private:
                         uint16_t virtualKey,
                         uint32_t codePoint,
                         uint16_t keyState);
-    void appendCPInputRecords(std::vector<INPUT_RECORD> &records,
-                              BOOL keyDown,
-                              uint16_t virtualKey,
-                              uint32_t codePoint,
-                              uint16_t keyState);
-    void appendInputRecord(std::vector<INPUT_RECORD> &records,
-                           BOOL keyDown,
-                           uint16_t virtualKey,
-                           uint16_t utf16Char,
-                           uint16_t keyState);
+
+public:
+    static void appendCPInputRecords(std::vector<INPUT_RECORD> &records,
+                                     BOOL keyDown,
+                                     uint16_t virtualKey,
+                                     uint32_t codePoint,
+                                     uint16_t keyState);
+    static void appendInputRecord(std::vector<INPUT_RECORD> &records,
+                                  BOOL keyDown,
+                                  uint16_t virtualKey,
+                                  wchar_t utf16Char,
+                                  uint16_t keyState);
+
+private:
     DWORD inputConsoleMode();
 
 private:
@@ -91,6 +96,7 @@ private:
     bool m_enableExtendedEnabled = false;
     bool m_mouseInputEnabled = false;
     bool m_quickEditEnabled = false;
+    bool m_escapeInputEnabled = false;
     SmallRect m_mouseWindowRect;
 };
 
