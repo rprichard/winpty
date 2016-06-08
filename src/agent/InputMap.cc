@@ -127,9 +127,11 @@ std::string InputMap::Key::toString() const {
         ret += buf;
     }
     if (unicodeChar >= 32 && unicodeChar <= 126) {
-        winpty_snprintf(buf, " ch='%c'", unicodeChar);
+        winpty_snprintf(buf, " ch='%c'",
+                        static_cast<char>(unicodeChar));
     } else {
-        winpty_snprintf(buf, " ch=%#x", unicodeChar);
+        winpty_snprintf(buf, " ch=%#x",
+                        static_cast<unsigned int>(unicodeChar));
     }
     ret += buf;
     return ret;

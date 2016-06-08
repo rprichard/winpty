@@ -34,7 +34,7 @@ class InputMap {
 public:
     struct Key {
         uint16_t virtualKey;
-        uint16_t unicodeChar;
+        uint32_t unicodeChar;
         uint16_t keyState;
 
         std::string toString() const;

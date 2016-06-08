@@ -29,7 +29,7 @@
 #include <string.h>
 #include <time.h>
 
-static void correctness()
+static void correctnessByCode()
 {
     char mbstr1[4];
     char mbstr2[4];
@@ -55,6 +55,18 @@ static void correctness()
             continue;
         }
 
+        if (mblen1 != utf8CharLength(mbstr1[0])) {
+            printf("Error: 0x%04X: mblen1=%d, utf8CharLength(mbstr1[0])=%d\n",
+                code, mblen1, utf8CharLength(mbstr1[0]));
+            continue;
+        }
+
+        if (code != decodeUtf8(mbstr1)) {
+            printf("Error: 0x%04X: decodeUtf8(mbstr1)=%u\n",
+                code, decodeUtf8(mbstr1));
+            continue;
+        }
+
         int mblen2 = WideCharToMultiByte(CP_UTF8, 0, wch, wlen, mbstr2, 4, NULL, NULL);
         if (mblen1 != mblen2) {
             printf("Error: 0x%04X: mblen1=%d, mblen2=%d\n", code, mblen1, mblen2);
@@ -63,6 +75,68 @@ static void correctness()
 
         if (memcmp(mbstr1, mbstr2, mblen1) != 0) {
             printf("Error: 0x%04x: encodings are different\n", code);
+            continue;
+        }
+    }
+}
+
+static const char *encodingStr(char (&output)[128], char (&buf)[4])
+{
+    sprintf(output, "Encoding %02X %02X %02X %02X",
+        static_cast<uint8_t>(buf[0]),
+        static_cast<uint8_t>(buf[1]),
+        static_cast<uint8_t>(buf[2]),
+        static_cast<uint8_t>(buf[3]));
+    return output;
+}
+
+// This test can take a couple of minutes to run.
+static void correctnessByUtf8Encoding()
+{
+    for (uint64_t encoding = 0; encoding <= 0xFFFFFFFF; ++encoding) {
+
+        char mb[4];
+        mb[0] = encoding;
+        mb[1] = encoding >> 8;
+        mb[2] = encoding >> 16;
+        mb[3] = encoding >> 24;
+
+        const int mblen = utf8CharLength(mb[0]);
+        if (mblen == 0) {
+            continue;
+        }
+
+        // Test this module.
+        const uint32_t code1 = decodeUtf8(mb);
+        wchar_t ws1[2] = {};
+        const int wslen1 = encodeUtf16(ws1, code1);
+
+        // Test using Windows.  We can't decode a codepoint directly; we have
+        // to do UTF8->UTF16, then decode the surrogate pair.
+        wchar_t ws2[2] = {};
+        const int wslen2 = MultiByteToWideChar(
+            CP_UTF8, MB_ERR_INVALID_CHARS, mb, mblen, ws2, 2);
+        const uint32_t code2 =
+            (wslen2 == 1 ? ws2[0] :
+             wslen2 == 2 ? decodeSurrogatePair(ws2[0], ws2[1]) :
+             static_cast<uint32_t>(-1));
+
+        // Verify that the two implementations match.
+        char prefix[128];
+        if (code1 != code2) {
+            printf("%s: code1=0x%04x code2=0x%04x\n",
+                encodingStr(prefix, mb),
+                code1, code2);
+            continue;
+        }
+        if (wslen1 != wslen2) {
+            printf("%s: wslen1=%d wslen2=%d\n",
+                encodingStr(prefix, mb),
+                wslen1, wslen2);
+            continue;
+        }
+        if (memcmp(ws1, ws2, wslen1 * sizeof(wchar_t)) != 0) {
+            printf("%s: ws1 != ws2\n", encodingStr(prefix, mb));
             continue;
         }
     }
@@ -99,7 +173,17 @@ static void performance()
 
 int main()
 {
-    correctness();
+    printf("Testing correctnessByCode...\n");
+    fflush(stdout);
+    correctnessByCode();
+
+    printf("Testing correctnessByUtf8Encoding... (may take a couple minutes)\n");
+    fflush(stdout);
+    correctnessByUtf8Encoding();
+
+    printf("Testing performance...\n");
+    fflush(stdout);
     performance();
+
     return 0;
 }

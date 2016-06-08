@@ -35,6 +35,7 @@
 #include "DebugShowInput.h"
 #include "DefaultInputMap.h"
 #include "DsrSender.h"
+#include "UnicodeEncoding.h"
 #include "Win32Console.h"
 
 #ifndef MAPVK_VK_TO_VSC
@@ -186,29 +187,6 @@ static int matchMouseRecord(const char *input, int inputSize, MouseRecord &out)
 #undef CHECK
 #undef ADVANCE
 #undef SCAN_INT
-
-// Return the byte size of a UTF-8 character using the value of the first
-// byte.
-static int utf8CharLength(char firstByte)
-{
-    // This code would probably be faster if it used __builtin_clz.
-    if ((firstByte & 0x80) == 0) {
-        return 1;
-    } else if ((firstByte & 0xE0) == 0xC0) {
-        return 2;
-    } else if ((firstByte & 0xF0) == 0xE0) {
-        return 3;
-    } else if ((firstByte & 0xF8) == 0xF0) {
-        return 4;
-    } else if ((firstByte & 0xFC) == 0xF8) {
-        return 5;
-    } else if ((firstByte & 0xFE) == 0xFC) {
-        return 6;
-    } else {
-        // Malformed UTF-8.
-        return 1;
-    }
-}
 
 } // anonymous namespace
 
@@ -419,18 +397,28 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
     // than the DSR flushing mechanism or use a decrepit terminal.  The user
     // might be on a slow network connection.)
     if (input[0] == '\x1B' && inputSize >= 2 && input[1] != '\x1B') {
-        int len = utf8CharLength(input[1]);
-        if (1 + len > inputSize) {
-            // Incomplete character.
-            trace("Incomplete UTF-8 character in Alt-<Char>");
-            return -1;
+        const int len = utf8CharLength(input[1]);
+        if (len > 0) {
+            if (1 + len > inputSize) {
+                // Incomplete character.
+                trace("Incomplete UTF-8 character in Alt-<Char>");
+                return -1;
+            }
+            appendUtf8Char(records, &input[1], len, LEFT_ALT_PRESSED);
+            return 1 + len;
         }
-        appendUtf8Char(records, &input[1], len, LEFT_ALT_PRESSED);
-        return 1 + len;
     }
 
     // A UTF-8 character.
-    int len = utf8CharLength(input[0]);
+    const int len = utf8CharLength(input[0]);
+    if (len == 0) {
+        static bool debugInput = isTracingEnabled() && hasDebugFlag("input");
+        if (debugInput) {
+            trace("Discarding invalid input byte: %02X",
+                static_cast<unsigned char>(input[0]));
+        }
+        return 1;
+    }
     if (len > inputSize) {
         // Incomplete character.
         trace("Incomplete UTF-8 character");
@@ -558,33 +546,39 @@ void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
                                   const int charLen,
                                   const uint16_t keyState)
 {
-    WCHAR wideInput[2];
-    int wideLen = MultiByteToWideChar(CP_UTF8,
-                                      0,
-                                      charBuffer,
-                                      charLen,
-                                      wideInput,
-                                      sizeof(wideInput) / sizeof(wideInput[0]));
-    for (int i = 0; i < wideLen; ++i) {
-        short charScan = VkKeyScan(wideInput[i]);
-        uint16_t virtualKey = 0;
-        uint16_t charKeyState = keyState;
-        if (charScan != -1) {
-            virtualKey = charScan & 0xFF;
-            if (charScan & 0x100)
-                charKeyState |= SHIFT_PRESSED;
-            else if (charScan & 0x200)
-                charKeyState |= LEFT_CTRL_PRESSED;
-            else if (charScan & 0x400)
-                charKeyState |= LEFT_ALT_PRESSED;
+    const uint32_t code = decodeUtf8(charBuffer);
+    if (code == static_cast<uint32_t>(-1)) {
+        static bool debugInput = isTracingEnabled() && hasDebugFlag("input");
+        if (debugInput) {
+            StringBuilder error(64);
+            error << "Discarding invalid UTF-8 sequence:";
+            for (int i = 0; i < charLen; ++i) {
+                error << ' ';
+                error << hexOfInt<true, uint8_t>(charBuffer[i]);
+            }
+            trace("%s", error.c_str());
         }
-        appendKeyPress(records, virtualKey, wideInput[i], charKeyState);
+        return;
     }
+
+    const short charScan = code > 0xFFFF ? -1 : VkKeyScan(code);
+    uint16_t virtualKey = 0;
+    uint16_t charKeyState = keyState;
+    if (charScan != -1) {
+        virtualKey = charScan & 0xFF;
+        if (charScan & 0x100)
+            charKeyState |= SHIFT_PRESSED;
+        else if (charScan & 0x200)
+            charKeyState |= LEFT_CTRL_PRESSED;
+        else if (charScan & 0x400)
+            charKeyState |= LEFT_ALT_PRESSED;
+    }
+    appendKeyPress(records, virtualKey, code, charKeyState);
 }
 
 void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
                                   uint16_t virtualKey,
-                                  uint16_t unicodeChar,
+                                  uint32_t codePoint,
                                   uint16_t keyState)
 {
     const bool ctrl = keyState & LEFT_CTRL_PRESSED;
@@ -594,7 +588,7 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
     if (isTracingEnabled()) {
         static bool debugInput = hasDebugFlag("input");
         if (debugInput) {
-            InputMap::Key key = { virtualKey, unicodeChar, keyState };
+            InputMap::Key key = { virtualKey, codePoint, keyState };
             trace("keypress: %s", key.toString().c_str());
         }
     }
@@ -615,15 +609,15 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
     if (ctrl && alt) {
         // This behavior seems arbitrary, but it's what I see in the Windows 7
         // console.
-        unicodeChar = 0;
+        codePoint = 0;
     }
-    appendInputRecord(records, TRUE, virtualKey, unicodeChar, stepKeyState);
+    appendCPInputRecords(records, TRUE, virtualKey, codePoint, stepKeyState);
     if (alt) {
         // This behavior seems arbitrary, but it's what I see in the Windows 7
         // console.
-        unicodeChar = 0;
+        codePoint = 0;
     }
-    appendInputRecord(records, FALSE, virtualKey, unicodeChar, stepKeyState);
+    appendCPInputRecords(records, FALSE, virtualKey, codePoint, stepKeyState);
     if (shift) {
         stepKeyState &= ~SHIFT_PRESSED;
         appendInputRecord(records, FALSE, VK_SHIFT, 0, stepKeyState);
@@ -638,10 +632,88 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
     }
 }
 
+void ConsoleInput::appendCPInputRecords(std::vector<INPUT_RECORD> &records,
+                                        BOOL keyDown,
+                                        uint16_t virtualKey,
+                                        uint32_t codePoint,
+                                        uint16_t keyState)
+{
+    // This behavior really doesn't match that of the Windows console (in
+    // normal, non-escape-mode).  Judging by the copy-and-paste behavior,
+    // Windows apparently handles everything outside of the keyboard layout by
+    // first sending a sequence of Alt+KeyPad events, then finally a key-up
+    // event whose UnicodeChar has the appropriate value.  For U+00A2 (CENT
+    // SIGN):
+    //
+    //      key: dn rpt=1 scn=56 LAlt-MENU ch=0
+    //      key: dn rpt=1 scn=79 LAlt-NUMPAD1 ch=0
+    //      key: up rpt=1 scn=79 LAlt-NUMPAD1 ch=0
+    //      key: dn rpt=1 scn=76 LAlt-NUMPAD5 ch=0
+    //      key: up rpt=1 scn=76 LAlt-NUMPAD5 ch=0
+    //      key: dn rpt=1 scn=76 LAlt-NUMPAD5 ch=0
+    //      key: up rpt=1 scn=76 LAlt-NUMPAD5 ch=0
+    //      key: up rpt=1 scn=56 MENU ch=0xa2
+    //
+    // The Alt+155 value matches the encoding of U+00A2 in CP-437.  Curiously,
+    // if I use "chcp 1252" to change the encoding, then copy-and-pasting
+    // produces Alt+162 instead.  (U+00A2 is 162 in CP-1252.)  However, typing
+    // Alt+155 or Alt+162 produce the same characters regardless of console
+    // code page.  (That is, they use CP-437 and yield U+00A2 and U+00F3.)
+    //
+    // For characters outside the BMP, Windows repeats the process for both
+    // UTF-16 code units, e.g, for U+1F300 (CYCLONE):
+    //
+    //      key: dn rpt=1 scn=56 LAlt-MENU ch=0
+    //      key: dn rpt=1 scn=77 LAlt-NUMPAD6 ch=0
+    //      key: up rpt=1 scn=77 LAlt-NUMPAD6 ch=0
+    //      key: dn rpt=1 scn=81 LAlt-NUMPAD3 ch=0
+    //      key: up rpt=1 scn=81 LAlt-NUMPAD3 ch=0
+    //      key: up rpt=1 scn=56 MENU ch=0xd83c
+    //      key: dn rpt=1 scn=56 LAlt-MENU ch=0
+    //      key: dn rpt=1 scn=77 LAlt-NUMPAD6 ch=0
+    //      key: up rpt=1 scn=77 LAlt-NUMPAD6 ch=0
+    //      key: dn rpt=1 scn=81 LAlt-NUMPAD3 ch=0
+    //      key: up rpt=1 scn=81 LAlt-NUMPAD3 ch=0
+    //      key: up rpt=1 scn=56 MENU ch=0xdf00
+    //
+    // In this case, it sends Alt+63 twice, which signifies '?'.  Apparently
+    // CMD and Cygwin bash are both able to decode this.
+    //
+    // Also note that typing Alt+NNN still works if NumLock is off, e.g.:
+    //
+    //      key: dn rpt=1 scn=56 LAlt-MENU ch=0
+    //      key: dn rpt=1 scn=79 LAlt-END ch=0
+    //      key: up rpt=1 scn=79 LAlt-END ch=0
+    //      key: dn rpt=1 scn=76 LAlt-CLEAR ch=0
+    //      key: up rpt=1 scn=76 LAlt-CLEAR ch=0
+    //      key: dn rpt=1 scn=76 LAlt-CLEAR ch=0
+    //      key: up rpt=1 scn=76 LAlt-CLEAR ch=0
+    //      key: up rpt=1 scn=56 MENU ch=0xa2
+    //
+    // Evidently, the Alt+NNN key events are not intended to be decoded to a
+    // character.  Maybe programs are looking for a key-up ALT/MENU event with
+    // a non-zero character?
+
+    wchar_t ws[2];
+    const int wslen = encodeUtf16(ws, codePoint);
+
+    if (wslen == 1) {
+        appendInputRecord(records, keyDown, virtualKey, ws[0], keyState);
+    } else if (wslen == 2) {
+        appendInputRecord(records, keyDown, virtualKey, ws[0], keyState);
+        appendInputRecord(records, keyDown, virtualKey, ws[1], keyState);
+    } else {
+        // This situation isn't that bad, but it should never happen,
+        // because invalid codepoints shouldn't reach this point.
+        trace("INTERNAL ERROR: appendInputRecordCP: invalid codePoint: "
+              "U+%04X", codePoint);
+    }
+}
+
 void ConsoleInput::appendInputRecord(std::vector<INPUT_RECORD> &records,
                                      BOOL keyDown,
                                      uint16_t virtualKey,
-                                     uint16_t unicodeChar,
+                                     uint16_t utf16Char,
                                      uint16_t keyState)
 {
     INPUT_RECORD ir;
@@ -652,7 +724,7 @@ void ConsoleInput::appendInputRecord(std::vector<INPUT_RECORD> &records,
     ir.Event.KeyEvent.wVirtualKeyCode = virtualKey;
     ir.Event.KeyEvent.wVirtualScanCode =
             MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
-    ir.Event.KeyEvent.uChar.UnicodeChar = unicodeChar;
+    ir.Event.KeyEvent.uChar.UnicodeChar = utf16Char;
     ir.Event.KeyEvent.dwControlKeyState = keyState;
     records.push_back(ir);
 }

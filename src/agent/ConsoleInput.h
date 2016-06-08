@@ -59,12 +59,17 @@ private:
                         uint16_t keyState);
     void appendKeyPress(std::vector<INPUT_RECORD> &records,
                         uint16_t virtualKey,
-                        uint16_t unicodeChar,
+                        uint32_t codePoint,
                         uint16_t keyState);
+    void appendCPInputRecords(std::vector<INPUT_RECORD> &records,
+                              BOOL keyDown,
+                              uint16_t virtualKey,
+                              uint32_t codePoint,
+                              uint16_t keyState);
     void appendInputRecord(std::vector<INPUT_RECORD> &records,
                            BOOL keyDown,
                            uint16_t virtualKey,
-                           uint16_t unicodeChar,
+                           uint16_t utf16Char,
                            uint16_t keyState);
     DWORD inputConsoleMode();
 
