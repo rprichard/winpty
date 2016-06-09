@@ -67,7 +67,7 @@ private:
         Terminal::SendClearFlag sendClear, const SmallRect &windowRect);
     void markEntireWindowDirty(const SmallRect &windowRect);
     void scanForDirtyLines(const SmallRect &windowRect);
-    void clearBufferLines(int firstRow, int count, WORD attributes);
+    void clearBufferLines(int firstRow, int count);
     void resizeImpl(const ConsoleScreenBufferInfo &origInfo);
     void syncConsoleContentAndSize(bool forceResize,
                                    ConsoleScreenBufferInfo &finalInfoOut);

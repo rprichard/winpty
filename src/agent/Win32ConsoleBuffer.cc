@@ -73,7 +73,7 @@ void Win32ConsoleBuffer::clearLines(
         trace("FillConsoleOutputCharacterW failed");
     }
     if (!FillConsoleOutputAttribute(
-            m_conout, info.wAttributes, width * count, Coord(0, row),
+            m_conout, kDefaultAttributes, width * count, Coord(0, row),
             &actual) || static_cast<int>(actual) != width * count) {
         trace("FillConsoleOutputAttribute failed");
     }

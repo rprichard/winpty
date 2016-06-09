@@ -50,6 +50,8 @@ private:
     }
 
 public:
+    static const int kDefaultAttributes = 7;
+
     ~Win32ConsoleBuffer() {
         if (m_owned) {
             CloseHandle(m_conout);

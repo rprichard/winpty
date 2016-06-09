@@ -83,7 +83,7 @@ Scraper::Scraper(
 
     // For the sake of the color translation heuristic, set the console color
     // to LtGray-on-Black.
-    buffer.setTextAttribute(7);
+    buffer.setTextAttribute(Win32ConsoleBuffer::kDefaultAttributes);
     buffer.clearAllLines(m_consoleBuffer->bufferInfo());
 
     m_consoleBuffer = nullptr;
@@ -166,14 +166,14 @@ void Scraper::scanForDirtyLines(const SmallRect &windowRect)
 // screen-buffer coordinates.
 void Scraper::clearBufferLines(
         const int firstRow,
-        const int count,
-        const WORD attributes)
+        const int count)
 {
     ASSERT(!m_directMode);
     for (int row = firstRow; row < firstRow + count; ++row) {
         const int64_t bufLine = row + m_scrolledCount;
         m_maxBufferedLine = std::max(m_maxBufferedLine, bufLine);
-        m_bufferData[bufLine % BUFFER_LINE_COUNT].blank(attributes);
+        m_bufferData[bufLine % BUFFER_LINE_COUNT].blank(
+            Win32ConsoleBuffer::kDefaultAttributes);
     }
 }
 
@@ -207,7 +207,7 @@ void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
 
         if (!m_directMode) {
             m_consoleBuffer->clearLines(0, origWindowRect.Top, origInfo);
-            clearBufferLines(0, origWindowRect.Top, origInfo.wAttributes);
+            clearBufferLines(0, origWindowRect.Top);
             if (m_syncRow != -1) {
                 createSyncMarker(std::min(
                     m_syncRow,
