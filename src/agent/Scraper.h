@@ -43,7 +43,9 @@ class Win32ConsoleBuffer;
 // hundred fewer characters than BUFFER_LINE_COUNT.
 const int BUFFER_LINE_COUNT = 3000;
 const int MAX_CONSOLE_WIDTH = 2500;
+const int MAX_CONSOLE_HEIGHT = 2000;
 const int SYNC_MARKER_LEN = 16;
+const int SYNC_MARKER_MARGIN = 200;
 
 class Scraper {
 public:

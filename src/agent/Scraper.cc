@@ -209,7 +209,11 @@ void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
             m_consoleBuffer->clearLines(0, origWindowRect.Top, origInfo);
             clearBufferLines(0, origWindowRect.Top, origInfo.wAttributes);
             if (m_syncRow != -1) {
-                createSyncMarker(m_syncRow);
+                createSyncMarker(std::min(
+                    m_syncRow,
+                    BUFFER_LINE_COUNT - rows
+                                      - SYNC_MARKER_LEN
+                                      - SYNC_MARKER_MARGIN));
             }
         }
 
@@ -452,8 +456,10 @@ bool Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
     // Creating a new sync row requires clearing part of the console buffer, so
     // avoid doing it if there's already a sync row that's good enough.
     // TODO: replace hard-coded constants
-    const int newSyncRow = static_cast<int>(windowRect.top()) - 200;
-    const bool shouldCreateSyncRow = newSyncRow >= m_syncRow + 200;
+    const int newSyncRow =
+        static_cast<int>(windowRect.top()) - SYNC_MARKER_LEN - SYNC_MARKER_MARGIN;
+    const bool shouldCreateSyncRow =
+        newSyncRow >= m_syncRow + SYNC_MARKER_LEN + SYNC_MARKER_MARGIN;
     if (tentative && shouldCreateSyncRow) {
         // It's difficult even in principle to put down a new marker if the
         // console can scroll an arbitrarily amount while we're writing.

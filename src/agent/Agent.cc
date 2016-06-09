@@ -153,6 +153,10 @@ Agent::Agent(LPCWSTR controlPipeName,
 {
     trace("Agent::Agent entered");
 
+    ASSERT(initialCols >= 1 && initialRows >= 1);
+    initialCols = std::min(initialCols, MAX_CONSOLE_WIDTH);
+    initialRows = std::min(initialRows, MAX_CONSOLE_HEIGHT);
+
     const bool outputColor =
         !m_plainMode || (agentFlags & WINPTY_FLAG_COLOR_ESCAPES);
     const Coord initialSize(initialCols, initialRows);
@@ -413,8 +417,8 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
 
 void Agent::handleSetSizePacket(ReadBuffer &packet)
 {
-    int cols = packet.getInt32();
-    int rows = packet.getInt32();
+    const int cols = packet.getInt32();
+    const int rows = packet.getInt32();
     packet.assertEof();
     resizeWindow(cols, rows);
     auto reply = newPacket();
@@ -515,15 +519,12 @@ std::unique_ptr<Win32ConsoleBuffer> Agent::openPrimaryBuffer()
     }
 }
 
-void Agent::resizeWindow(const int cols, const int rows)
+void Agent::resizeWindow(int cols, int rows)
 {
-    if (cols < 1 ||
-            cols > MAX_CONSOLE_WIDTH ||
-            rows < 1 ||
-            rows > BUFFER_LINE_COUNT - 1) {
-        trace("resizeWindow: invalid size: cols=%d,rows=%d", cols, rows);
-        return;
-    }
+    ASSERT(cols >= 1 && rows >= 1);
+    cols = std::min(cols, MAX_CONSOLE_WIDTH);
+    rows = std::min(rows, MAX_CONSOLE_HEIGHT);
+
     Win32Console::FreezeGuard guard(m_console, m_console.frozen());
     const Coord newSize(cols, rows);
     ConsoleScreenBufferInfo info;
