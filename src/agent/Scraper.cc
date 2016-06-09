@@ -93,6 +93,7 @@ Scraper::~Scraper()
 {
 }
 
+// Whether or not the agent is frozen on entry, it will be frozen on exit.
 void Scraper::resizeWindow(Win32ConsoleBuffer &buffer,
                            Coord newSize,
                            ConsoleScreenBufferInfo &finalInfoOut)
@@ -103,6 +104,7 @@ void Scraper::resizeWindow(Win32ConsoleBuffer &buffer,
     m_consoleBuffer = nullptr;
 }
 
+// This function may freeze the agent, but it will not unfreeze it.
 void Scraper::scrapeBuffer(Win32ConsoleBuffer &buffer,
                            ConsoleScreenBufferInfo &finalInfoOut)
 {
@@ -310,7 +312,18 @@ void Scraper::syncConsoleContentAndSize(
     bool forceResize,
     ConsoleScreenBufferInfo &finalInfoOut)
 {
-    Win32Console::FreezeGuard guard(m_console, true);
+    // We'll try to avoid freezing the console by reading large chunks (or
+    // all!) of the screen buffer without otherwise attempting to synchronize
+    // with the console application.  We can only do this on Windows 10 and up
+    // because:
+    //  - Prior to Windows 8, the size of a ReadConsoleOutputW call was limited
+    //    by the ~32KB RPC buffer.
+    //  - Prior to Windows 10, an out-of-range read region crashes the caller.
+    //    (See misc/WindowsBugCrashReader.cc.)
+    //
+    if (!m_console.isNewW10() || forceResize) {
+        m_console.setFrozen(true);
+    }
 
     const ConsoleScreenBufferInfo info = m_consoleBuffer->bufferInfo();
     BOOL cursorVisible = true;
@@ -332,6 +345,7 @@ void Scraper::syncConsoleContentAndSize(
         // When we switch from direct->scrolling mode, make sure the console is
         // the right size.
         if (!m_directMode) {
+            m_console.setFrozen(true);
             forceResize = true;
         }
     }
@@ -339,7 +353,14 @@ void Scraper::syncConsoleContentAndSize(
     if (m_directMode) {
         directScrapeOutput(info, cursorVisible);
     } else {
-        scrollingScrapeOutput(info, cursorVisible);
+        if (!m_console.frozen()) {
+            if (!scrollingScrapeOutput(info, cursorVisible, true)) {
+                m_console.setFrozen(true);
+            }
+        }
+        if (m_console.frozen()) {
+            scrollingScrapeOutput(info, cursorVisible, false);
+        }
     }
 
     if (forceResize) {
@@ -397,8 +418,9 @@ void Scraper::directScrapeOutput(const ConsoleScreenBufferInfo &info,
     }
 }
 
-void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
-                                    bool cursorVisible)
+bool Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
+                                    bool cursorVisible,
+                                    bool tentative)
 {
     const Coord cursor = info.cursorPosition();
     const SmallRect windowRect = info.windowRect();
@@ -406,8 +428,13 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
     if (m_syncRow != -1) {
         // If a synchronizing marker was placed into the history, look for it
         // and adjust the scroll count.
-        int markerRow = findSyncMarker();
+        const int markerRow = findSyncMarker();
         if (markerRow == -1) {
+            if (tentative) {
+                // I *think* it's possible to keep going, but it's simple to
+                // bail out.
+                return false;
+            }
             // Something has happened.  Reset the terminal.
             trace("Sync marker has disappeared -- resetting the terminal"
                   " (m_syncCounter=%u)",
@@ -422,6 +449,17 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
         }
     }
 
+    // Creating a new sync row requires clearing part of the console buffer, so
+    // avoid doing it if there's already a sync row that's good enough.
+    // TODO: replace hard-coded constants
+    const int newSyncRow = static_cast<int>(windowRect.top()) - 200;
+    const bool shouldCreateSyncRow = newSyncRow >= m_syncRow + 200;
+    if (tentative && shouldCreateSyncRow) {
+        // It's difficult even in principle to put down a new marker if the
+        // console can scroll an arbitrarily amount while we're writing.
+        return false;
+    }
+
     // Update the dirty line count:
     //  - If the window has moved, the entire window is dirty.
     //  - Everything up to the cursor is dirty.
@@ -432,6 +470,11 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
             // The window has moved down, presumably as a result of scrolling.
             markEntireWindowDirty(windowRect);
         } else if (windowRect.top() < m_dirtyWindowTop) {
+            if (tentative) {
+                // I *think* it's possible to keep going, but it's simple to
+                // bail out.
+                return false;
+            }
             // The window has moved upward.  This is generally not expected to
             // happen, but the CMD/PowerShell CLS command will move the window
             // to the top as part of clearing everything else in the console.
@@ -469,6 +512,32 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
                                std::min<SHORT>(info.bufferSize().X,
                                                MAX_CONSOLE_WIDTH),
                                stopReadLine - firstReadLine));
+
+    // If we're scraping the buffer without freezing it, we have to query the
+    // buffer position data separately from the buffer content, so the two
+    // could easily be out-of-sync.  If they *are* out-of-sync, abort the
+    // scrape operation and restart it frozen.  (We may have updated the
+    // dirty-line high-water-mark, but that should be OK.)
+    if (tentative) {
+        const auto infoCheck = m_consoleBuffer->bufferInfo();
+        if (info.bufferSize() != infoCheck.bufferSize() ||
+                info.windowRect() != infoCheck.windowRect() ||
+                info.cursorPosition() != infoCheck.cursorPosition()) {
+            return false;
+        }
+        if (m_syncRow != -1 && m_syncRow != findSyncMarker()) {
+            return false;
+        }
+    }
+
+    if (shouldCreateSyncRow) {
+        ASSERT(!tentative);
+        createSyncMarker(newSyncRow);
+    }
+
+    // At this point, we're finished interacting (reading or writing) the
+    // console, and we just need to convert our collected data into terminal
+    // output.
 
     scanForDirtyLines(windowRect);
 
@@ -511,17 +580,11 @@ void Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
 
     m_scrapedLineCount = windowRect.top() + m_scrolledCount;
 
-    // Creating a new sync row requires clearing part of the console buffer, so
-    // avoid doing it if there's already a sync row that's good enough.
-    // TODO: replace hard-coded constants
-    const int newSyncRow = static_cast<int>(windowRect.top()) - 200;
-    if (newSyncRow >= 1 && newSyncRow >= m_syncRow + 200) {
-        createSyncMarker(newSyncRow);
-    }
-
     if (cursorVisible) {
         m_terminal->showTerminalCursor(cursorColumn, cursorLine);
     }
+
+    return true;
 }
 
 void Scraper::syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN])

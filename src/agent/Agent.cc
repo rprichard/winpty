@@ -524,7 +524,7 @@ void Agent::resizeWindow(const int cols, const int rows)
         trace("resizeWindow: invalid size: cols=%d,rows=%d", cols, rows);
         return;
     }
-    Win32Console::FreezeGuard guard(m_console, true);
+    Win32Console::FreezeGuard guard(m_console, m_console.frozen());
     const Coord newSize(cols, rows);
     ConsoleScreenBufferInfo info;
     m_primaryScraper->resizeWindow(*openPrimaryBuffer(), newSize, info);
@@ -536,7 +536,7 @@ void Agent::resizeWindow(const int cols, const int rows)
 
 void Agent::scrapeBuffers()
 {
-    Win32Console::FreezeGuard guard(m_console, true);
+    Win32Console::FreezeGuard guard(m_console, m_console.frozen());
     ConsoleScreenBufferInfo info;
     m_primaryScraper->scrapeBuffer(*openPrimaryBuffer(), info);
     m_consoleInput->setMouseWindowRect(info.windowRect());
