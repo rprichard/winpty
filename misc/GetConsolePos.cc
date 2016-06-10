@@ -11,6 +11,9 @@ int main() {
     BOOL ret = GetConsoleScreenBufferInfo(conout, &info);
     ASSERT(ret && "GetConsoleScreenBufferInfo failed");
 
+    trace("cursor=%d,%d", info.dwCursorPosition.X, info.dwCursorPosition.Y);
+    printf("cursor=%d,%d\n", info.dwCursorPosition.X, info.dwCursorPosition.Y);
+
     trace("srWindow={L=%d,T=%d,R=%d,B=%d}", info.srWindow.Left, info.srWindow.Top, info.srWindow.Right, info.srWindow.Bottom);
     printf("srWindow={L=%d,T=%d,R=%d,B=%d}\n", info.srWindow.Left, info.srWindow.Top, info.srWindow.Right, info.srWindow.Bottom);
 
