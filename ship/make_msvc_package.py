@@ -37,8 +37,8 @@ import sys
 
 os.chdir(common_ship.topDir)
 ZIP_TOOL = common_ship.requireExe("7z.exe", [
-    "C:\\Program Files\\7-Zip\7z.exe",
-    "C:\\Program Files (x86)\\7-Zip\7z.exe",
+    "C:\\Program Files\\7-Zip\\7z.exe",
+    "C:\\Program Files (x86)\\7-Zip\\7z.exe",
 ])
 
 MSVC_VERSION_TABLE = {
@@ -101,7 +101,7 @@ def build(arch, packageDir, xp=False):
         sys.exit("Error: MSVC environment script missing: " + devCmdPath)
 
     newEnv = os.environ.copy()
-    newEnv["Path"] = os.path.dirname(sys.executable) + ";" + common_ship.defaultPathEnviron
+    newEnv["PATH"] = os.path.dirname(sys.executable) + ";" + common_ship.defaultPathEnviron
     commandLine = (
         '"' + devCmdPath + '" && '
         " vcbuild.bat" +
