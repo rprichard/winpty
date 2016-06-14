@@ -23,8 +23,6 @@
 #ifndef WINPTY_CONSTANTS_H
 #define WINPTY_CONSTANTS_H
 
-// TODO: Review the winpty and spawn flags...
-
 /*
  * You may want to include winpty.h instead, which includes this header.
  *

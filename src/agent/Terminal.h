@@ -62,7 +62,7 @@ private:
     int m_remoteColor = -1;
     std::string m_termLineWorkingBuffer;
     bool m_plainMode = false;
-    bool m_outputColor = true; // TODO: Respect the m_outputColor flag.
+    bool m_outputColor = true;
     bool m_mouseModeEnabled = false;
 };
 

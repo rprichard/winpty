@@ -237,11 +237,6 @@ static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
                                         wp.agentProcess.get() };
         DWORD waitRet = WaitForMultipleObjects(
             2, waitHandles, FALSE, wp.agentTimeoutMs);
-        // TODO: interesting edge case to test; what if the client
-        // disconnects after we wake up and before we call
-        // GetOverlappedResult?  I predict either:
-        //  - the connect succeeds
-        //  - the connect fails with ERROR_BROKEN_PIPE
         if (waitRet != WAIT_OBJECT_0) {
             // The I/O is still pending.  Cancel it, close the I/O event, and
             // throw an exception.
@@ -272,7 +267,13 @@ static void handleReadWriteErrors(winpty_t &wp, BOOL success, DWORD lastError,
     if (!success) {
         // TODO: We failed during the write.  We *probably* should permanently
         // shut things down, disconnect at least the control pipe.
-        // TODO: Which errors, *specifically*, do we care about?
+        //
+        // If the pipe connection is broken after it's been connected, then
+        // later I/O operations fail with ERROR_BROKEN_PIPE (reads) or
+        // ERROR_NO_DATA (writes).  With Wine, they may also fail with
+        // ERROR_PIPE_NOT_CONNECTED.  See this gist[1].
+        //
+        // [1] https://gist.github.com/rprichard/8dd8ca134b39534b7da2733994aa07ba
         if (lastError == ERROR_BROKEN_PIPE || lastError == ERROR_NO_DATA ||
                 lastError == ERROR_PIPE_NOT_CONNECTED) {
             throw LibWinptyException(WINPTY_ERROR_LOST_CONNECTION,
@@ -829,8 +830,6 @@ winpty_spawn(winpty_t *wp,
         if (result == StartProcessResult::CreateProcessFailed) {
             const DWORD lastError = reply.getInt32();
             reply.assertEof();
-
-            // TODO: include an error number
             if (create_process_error != nullptr) {
                 *create_process_error = lastError;
             }

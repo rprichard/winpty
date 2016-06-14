@@ -455,7 +455,6 @@ bool Scraper::scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
 
     // Creating a new sync row requires clearing part of the console buffer, so
     // avoid doing it if there's already a sync row that's good enough.
-    // TODO: replace hard-coded constants
     const int newSyncRow =
         static_cast<int>(windowRect.top()) - SYNC_MARKER_LEN - SYNC_MARKER_MARGIN;
     const bool shouldCreateSyncRow =
