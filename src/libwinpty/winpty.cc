@@ -215,11 +215,13 @@ public:
             waitForCompletion();
         }
     }
-    BOOL waitForCompletion(DWORD &actual) WINPTY_NOEXCEPT {
+    std::tuple<BOOL, DWORD> waitForCompletion(DWORD &actual) WINPTY_NOEXCEPT {
         m_finished = true;
-        return GetOverlappedResult(m_file, &m_over, &actual, TRUE);
+        const BOOL success =
+            GetOverlappedResult(m_file, &m_over, &actual, TRUE);
+        return std::make_tuple(success, GetLastError());
     }
-    BOOL waitForCompletion() WINPTY_NOEXCEPT {
+    std::tuple<BOOL, DWORD> waitForCompletion() WINPTY_NOEXCEPT {
         DWORD actual = 0;
         return waitForCompletion(actual);
     }
@@ -228,8 +230,8 @@ public:
 } // anonymous namespace
 
 static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
-                            DWORD &actual) {
-    if (!success && GetLastError() == ERROR_IO_PENDING) {
+                            DWORD &lastError, DWORD &actual) {
+    if (!success && lastError == ERROR_IO_PENDING) {
         PendingIo io(wp.controlPipe.get(), over);
         const HANDLE waitHandles[2] = { wp.ioEvent.get(),
                                         wp.agentProcess.get() };
@@ -255,28 +257,28 @@ static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
                     "unexpected WaitForMultipleObjects return value");
             }
         }
-        success = io.waitForCompletion(actual);
+        std::tie(success, lastError) = io.waitForCompletion(actual);
     }
 }
 
-static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success) {
+static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
+                            DWORD &lastError) {
     DWORD actual = 0;
-    handlePendingIo(wp, over, success, actual);
+    handlePendingIo(wp, over, success, lastError, actual);
 }
 
-static void handleReadWriteErrors(winpty_t &wp, BOOL success,
+static void handleReadWriteErrors(winpty_t &wp, BOOL success, DWORD lastError,
                                   const wchar_t *genericErrMsg) {
     if (!success) {
         // TODO: We failed during the write.  We *probably* should permanently
         // shut things down, disconnect at least the control pipe.
         // TODO: Which errors, *specifically*, do we care about?
-        const DWORD lastError = GetLastError();
         if (lastError == ERROR_BROKEN_PIPE || lastError == ERROR_NO_DATA ||
                 lastError == ERROR_PIPE_NOT_CONNECTED) {
             throw LibWinptyException(WINPTY_ERROR_LOST_CONNECTION,
                 L"lost connection to agent");
         } else {
-            throwWindowsError(genericErrMsg);
+            throwWindowsError(genericErrMsg, lastError);
         }
     }
 }
@@ -287,12 +289,13 @@ connectControlPipe(winpty_t &wp) {
     OVERLAPPED over = {};
     over.hEvent = wp.ioEvent.get();
     BOOL success = ConnectNamedPipe(wp.controlPipe.get(), &over);
-    handlePendingIo(wp, over, success);
-    if (!success && GetLastError() == ERROR_PIPE_CONNECTED) {
+    DWORD lastError = GetLastError();
+    handlePendingIo(wp, over, success, lastError);
+    if (!success && lastError == ERROR_PIPE_CONNECTED) {
         success = TRUE;
     }
     if (!success) {
-        throwWindowsError(L"ConnectNamedPipe failed");
+        throwWindowsError(L"ConnectNamedPipe failed", lastError);
     }
 }
 
@@ -303,9 +306,10 @@ static void writeData(winpty_t &wp, const void *data, size_t amount) {
     over.hEvent = wp.ioEvent.get();
     BOOL success = WriteFile(wp.controlPipe.get(), data, amount,
                              &actual, &over);
+    DWORD lastError = GetLastError();
     if (!success) {
-        handlePendingIo(wp, over, success, actual);
-        handleReadWriteErrors(wp, success, L"WriteFile failed");
+        handlePendingIo(wp, over, success, lastError, actual);
+        handleReadWriteErrors(wp, success, lastError, L"WriteFile failed");
         ASSERT(success);
     }
     // TODO: Can a partial write actually happen somehow?
@@ -330,9 +334,10 @@ static size_t readData(winpty_t &wp, void *data, size_t amount) {
     over.hEvent = wp.ioEvent.get();
     BOOL success = ReadFile(wp.controlPipe.get(), data, amount,
                             &actual, &over);
+    DWORD lastError = GetLastError();
     if (!success) {
-        handlePendingIo(wp, over, success, actual);
-        handleReadWriteErrors(wp, success, L"ReadFile failed");
+        handlePendingIo(wp, over, success, lastError, actual);
+        handleReadWriteErrors(wp, success, lastError, L"ReadFile failed");
     }
     return actual;
 }
@@ -518,8 +523,8 @@ static OwnedHandle startAgentProcess(
 
 static void verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid) {
     const auto client = getNamedPipeClientProcessId(serverPipe);
-    const auto err = GetLastError();
     const auto success = std::get<0>(client);
+    const auto lastError = std::get<2>(client);
     if (success == GetNamedPipeClientProcessId_Result::Success) {
         const auto clientPid = std::get<1>(client);
         if (clientPid != agentPid) {
@@ -532,7 +537,7 @@ static void verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid) {
         trace("Pipe client PID security check skipped: "
             "GetNamedPipeClientProcessId unsupported on this OS version");
     } else {
-        throwWindowsError(L"GetNamedPipeClientProcessId failed", err);
+        throwWindowsError(L"GetNamedPipeClientProcessId failed", lastError);
     }
 }
 

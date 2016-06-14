@@ -98,7 +98,7 @@ enum class GetNamedPipeClientProcessId_Result {
     UnsupportedOs,
 };
 
-std::tuple<GetNamedPipeClientProcessId_Result, DWORD>
+std::tuple<GetNamedPipeClientProcessId_Result, DWORD, DWORD>
 getNamedPipeClientProcessId(HANDLE serverPipe);
 
 #endif // WINPTY_WINDOWS_SECURITY_H

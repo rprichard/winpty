@@ -438,7 +438,7 @@ typedef BOOL WINAPI GetNamedPipeClientProcessId_t(
     HANDLE Pipe,
     PULONG ClientProcessId);
 
-std::tuple<GetNamedPipeClientProcessId_Result, DWORD>
+std::tuple<GetNamedPipeClientProcessId_Result, DWORD, DWORD>
 getNamedPipeClientProcessId(HANDLE serverPipe) {
     OsModule kernel32(L"kernel32.dll");
     const auto pGetNamedPipeClientProcessId =
@@ -446,14 +446,15 @@ getNamedPipeClientProcessId(HANDLE serverPipe) {
             kernel32.proc("GetNamedPipeClientProcessId"));
     if (pGetNamedPipeClientProcessId == nullptr) {
         return std::make_tuple(
-            GetNamedPipeClientProcessId_Result::UnsupportedOs, 0);
+            GetNamedPipeClientProcessId_Result::UnsupportedOs, 0, 0);
     }
     ULONG pid = 0;
     if (!pGetNamedPipeClientProcessId(serverPipe, &pid)) {
         return std::make_tuple(
-            GetNamedPipeClientProcessId_Result::Failure, 0);
+            GetNamedPipeClientProcessId_Result::Failure, 0, GetLastError());
     }
     return std::make_tuple(
         GetNamedPipeClientProcessId_Result::Success,
-        static_cast<DWORD>(pid));
+        static_cast<DWORD>(pid),
+        0);
 }
