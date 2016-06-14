@@ -34,6 +34,22 @@ const wchar_t *const kPipeName = L"\\\\.\\pipe\\DebugServer";
 
 void *volatile g_debugConfig;
 
+namespace {
+
+// It would be easy to accidentally trample on the Windows LastError value
+// by adding logging/debugging code.  Ensure that can't happen by saving and
+// restoring the value.  This saving and restoring doesn't happen along the
+// fast path.
+class PreserveLastError {
+public:
+    PreserveLastError() : m_lastError(GetLastError()) {}
+    ~PreserveLastError() { SetLastError(m_lastError); }
+private:
+    DWORD m_lastError;
+};
+
+} // anonymous namespace
+
 static void sendToDebugServer(const char *message)
 {
     HANDLE tracePipe = INVALID_HANDLE_VALUE;
@@ -82,6 +98,7 @@ static long long unixTimeMillis()
 static const char *getDebugConfig()
 {
     if (g_debugConfig == NULL) {
+        PreserveLastError preserve;
         const int bufSize = 256;
         char buf[bufSize];
         DWORD actualSize =
@@ -110,6 +127,7 @@ bool isTracingEnabled()
         return true;
     } else {
         // Recognize WINPTY_DEBUG=1 for backwards compatibility.
+        PreserveLastError preserve;
         bool value = hasDebugFlag("trace") || hasDebugFlag("1");
         disabled = !value;
         enabled = value;
@@ -127,6 +145,7 @@ bool hasDebugFlag(const char *flag)
     if (configCStr[0] == '\0') {
         return false;
     }
+    PreserveLastError preserve;
     std::string config(configCStr);
     std::string flagStr(flag);
     config = "," + config + ",";
@@ -139,6 +158,7 @@ void trace(const char *format, ...)
     if (!isTracingEnabled())
         return;
 
+    PreserveLastError preserve;
     char message[1024];
 
     va_list ap;

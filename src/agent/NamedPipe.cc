@@ -56,7 +56,7 @@ bool NamedPipe::serviceIo(std::vector<HANDLE> *waitHandles)
                 "Pended ConnectNamedPipe call failed");
             waitHandles->push_back(m_connectEvent.get());
         } else {
-            trace("Server pipe [%s] connected",
+            TRACE("Server pipe [%s] connected",
                 utf8FromWide(m_name).c_str());
             m_connectEvent.dispose();
             startPipeWorkers();
@@ -226,7 +226,7 @@ void NamedPipe::openServerPipe(LPCWSTR pipeName, OpenMode::t openMode,
         /*nInBufferSize=*/inBufferSize,
         /*nDefaultTimeOut=*/30000,
         &sa);
-    trace("opened server pipe [%s], handle == %p",
+    TRACE("opened server pipe [%s], handle == %p",
         utf8FromWide(pipeName).c_str(), handle);
     ASSERT(handle != INVALID_HANDLE_VALUE && "Could not open server pipe");
     m_name = pipeName;
@@ -243,7 +243,7 @@ void NamedPipe::openServerPipe(LPCWSTR pipeName, OpenMode::t openMode,
         success = TRUE;
     }
     if (success) {
-        trace("Server pipe [%s] connected", utf8FromWide(pipeName).c_str());
+        TRACE("Server pipe [%s] connected", utf8FromWide(pipeName).c_str());
         m_connectEvent.dispose();
         startPipeWorkers();
     } else if (err != ERROR_IO_PENDING) {
@@ -263,7 +263,7 @@ void NamedPipe::connectToServer(LPCWSTR pipeName, OpenMode::t openMode)
         OPEN_EXISTING,
         SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION | FILE_FLAG_OVERLAPPED,
         NULL);
-    trace("connected to [%s], handle == %p",
+    TRACE("connected to [%s], handle == %p",
         utf8FromWide(pipeName).c_str(), handle);
     ASSERT(handle != INVALID_HANDLE_VALUE && "Could not connect to pipe");
     m_name = pipeName;

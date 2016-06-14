@@ -509,7 +509,7 @@ static OwnedHandle startAgentProcess(
             WINPTY_ERROR_AGENT_CREATION_FAILED, errStr.c_str());
     }
     CloseHandle(pi.hThread);
-    trace("Created agent successfully, pid=%u, cmdline=%s",
+    TRACE("Created agent successfully, pid=%u, cmdline=%s",
           static_cast<unsigned int>(pi.dwProcessId),
           utf8FromWide(cmdline).c_str());
     agentPid = pi.dwProcessId;

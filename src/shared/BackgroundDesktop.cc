@@ -79,7 +79,7 @@ BackgroundDesktop::BackgroundDesktop() {
                 L"BackgroundDesktop ctor: CreateDesktopW failed");
         }
         m_newDesktopName = getDesktopName(m_newStation, m_newDesktop);
-        trace("Created background desktop: %s",
+        TRACE("Created background desktop: %s",
             utf8FromWide(m_newDesktopName).c_str());
     } catch (...) {
         dispose();

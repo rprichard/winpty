@@ -27,4 +27,12 @@ bool isTracingEnabled();
 bool hasDebugFlag(const char *flag);
 void trace(const char *format, ...) WINPTY_SNPRINTF_FORMAT(1, 2);
 
+// This macro calls trace without evaluating the arguments.
+#define TRACE(format, ...)                          \
+    do {                                            \
+        if (isTracingEnabled()) {                   \
+            trace((format), ## __VA_ARGS__);        \
+        }                                           \
+    } while (false)
+
 #endif // DEBUGCLIENT_H
