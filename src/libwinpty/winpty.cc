@@ -265,9 +265,6 @@ static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
 static void handleReadWriteErrors(winpty_t &wp, BOOL success, DWORD lastError,
                                   const wchar_t *genericErrMsg) {
     if (!success) {
-        // TODO: We failed during the write.  We *probably* should permanently
-        // shut things down, disconnect at least the control pipe.
-        //
         // If the pipe connection is broken after it's been connected, then
         // later I/O operations fail with ERROR_BROKEN_PIPE (reads) or
         // ERROR_NO_DATA (writes).  With Wine, they may also fail with
@@ -728,6 +725,36 @@ WINPTY_API LPCWSTR winpty_conerr_name(winpty_t *wp) {
 
 
 /*****************************************************************************
+ * winpty agent RPC calls. */
+
+namespace {
+
+// Close the control pipe if something goes wrong with the pipe communication,
+// which could leave the control pipe in an inconsistent state.
+class RpcOperation {
+public:
+    RpcOperation(winpty_t &wp) : m_wp(wp) {
+        if (m_wp.controlPipe.get() == nullptr) {
+            throwWinptyException(L"Agent shutdown due to RPC failure");
+        }
+    }
+    ~RpcOperation() {
+        if (!m_success) {
+            trace("~RpcOperation: Closing control pipe");
+            m_wp.controlPipe.dispose(true);
+        }
+    }
+    void success() { m_success = true; }
+private:
+    winpty_t &m_wp;
+    bool m_success = false;
+};
+
+} // anonymous namespace
+
+
+
+/*****************************************************************************
  * winpty agent RPC call: process creation. */
 
 // Return a std::wstring containing every character of the environment block.
@@ -796,6 +823,19 @@ static inline HANDLE handleFromInt64(int64_t i) {
     return reinterpret_cast<HANDLE>(static_cast<intptr_t>(i));
 }
 
+// Given a process and a handle in that process, duplicate the handle into the
+// current process and close it in the originating process.
+static inline OwnedHandle stealHandle(HANDLE process, HANDLE handle) {
+    HANDLE result = nullptr;
+    if (!DuplicateHandle(process, handle,
+            GetCurrentProcess(),
+            &result, 0, FALSE,
+            DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS)) {
+        throwWindowsError(L"DuplicateHandle of process handle");
+    }
+    return OwnedHandle(result);
+}
+
 WINPTY_API BOOL
 winpty_spawn(winpty_t *wp,
              const winpty_spawn_config_t *cfg,
@@ -805,11 +845,13 @@ winpty_spawn(winpty_t *wp,
              winpty_error_ptr_t *err /*OPTIONAL*/) {
     API_TRY {
         ASSERT(wp != nullptr && cfg != nullptr);
-        LockGuard<Mutex> lock(wp->mutex);
 
         if (process_handle != nullptr) { *process_handle = nullptr; }
         if (thread_handle != nullptr) { *thread_handle = nullptr; }
         if (create_process_error != nullptr) { *create_process_error = 0; }
+
+        LockGuard<Mutex> lock(wp->mutex);
+        RpcOperation rpc(*wp);
 
         // Send spawn request.
         auto packet = newPacket();
@@ -833,33 +875,30 @@ winpty_spawn(winpty_t *wp,
             if (create_process_error != nullptr) {
                 *create_process_error = lastError;
             }
+            rpc.success();
             throw LibWinptyException(WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED,
                 L"CreateProcess failed");
         } else if (result == StartProcessResult::ProcessCreated) {
-            const HANDLE process = handleFromInt64(reply.getInt64());
-            const HANDLE thread = handleFromInt64(reply.getInt64());
+            const HANDLE remoteProcess = handleFromInt64(reply.getInt64());
+            const HANDLE remoteThread = handleFromInt64(reply.getInt64());
             reply.assertEof();
-
-            // TODO: Maybe this is good enough, but there are code paths that leak
-            // handles...
-            if (process_handle != nullptr && process != nullptr) {
-                if (!DuplicateHandle(wp->agentProcess.get(), process,
-                        GetCurrentProcess(),
-                        process_handle, 0, FALSE,
-                        DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS)) {
-                    // TODO: Shut down the winpty instance?  This code path is never supposed to happen...
-                    throwWindowsError(L"DuplicateHandle of process handle");
-                }
+            OwnedHandle localProcess;
+            OwnedHandle localThread;
+            if (remoteProcess != nullptr) {
+                localProcess =
+                    stealHandle(wp->agentProcess.get(), remoteProcess);
             }
-            if (thread_handle != nullptr && thread != nullptr) {
-                if (!DuplicateHandle(wp->agentProcess.get(), thread,
-                        GetCurrentProcess(),
-                        thread_handle, 0, FALSE,
-                        DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS)) {
-                    // TODO: Shut down the winpty instance?  This code path is never supposed to happen...
-                    throwWindowsError(L"DuplicateHandle of thread handle");
-                }
+            if (remoteThread != nullptr) {
+                localThread =
+                    stealHandle(wp->agentProcess.get(), remoteThread);
             }
+            if (process_handle != nullptr) {
+                *process_handle = localProcess.release();
+            }
+            if (thread_handle != nullptr) {
+                *thread_handle = localThread.release();
+            }
+            rpc.success();
         } else {
             ASSERT(false && "Invalid StartProcessResult");
         }
@@ -878,12 +917,14 @@ winpty_set_size(winpty_t *wp, int cols, int rows,
     API_TRY {
         ASSERT(wp != nullptr && cols > 0 && rows > 0);
         LockGuard<Mutex> lock(wp->mutex);
+        RpcOperation rpc(*wp);
         auto packet = newPacket();
         packet.putInt32(AgentMsg::SetSize);
         packet.putInt32(cols);
         packet.putInt32(rows);
         writePacket(*wp, packet);
         readPacket(*wp).assertEof();
+        rpc.success();
         return TRUE;
     } API_CATCH(FALSE)
 }
