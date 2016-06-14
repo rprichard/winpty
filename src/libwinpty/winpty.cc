@@ -904,7 +904,8 @@ winpty_spawn(winpty_t *wp,
             }
             rpc.success();
         } else {
-            ASSERT(false && "Invalid StartProcessResult");
+            throwWinptyException(
+                L"Agent RPC error: invalid StartProcessResult");
         }
         return TRUE;
     } API_CATCH(FALSE)
