@@ -1,5 +1,7 @@
 # winpty
 
+[![Build Status](https://tea-ci.org/api/badges/rprichard/winpty/status.svg)](https://tea-ci.org/rprichard/winpty)
+
 winpty is a Windows software package providing an interface similar to a Unix
 pty-master for communicating with Windows console programs.  The package
 consists of a library (libwinpty) and a tool for Cygwin and MSYS for running
