@@ -562,6 +562,8 @@ createAgentSession(const winpty_config_t *cfg,
     return std::move(wp);
 }
 
+namespace {
+
 class AgentDesktop {
 public:
     virtual std::wstring name() = 0;
@@ -592,6 +594,8 @@ private:
     std::unique_ptr<winpty_t> m_wp;
     std::wstring m_desktopName;
 };
+
+} // anonymous namespace
 
 std::unique_ptr<AgentDesktop>
 setupBackgroundDesktop(const winpty_config_t *cfg) {
