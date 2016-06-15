@@ -86,8 +86,8 @@ typedef struct winpty_config_s winpty_config_t;
 
 /* Allocate a winpty_config_t value.  Returns NULL on error.  There are no
  * required settings -- the object may immediately be used.  agentFlags is a
- * set of zero or more WINPTY_FLAG_xxx values.  An unrecognized flag is an
- * error. */
+ * set of zero or more WINPTY_FLAG_xxx values.  An unrecognized flag results
+ * in an assertion failure. */
 WINPTY_API winpty_config_t *
 winpty_config_new(UINT64 agentFlags, winpty_error_ptr_t *err /*OPTIONAL*/);
 
@@ -115,9 +115,8 @@ winpty_config_set_agent_timeout(winpty_config_t *cfg, DWORD timeoutMs);
 typedef struct winpty_s winpty_t;
 
 /* Starts the agent.  Returns NULL on error.  This process will connect to the
- * agent over a control pipe, and the agent will open CONIN and CONOUT server
- * pipes.  The agent blocks until these pipes are connected, so the client must
- * connect to them before invoking an agent RPC (or else deadlock). */
+ * agent over a control pipe, and the agent will open data pipes (e.g. CONIN
+ * and CONOUT). */
 WINPTY_API winpty_t *
 winpty_open(const winpty_config_t *cfg,
             winpty_error_ptr_t *err /*OPTIONAL*/);
@@ -136,6 +135,8 @@ WINPTY_API HANDLE winpty_agent_process(winpty_t *wp);
  * these pipes, and the client can connect to them using ordinary I/O methods.
  * The strings are freed when the winpty_t object is freed.
  *
+ * winpty_conerr_name returns NULL unless WINPTY_FLAG_CONERR is specified.
+ *
  * N.B.: CreateFile does not block when connecting to a local server pipe.  If
  * the server pipe does not exist or is already connected, then it fails
  * instantly. */
@@ -153,12 +154,16 @@ typedef struct winpty_spawn_config_s winpty_spawn_config_t;
 
 /* winpty_spawn_config strings do not need to live as long as the config
  * object.  They are copied.  Returns NULL on error.  spawnFlags is a set of
- * zero or more WINPTY_SPAWN_FLAG_xxx values.  An unrecognized flag is an
- * error.
+ * zero or more WINPTY_SPAWN_FLAG_xxx values.  An unrecognized flag results in
+ * an assertion failure.
  *
  * env is a a pointer to an environment block like that passed to
  * CreateProcess--a contiguous array of NUL-terminated "VAR=VAL" strings
- * followed by a final NUL terminator. */
+ * followed by a final NUL terminator.
+ *
+ * N.B.: If you want to gather all of the child's output, you may want the
+ * WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN flag.
+ */
 WINPTY_API winpty_spawn_config_t *
 winpty_spawn_config_new(UINT64 spawnFlags,
                         LPCWSTR appname /*OPTIONAL*/,
@@ -187,6 +192,10 @@ WINPTY_API void winpty_spawn_config_free(winpty_spawn_config_t *cfg);
  * to GetLastError(), and the WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED error
  * is returned.
  *
+ * winpty_spawn can only be called once per winpty_t object.  If it is called
+ * before the output data pipe(s) is/are connected, then collected output is
+ * buffered until the pipes are connected, rather than being discarded.
+ *
  * N.B.: GetProcessId works even if the process has exited.  The PID is not
  * recycled until the NT process object is freed.
  * (https://blogs.msdn.microsoft.com/oldnewthing/20110107-00/?p=11803)
@@ -204,7 +213,7 @@ winpty_spawn(winpty_t *wp,
 /*****************************************************************************
  * winpty agent RPC calls: everything else */
 
-/* Change the size of the Windows console.  Returns an error code. */
+/* Change the size of the Windows console window. */
 WINPTY_API BOOL
 winpty_set_size(winpty_t *wp, int cols, int rows,
                 winpty_error_ptr_t *err /*OPTIONAL*/);
@@ -213,8 +222,8 @@ winpty_set_size(winpty_t *wp, int cols, int rows,
  * call breaks the connection with the agent, which should then close its
  * console, terminating the processes attached to it.
  *
- * It is a programmer error to call this function if any other threads are
- * using the winpty_t object.  Undefined behavior results. */
+ * This function must not be called if any other threads are using the
+ * winpty_t object.  Undefined behavior results. */
 WINPTY_API void winpty_free(winpty_t *wp);
 
 
