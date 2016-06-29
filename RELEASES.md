@@ -1,6 +1,7 @@
-# Next Version
+# Version 0.4.0 (2016-06-28)
 
 The winpty library has a new API that should be easier for embedding.
+[880c00c69e](https://github.com/rprichard/winpty/commit/880c00c69eeca73643ddb576f02c5badbec81f56)
 
 User-visible changes:
 
@@ -24,6 +25,10 @@ Bug fixes:
  * winpty now works better with very large and very small terminal windows.
    It resizes the console font according to the number of columns.
    [#61](https://github.com/rprichard/winpty/issues/61)
+ * winpty no longer uses Mark to freeze the console on Windows 10.  The Mark
+   command could interfere with the cursor position, corrupting the data in
+   the screen buffer.
+   [#79](https://github.com/rprichard/winpty/issues/79)
 
 # Version 0.3.0 (2016-05-20)
 
