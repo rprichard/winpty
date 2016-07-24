@@ -147,7 +147,7 @@ static void outputSetColor(std::string &out, int color)
     //  (B) DkGray => DkGray
     //
 
-    out.append(CSI"0");
+    out.append(CSI "0");
     if (back == BLACK) {
         if (fore == LTGRAY) {
             // The "default" foreground color.  Use the terminal's
@@ -292,7 +292,7 @@ void Terminal::reset(SendClearFlag sendClearFirst, int64_t newLine)
         // 0m   ==> reset SGR parameters
         // 1;1H ==> move cursor to top-left position
         // 2J   ==> clear the entire screen
-        m_output.write(CSI"0m" CSI"1;1H" CSI"2J");
+        m_output.write(CSI "0m" CSI "1;1H" CSI "2J");
     }
     m_remoteLine = newLine;
     m_remoteColumn = 0;
@@ -380,7 +380,7 @@ void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width,
                 // the line.  Work around this behavior by issuing the erase
                 // one character early in that case.
                 if (!m_plainMode) {
-                    termLine.append(CSI"0K"); // Erase from cursor to EOL
+                    termLine.append(CSI "0K"); // Erase from cursor to EOL
                 }
                 alreadyErasedLine = true;
             }
@@ -407,7 +407,7 @@ void Terminal::sendLine(int64_t line, const CHAR_INFO *lineData, int width,
 
     m_output.write(termLine.data(), trimmedLineLength);
     if (!alreadyErasedLine && !m_plainMode) {
-        m_output.write(CSI"0K"); // Erase from cursor to EOL
+        m_output.write(CSI "0K"); // Erase from cursor to EOL
     }
 
     ASSERT(trimmedCellCount <= width);
@@ -423,14 +423,14 @@ void Terminal::showTerminalCursor(int column, int64_t line)
     if (!m_plainMode) {
         if (m_remoteColumn != column) {
             char buffer[32];
-            winpty_snprintf(buffer, CSI"%dG", column + 1);
+            winpty_snprintf(buffer, CSI "%dG", column + 1);
             m_output.write(buffer);
             m_lineDataValid = (column == 0);
             m_lineData.clear();
             m_remoteColumn = column;
         }
         if (m_cursorHidden) {
-            m_output.write(CSI"?25h");
+            m_output.write(CSI "?25h");
             m_cursorHidden = false;
         }
     }
@@ -442,7 +442,7 @@ void Terminal::hideTerminalCursor()
         if (m_cursorHidden) {
             return;
         }
-        m_output.write(CSI"?25l");
+        m_output.write(CSI "?25l");
         m_cursorHidden = true;
     }
 }
@@ -469,7 +469,7 @@ void Terminal::moveTerminalToLine(int64_t line)
             // Backtrack and overwrite previous lines.
             // CUrsor Up (CUU)
             char buffer[32];
-            winpty_snprintf(buffer, "\r" CSI"%uA",
+            winpty_snprintf(buffer, "\r" CSI "%uA",
                 static_cast<unsigned int>(m_remoteLine - line));
             m_output.write(buffer);
             m_remoteLine = line;
@@ -509,13 +509,13 @@ void Terminal::enableMouseMode(bool enabled)
         //
         // See misc/MouseInputNotes.txt for details.
         m_output.write(
-            CSI"?1005l"
-            CSI"?1000h" CSI"?1002h" CSI"?1003h" CSI"?1015h" CSI"?1006h");
+            CSI "?1005l"
+            CSI "?1000h" CSI "?1002h" CSI "?1003h" CSI "?1015h" CSI "?1006h");
     } else {
         // Resetting both encoding modes (1006 and 1015) is necessary, but
         // apparently we only need to use reset on one of the 100[023] modes.
         // Doing both doesn't hurt.
         m_output.write(
-            CSI"?1006l" CSI"?1015l" CSI"?1003l" CSI"?1002l" CSI"?1000l");
+            CSI "?1006l" CSI "?1015l" CSI "?1003l" CSI "?1002l" CSI "?1000l");
     }
 }
