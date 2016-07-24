@@ -69,8 +69,8 @@ private:
     public:
         InputWorker(NamedPipe &namedPipe) : IoWorker(namedPipe) {}
     protected:
-        virtual void completeIo(DWORD size);
-        virtual bool shouldIssueIo(DWORD *size, bool *isRead);
+        virtual void completeIo(DWORD size) override;
+        virtual bool shouldIssueIo(DWORD *size, bool *isRead) override;
     };
 
     class OutputWorker : public IoWorker
@@ -79,8 +79,8 @@ private:
         OutputWorker(NamedPipe &namedPipe) : IoWorker(namedPipe) {}
         DWORD getPendingIoSize();
     protected:
-        virtual void completeIo(DWORD size);
-        virtual bool shouldIssueIo(DWORD *size, bool *isRead);
+        virtual void completeIo(DWORD size) override;
+        virtual bool shouldIssueIo(DWORD *size, bool *isRead) override;
     };
 
 public:

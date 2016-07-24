@@ -576,7 +576,7 @@ public:
         m_desktop(std::move(desktop))
     {
     }
-    std::wstring name() { return m_desktop.desktopName(); }
+    std::wstring name() override { return m_desktop.desktopName(); }
 private:
     BackgroundDesktop m_desktop;
 };
@@ -589,7 +589,7 @@ public:
         m_desktopName(std::move(desktopName))
     {
     }
-    std::wstring name() { return m_desktopName; }
+    std::wstring name() override { return m_desktopName; }
 private:
     std::unique_ptr<winpty_t> m_wp;
     std::wstring m_desktopName;

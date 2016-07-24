@@ -47,7 +47,7 @@ public:
           int initialCols,
           int initialRows);
     virtual ~Agent();
-    void sendDsr();
+    void sendDsr() override;
 
 private:
     NamedPipe &connectToControlPipe(LPCWSTR pipeName);
@@ -62,8 +62,8 @@ private:
     void pollConinPipe();
 
 protected:
-    virtual void onPollTimeout();
-    virtual void onPipeIo(NamedPipe &namedPipe);
+    virtual void onPollTimeout() override;
+    virtual void onPipeIo(NamedPipe &namedPipe) override;
 
 private:
     void autoClosePipesForShutdown();

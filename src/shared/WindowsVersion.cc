@@ -68,7 +68,7 @@ Version getWindowsVersion() {
 }
 
 struct ModuleNotFound : WinptyException {
-    virtual const wchar_t *what() const WINPTY_NOEXCEPT {
+    virtual const wchar_t *what() const WINPTY_NOEXCEPT override {
         return L"ModuleNotFound";
     }
 };

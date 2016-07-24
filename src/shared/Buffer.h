@@ -64,7 +64,7 @@ public:
 class ReadBuffer {
 public:
     class DecodeError : public WinptyException {
-        virtual const wchar_t *what() const WINPTY_NOEXCEPT {
+        virtual const wchar_t *what() const WINPTY_NOEXCEPT override {
             return L"DecodeError: RPC message decoding error";
         }
     };
@@ -74,7 +74,7 @@ private:
     size_t m_off = 0;
 
 public:
-    ReadBuffer(std::vector<char> &&buf) : m_buf(std::move(buf)) {}
+    explicit ReadBuffer(std::vector<char> &&buf) : m_buf(std::move(buf)) {}
 
     template <typename T> T getRawValue() {
         T ret = {};

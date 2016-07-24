@@ -37,7 +37,7 @@ public:
         return m_code;
     }
 
-    const wchar_t *what() const WINPTY_NOEXCEPT {
+    const wchar_t *what() const WINPTY_NOEXCEPT override {
         return m_what->c_str();
     }
 

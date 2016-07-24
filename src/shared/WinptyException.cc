@@ -31,7 +31,7 @@ class ExceptionImpl : public WinptyException {
 public:
     ExceptionImpl(const wchar_t *what) :
         m_what(std::make_shared<std::wstring>(what)) {}
-    virtual const wchar_t *what() const WINPTY_NOEXCEPT {
+    virtual const wchar_t *what() const WINPTY_NOEXCEPT override {
         return m_what->c_str();
     }
 private:

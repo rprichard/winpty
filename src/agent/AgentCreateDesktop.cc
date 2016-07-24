@@ -41,7 +41,7 @@ public:
     CreateDesktopLoop(LPCWSTR controlPipeName);
 
 protected:
-    virtual void onPipeIo(NamedPipe &namedPipe);
+    virtual void onPipeIo(NamedPipe &namedPipe) override;
 
 private:
     void writePacket(WriteBuffer &packet);
