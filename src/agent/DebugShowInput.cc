@@ -199,8 +199,16 @@ void debugShowInput(bool enableMouse, bool escapeInput) {
                    << " rpt=" << ker.wRepeatCount
                    << " scn=" << ker.wVirtualScanCode
                    << ' ' << key.toString() << '\n';
-                if ((ker.dwControlKeyState & LEFT_CTRL_PRESSED) &&
+                if ((ker.dwControlKeyState &
+                        (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) &&
                         ker.wVirtualKeyCode == 'D') {
+                    finished = true;
+                    break;
+                } else if (ker.wVirtualKeyCode == 0 &&
+                        ker.wVirtualScanCode == 0 &&
+                        ker.uChar.UnicodeChar == 4) {
+                    // Also look for a zeroed-out Ctrl-D record generated for
+                    // ENABLE_VIRTUAL_TERMINAL_INPUT.
                     finished = true;
                     break;
                 }
