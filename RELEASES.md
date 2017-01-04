@@ -1,3 +1,11 @@
+# Version 0.4.1 (2017-01-03)
+
+Bug fixes:
+
+ * This version fixes a bug where the `winpty-agent.exe` process could read
+   past the end of a buffer.
+   [#94](https://github.com/rprichard/winpty/issues/94)
+
 # Version 0.4.0 (2016-06-28)
 
 The winpty library has a new API that should be easier for embedding.
