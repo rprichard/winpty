@@ -342,7 +342,8 @@ static size_t readData(winpty_t &wp, void *data, size_t amount) {
 
 static void readAll(winpty_t &wp, void *data, size_t amount) {
     while (amount > 0) {
-        size_t chunk = readData(wp, data, amount);
+        const size_t chunk = readData(wp, data, amount);
+        ASSERT(chunk <= amount && "readData result is larger than amount");
         data = reinterpret_cast<char*>(data) + chunk;
         amount -= chunk;
     }
