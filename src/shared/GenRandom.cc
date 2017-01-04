@@ -50,7 +50,7 @@ GenRandom::GenRandom() : m_advapi32(L"advapi32.dll") {
     // Fall back to the crypto API.
     m_cryptProvIsValid =
         CryptAcquireContext(&m_cryptProv, nullptr, nullptr,
-                            PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+                            PROV_RSA_FULL, CRYPT_VERIFYCONTEXT) != 0;
     if (!m_cryptProvIsValid) {
         trace("GenRandom: CryptAcquireContext failed: %u",
             static_cast<unsigned>(GetLastError()));
@@ -68,14 +68,15 @@ bool GenRandom::fillBuffer(void *buffer, size_t size) {
     memset(buffer, 0, size);
     bool success = false;
     if (m_rtlGenRandom != nullptr) {
-        success = m_rtlGenRandom(buffer, size);
+        success = m_rtlGenRandom(buffer, size) != 0;
         if (!success) {
             trace("GenRandom: RtlGenRandom/SystemFunction036 failed: %u",
                 static_cast<unsigned>(GetLastError()));
         }
     } else if (m_cryptProvIsValid) {
-        success = CryptGenRandom(m_cryptProv, size,
-                                 reinterpret_cast<BYTE*>(buffer));
+        success =
+            CryptGenRandom(m_cryptProv, size,
+                           reinterpret_cast<BYTE*>(buffer)) != 0;
         if (!success) {
             trace("GenRandom: CryptGenRandom failed, size=%d, lasterror=%u",
                 static_cast<int>(size),

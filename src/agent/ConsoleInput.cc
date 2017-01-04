@@ -288,10 +288,10 @@ void ConsoleInput::flushIncompleteEscapeCode()
 void ConsoleInput::updateInputFlags(bool forceTrace)
 {
     const DWORD mode = inputConsoleMode();
-    const bool newFlagEE = mode & ENABLE_EXTENDED_FLAGS;
-    const bool newFlagMI = mode & ENABLE_MOUSE_INPUT;
-    const bool newFlagQE = mode & ENABLE_QUICK_EDIT_MODE;
-    const bool newFlagEI = mode & 0x200;
+    const bool newFlagEE = (mode & ENABLE_EXTENDED_FLAGS) != 0;
+    const bool newFlagMI = (mode & ENABLE_MOUSE_INPUT) != 0;
+    const bool newFlagQE = (mode & ENABLE_QUICK_EDIT_MODE) != 0;
+    const bool newFlagEI = (mode & 0x200) != 0;
     if (forceTrace ||
             newFlagEE != m_enableExtendedEnabled ||
             newFlagMI != m_mouseInputEnabled ||
@@ -591,9 +591,9 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
                                   uint32_t codePoint,
                                   uint16_t keyState)
 {
-    const bool ctrl = keyState & LEFT_CTRL_PRESSED;
-    const bool alt = keyState & LEFT_ALT_PRESSED;
-    const bool shift = keyState & SHIFT_PRESSED;
+    const bool ctrl = (keyState & LEFT_CTRL_PRESSED) != 0;
+    const bool alt = (keyState & LEFT_ALT_PRESSED) != 0;
+    const bool shift = (keyState & SHIFT_PRESSED) != 0;
 
     if (isTracingEnabled()) {
         static bool debugInput = hasDebugFlag("input");

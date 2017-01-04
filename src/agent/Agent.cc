@@ -147,8 +147,8 @@ Agent::Agent(LPCWSTR controlPipeName,
              int mouseMode,
              int initialCols,
              int initialRows) :
-    m_useConerr(agentFlags & WINPTY_FLAG_CONERR),
-    m_plainMode(agentFlags & WINPTY_FLAG_PLAIN_OUTPUT),
+    m_useConerr((agentFlags & WINPTY_FLAG_CONERR) != 0),
+    m_plainMode((agentFlags & WINPTY_FLAG_PLAIN_OUTPUT) != 0),
     m_mouseMode(mouseMode)
 {
     trace("Agent::Agent entered");
@@ -310,7 +310,7 @@ void Agent::pollControlPipe()
             ReadBuffer buffer(std::move(packetData));
             buffer.getRawValue<uint64_t>(); // Discard the size.
             handlePacket(buffer);
-        } catch (const ReadBuffer::DecodeError &error) {
+        } catch (const ReadBuffer::DecodeError&) {
             ASSERT(false && "Decode error");
         }
     }
@@ -349,8 +349,8 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
     ASSERT(!m_closingOutputPipes);
 
     const uint64_t spawnFlags = packet.getInt64();
-    const bool wantProcessHandle = packet.getInt32();
-    const bool wantThreadHandle = packet.getInt32();
+    const bool wantProcessHandle = packet.getInt32() != 0;
+    const bool wantThreadHandle = packet.getInt32() != 0;
     const auto program = packet.getWString();
     const auto cmdline = packet.getWString();
     const auto cwd = packet.getWString();
@@ -403,8 +403,8 @@ void Agent::handleStartProcessPacket(ReadBuffer &packet)
         }
         CloseHandle(pi.hThread);
         m_childProcess = pi.hProcess;
-        m_autoShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN);
-        m_exitAfterShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_EXIT_AFTER_SHUTDOWN);
+        m_autoShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN) != 0;
+        m_exitAfterShutdown = (spawnFlags & WINPTY_SPAWN_FLAG_EXIT_AFTER_SHUTDOWN) != 0;
         reply.putInt32(static_cast<int32_t>(StartProcessResult::ProcessCreated));
         reply.putInt64(replyProcess);
         reply.putInt64(replyThread);

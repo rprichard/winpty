@@ -330,12 +330,12 @@ void Scraper::syncConsoleContentAndSize(
     }
 
     const ConsoleScreenBufferInfo info = m_consoleBuffer->bufferInfo();
-    BOOL cursorVisible = true;
+    bool cursorVisible = true;
     CONSOLE_CURSOR_INFO cursorInfo = {};
     if (!GetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursorInfo)) {
         trace("GetConsoleCursorInfo failed");
     } else {
-        cursorVisible = cursorInfo.bVisible;
+        cursorVisible = cursorInfo.bVisible != 0;
     }
 
     // If an app resizes the buffer height, then we enter "direct mode", where

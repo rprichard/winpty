@@ -232,7 +232,7 @@ void dumpWindowsVersion() {
             fb << "F:" << versionToString(fileVersionFromInfo(info)) << '/'
                << "P:" << versionToString(productVersionFromInfo(info));
             return fb.str_moved();
-        } catch (const ModuleNotFound &e) {
+        } catch (const ModuleNotFound&) {
             return utf8FromWide(dllPath) + ":none";
         } catch (const WinptyException &e) {
             trace("Error getting %s version: %s",

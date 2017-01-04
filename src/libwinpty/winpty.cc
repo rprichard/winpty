@@ -108,7 +108,7 @@ static void translateException(winpty_error_ptr_t *&err) {
     try {
         try {
             throw;
-        } catch (const ReadBuffer::DecodeError &e) {
+        } catch (const ReadBuffer::DecodeError&) {
             ret = const_cast<winpty_error_ptr_t>(&kBadRpcPacket);
         } catch (const LibWinptyException &e) {
             std::unique_ptr<winpty_error_t> obj(new winpty_error_t);
@@ -125,7 +125,7 @@ static void translateException(winpty_error_ptr_t *&err) {
             obj->msgDynamic = new std::shared_ptr<std::wstring>(msg);
             ret = obj.release();
         }
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc&) {
         ret = const_cast<winpty_error_ptr_t>(&kOutOfMemory);
     } catch (...) {
         ret = const_cast<winpty_error_ptr_t>(&kUncaughtException);
@@ -703,7 +703,7 @@ WINPTY_API HANDLE winpty_agent_process(winpty_t *wp) {
 static const wchar_t *cstrFromWStringOrNull(const std::wstring &str) {
     try {
         return str.c_str();
-    } catch (const std::bad_alloc &e) {
+    } catch (const std::bad_alloc&) {
         return nullptr;
     }
 }
