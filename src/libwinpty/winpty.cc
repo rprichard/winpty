@@ -20,6 +20,7 @@
 
 #include <windows.h>
 
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -297,7 +298,7 @@ connectControlPipe(winpty_t &wp) {
     }
 }
 
-static void writeData(winpty_t &wp, const void *data, size_t amount) {
+static void writeData(winpty_t &wp, const void *data, uint32_t amount) {
     // Perform a single pipe write.
     DWORD actual = 0;
     OVERLAPPED over = {};
@@ -321,12 +322,16 @@ static inline WriteBuffer newPacket() {
 }
 
 static void writePacket(winpty_t &wp, WriteBuffer &packet) {
+    // The protocol allows a "packet" of 2**64 bytes, but this implementation
+    // uses a single WriteFile call, which limits the packet size it can send.
+    // XXX: do this right...
     const auto &buf = packet.buf();
     packet.replaceRawValue<uint64_t>(0, buf.size());
-    writeData(wp, buf.data(), buf.size());
+    ASSERT(buf.size() <= UINT32_MAX);
+    writeData(wp, buf.data(), static_cast<uint32_t>(buf.size()));
 }
 
-static size_t readData(winpty_t &wp, void *data, size_t amount) {
+static uint32_t readData(winpty_t &wp, void *data, uint32_t amount) {
     DWORD actual = 0;
     OVERLAPPED over = {};
     over.hEvent = wp.ioEvent.get();
@@ -342,7 +347,9 @@ static size_t readData(winpty_t &wp, void *data, size_t amount) {
 
 static void readAll(winpty_t &wp, void *data, size_t amount) {
     while (amount > 0) {
-        const size_t chunk = readData(wp, data, amount);
+        const auto chunk =
+            readData(wp, data, 
+                static_cast<uint32_t>(std::min<size_t>(amount, 1024 * 1024)));
         ASSERT(chunk <= amount && "readData result is larger than amount");
         data = reinterpret_cast<char*>(data) + chunk;
         amount -= chunk;
@@ -357,11 +364,12 @@ static uint64_t readUInt64(winpty_t &wp) {
 
 // Returns a reply packet's payload.
 static ReadBuffer readPacket(winpty_t &wp) {
-    const uint64_t packetSize = readUInt64(wp);
+    const auto packetSize = readUInt64(wp);
     if (packetSize < sizeof(packetSize) || packetSize > SIZE_MAX) {
         throwWinptyException(L"Agent RPC error: invalid packet size");
     }
-    const size_t payloadSize = packetSize - sizeof(packetSize);
+    const auto payloadSize =
+        static_cast<size_t>(packetSize - sizeof(packetSize));
     std::vector<char> bytes(payloadSize);
     readAll(wp, bytes.data(), bytes.size());
     return ReadBuffer(std::move(bytes));

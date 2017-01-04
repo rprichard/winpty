@@ -49,14 +49,14 @@ private:
     void doWrite(bool isEof);
     int scanInput(std::vector<INPUT_RECORD> &records,
                   const char *input,
-                  int inputSize,
+                  size_t inputSize,
                   bool isEof);
     int scanMouseInput(std::vector<INPUT_RECORD> &records,
                        const char *input,
-                       int inputSize);
+                       size_t inputSize);
     void appendUtf8Char(std::vector<INPUT_RECORD> &records,
                         const char *charBuffer,
-                        int charLen,
+                        size_t charLen,
                         uint16_t keyState);
     void appendKeyPress(std::vector<INPUT_RECORD> &records,
                         uint16_t virtualKey,

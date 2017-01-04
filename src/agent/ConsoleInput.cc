@@ -80,7 +80,7 @@ const unsigned int kIncompleteEscapeTimeoutMs = 1000u;
         do {                                        \
             (out) = 0;                              \
             CHECK(isdigit(*pch));                   \
-            const char *begin = pch;                \
+            const char *const begin = pch;          \
             do {                                    \
                 CHECK(pch - begin + 1 < maxLen);    \
                 (out) = (out) * 10 + *pch - '0';    \
@@ -106,25 +106,25 @@ const unsigned int kIncompleteEscapeTimeoutMs = 1000u;
 // 0   no match
 // >0  match, returns length of match
 // -1  incomplete match
-static int matchDsr(const char *input, int inputSize)
+static int matchDsr(const char *input, size_t inputSize)
 {
     int32_t dummy = 0;
     const char *pch = input;
-    const char *stop = input + inputSize;
+    const char *const stop = input + inputSize;
     CHECK(*pch == '\x1B');  ADVANCE();
     CHECK(*pch == '[');     ADVANCE();
     SCAN_INT(dummy, 8);
     CHECK(*pch == ';');     ADVANCE();
     SCAN_INT(dummy, 8);
     CHECK(*pch == 'R');
-    return pch - input + 1;
+    return static_cast<int>(pch - input + 1);
 }
 
-static int matchMouseDefault(const char *input, int inputSize,
+static int matchMouseDefault(const char *input, size_t inputSize,
                              MouseRecord &out)
 {
     const char *pch = input;
-    const char *stop = input + inputSize;
+    const char *const stop = input + inputSize;
     CHECK(*pch == '\x1B');              ADVANCE();
     CHECK(*pch == '[');                 ADVANCE();
     CHECK(*pch == 'M');                 ADVANCE();
@@ -133,14 +133,15 @@ static int matchMouseDefault(const char *input, int inputSize,
     ADVANCE();
     out.coord.Y = (*pch - '!') & 0xFF;
     out.release = false;
-    return pch - input + 1;
+    return static_cast<int>(pch - input + 1);
 }
 
-static int matchMouse1006(const char *input, int inputSize, MouseRecord &out)
+static int matchMouse1006(const char *input, size_t inputSize,
+                          MouseRecord &out)
 {
     const char *pch = input;
-    const char *stop = input + inputSize;
-    int32_t temp;
+    const char *const stop = input + inputSize;
+    int32_t temp = 0;
     CHECK(*pch == '\x1B');      ADVANCE();
     CHECK(*pch == '[');         ADVANCE();
     CHECK(*pch == '<');         ADVANCE();
@@ -151,14 +152,15 @@ static int matchMouse1006(const char *input, int inputSize, MouseRecord &out)
     SCAN_SIGNED_INT(temp, 8); out.coord.Y = temp - 1;
     CHECK(*pch == 'M' || *pch == 'm');
     out.release = (*pch == 'm');
-    return pch - input + 1;
+    return static_cast<int>(pch - input + 1);
 }
 
-static int matchMouse1015(const char *input, int inputSize, MouseRecord &out)
+static int matchMouse1015(const char *input, size_t inputSize,
+                          MouseRecord &out)
 {
     const char *pch = input;
-    const char *stop = input + inputSize;
-    int32_t temp;
+    const char *const stop = input + inputSize;
+    int32_t temp = 0;
     CHECK(*pch == '\x1B');      ADVANCE();
     CHECK(*pch == '[');         ADVANCE();
     SCAN_INT(out.flags, 8); out.flags -= 32;
@@ -168,17 +170,18 @@ static int matchMouse1015(const char *input, int inputSize, MouseRecord &out)
     SCAN_SIGNED_INT(temp, 8); out.coord.Y = temp - 1;
     CHECK(*pch == 'M');
     out.release = false;
-    return pch - input + 1;
+    return static_cast<int>(pch - input + 1);
 }
 
 // Match a mouse input escape sequence of any kind.
 // 0   no match
 // >0  match, returns length of match
 // -1  incomplete match
-static int matchMouseRecord(const char *input, int inputSize, MouseRecord &out)
+static int matchMouseRecord(const char *input, size_t inputSize,
+                            MouseRecord &out)
 {
     memset(&out, 0, sizeof(out));
-    int ret;
+    int ret = 0;
     if ((ret = matchMouse1006(input, inputSize, out)) != 0) { return ret; }
     if ((ret = matchMouse1015(input, inputSize, out)) != 0) { return ret; }
     if ((ret = matchMouseDefault(input, inputSize, out)) != 0) { return ret; }
@@ -342,7 +345,12 @@ void ConsoleInput::doWrite(bool isEof)
     m_byteQueue.erase(0, idx);
     DWORD actual = 0;
     if (records.size() > 0) {
-        if (!WriteConsoleInputW(m_conin, records.data(), records.size(), &actual)) {
+        ASSERT(records.size() <= UINT32_MAX);
+        if (!WriteConsoleInputW(
+                m_conin,
+                records.data(),
+                static_cast<uint32_t>(records.size()),
+                &actual)) {
             trace("WriteConsoleInputW failed");
         }
     }
@@ -350,7 +358,7 @@ void ConsoleInput::doWrite(bool isEof)
 
 int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
                             const char *input,
-                            int inputSize,
+                            size_t inputSize,
                             bool isEof)
 {
     ASSERT(inputSize >= 1);
@@ -407,7 +415,7 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
     // than the DSR flushing mechanism or use a decrepit terminal.  The user
     // might be on a slow network connection.)
     if (input[0] == '\x1B' && inputSize >= 2 && input[1] != '\x1B') {
-        const int len = utf8CharLength(input[1]);
+        const unsigned int len = utf8CharLength(input[1]);
         if (len > 0) {
             if (1 + len > inputSize) {
                 // Incomplete character.
@@ -420,7 +428,7 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
     }
 
     // A UTF-8 character.
-    const int len = utf8CharLength(input[0]);
+    const unsigned int len = utf8CharLength(input[0]);
     if (len == 0) {
         static bool debugInput = isTracingEnabled() && hasDebugFlag("input");
         if (debugInput) {
@@ -440,9 +448,9 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
 
 int ConsoleInput::scanMouseInput(std::vector<INPUT_RECORD> &records,
                                  const char *input,
-                                 int inputSize)
+                                 size_t inputSize)
 {
-    MouseRecord record;
+    MouseRecord record = {};
     const int len = matchMouseRecord(input, inputSize, record);
     if (len <= 0) {
         return len;
@@ -553,7 +561,7 @@ int ConsoleInput::scanMouseInput(std::vector<INPUT_RECORD> &records,
 
 void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
                                   const char *charBuffer,
-                                  const int charLen,
+                                  const size_t charLen,
                                   const uint16_t keyState)
 {
     const uint32_t code = decodeUtf8(charBuffer);
@@ -562,7 +570,7 @@ void ConsoleInput::appendUtf8Char(std::vector<INPUT_RECORD> &records,
         if (debugInput) {
             StringBuilder error(64);
             error << "Discarding invalid UTF-8 sequence:";
-            for (int i = 0; i < charLen; ++i) {
+            for (size_t i = 0; i < charLen; ++i) {
                 error << ' ';
                 error << hexOfInt<true, uint8_t>(charBuffer[i]);
             }

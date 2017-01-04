@@ -186,7 +186,7 @@ InputMap::Node &InputMap::getOrCreateChild(Node &node, unsigned char ch) {
 }
 
 // Find the longest matching key and node.
-int InputMap::lookupKey(const char *input, int inputSize,
+int InputMap::lookupKey(const char *input, size_t inputSize,
                         Key &keyOut, bool &incompleteOut) const {
     keyOut = kKeyZero;
     incompleteOut = false;
@@ -195,7 +195,7 @@ int InputMap::lookupKey(const char *input, int inputSize,
     InputMap::Key longestMatch = kKeyZero;
     int longestMatchLen = 0;
 
-    for (int i = 0; i < inputSize; ++i) {
+    for (size_t i = 0; i < inputSize; ++i) {
         unsigned char ch = input[i];
         node = getChild(*node, ch);
         if (node == NULL) {

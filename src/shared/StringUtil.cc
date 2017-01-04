@@ -21,6 +21,7 @@
 #include "StringUtil.h"
 
 #include <windows.h>
+#include <limits.h>
 
 #include "WinptyAssert.h"
 
@@ -37,19 +38,20 @@ size_t winpty_wcsnlen(const wchar_t *s, size_t maxlen) {
 }
 
 std::string utf8FromWide(const std::wstring &input) {
-    int mblen = WideCharToMultiByte(
+    ASSERT(input.size() <= INT_MAX);
+    const int mblen = WideCharToMultiByte(
         CP_UTF8, 0,
-        input.data(), input.size(),
+        input.data(), static_cast<int>(input.size()),
         NULL, 0, NULL, NULL);
     if (mblen <= 0) {
-        return std::string();
+        return std::string(); // XXX: Better error handling.
     }
-    std::vector<char> tmp(mblen);
-    int mblen2 = WideCharToMultiByte(
+    std::vector<char> mbstr(mblen);
+    const int mblen2 = WideCharToMultiByte(
         CP_UTF8, 0,
-        input.data(), input.size(),
-        tmp.data(), tmp.size(),
+        input.data(), static_cast<int>(input.size()),
+        mbstr.data(), mblen,
         NULL, NULL);
     ASSERT(mblen2 == mblen);
-    return std::string(tmp.data(), tmp.size());
+    return std::string(mbstr.data(), mbstr.size());
 }
