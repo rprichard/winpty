@@ -1,3 +1,12 @@
+# Next Version
+
+Bug fixes:
+
+ * winpty generates more correct input escape sequences for WSL programs that
+   enable an alternate input mode using DECCKM.  This bug affected arrow keys
+   and Home/End in WSL programs such as `vim`, `mc`, and `less`.
+   [#90](https://github.com/rprichard/winpty/issues/90)
+
 # Version 0.4.1 (2017-01-03)
 
 Bug fixes:
