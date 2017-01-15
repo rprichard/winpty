@@ -1,11 +1,17 @@
 # Next Version
 
-Bug fixes:
+This release improves WSL support (i.e. Bash-on-Windows).
+
+Changes:
 
  * winpty generates more correct input escape sequences for WSL programs that
    enable an alternate input mode using DECCKM.  This bug affected arrow keys
    and Home/End in WSL programs such as `vim`, `mc`, and `less`.
    [#90](https://github.com/rprichard/winpty/issues/90)
+ * winpty now recognizes the `COMMON_LVB_REVERSE_VIDEO` and
+   `COMMON_LVB_UNDERSCORE` text attributes.  The Windows console uses these
+   attributes to implement the SGR.4(Underline) and SGR.7(Negative) modes in
+   its VT handling.  This change affects WSL pager status bars, man pages, etc.
 
 # Version 0.4.1 (2017-01-03)
 
