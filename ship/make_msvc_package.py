@@ -88,7 +88,7 @@ def checkoutGyp():
 
 def cleanMsvc():
     common_ship.rmrf("""
-        src/Release src/.vs
+        src/Release src/.vs src/gen
         src/*.vcxproj src/*.vcxproj.filters src/*.sln src/*.sdf
     """.split())
 
@@ -106,7 +106,6 @@ def build(arch, packageDir, xp=False):
         '"' + devCmdPath + '" && '
         " vcbuild.bat" +
         " --gyp-msvs-version " + versionInfo["gyp_version"] +
-        " --version-suffix __none__" +
         " --msvc-platform " + archInfo["msvc_platform"]
     )
 

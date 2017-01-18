@@ -43,15 +43,6 @@ if "%1" == "--toolset" (
     shift && shift
     goto :ParamLoop
 )
-if "%1" == "--version-suffix" (
-    if x%2 == x"" (
-        set GYP_ARGS=%GYP_ARGS% -D VERSION_SUFFIX=__none__
-    ) else (
-        set GYP_ARGS=%GYP_ARGS% -D VERSION_SUFFIX=%2
-    )
-    shift && shift
-    goto :ParamLoop
-)
 echo error: Unrecognized argument: %1
 exit /b 1
 :ParamDone
