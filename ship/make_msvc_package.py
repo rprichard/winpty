@@ -160,7 +160,5 @@ def buildPackage():
 
     subprocess.check_call([ZIP_TOOL, "a", packageFile, "."], cwd=packageDir)
 
-    common_ship.rmrf([packageDir])
-
 if __name__ == "__main__":
     buildPackage()

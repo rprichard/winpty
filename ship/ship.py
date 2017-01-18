@@ -74,6 +74,8 @@ BUILD_TARGETS = [
 
 def buildTarget(target):
     packageName = "winpty-" + common_ship.winptyVersion + "-" + target["name"]
+    if os.path.exists("ship\\packages\\" + packageName):
+        shutil.rmtree("ship\\packages\\" + packageName)
     oldPath = os.environ["PATH"]
     os.environ["PATH"] = target["path"] + ";" + common_ship.defaultPathEnviron
     subprocess.check_call(["sh.exe", "configure"])
@@ -91,12 +93,9 @@ def buildTarget(target):
     subprocess.check_call(["tar.exe", "cvfz",
         packageName + ".tar.gz",
         packageName], cwd=os.path.join(os.getcwd(), "ship", "packages"))
-    shutil.rmtree("ship\\packages\\" + packageName)
     os.environ["PATH"] = oldPath
 
 def main():
-    if os.path.exists("ship\\packages"):
-        shutil.rmtree("ship\\packages")
     oldPath = os.environ["PATH"]
     for t in BUILD_TARGETS:
         os.environ["PATH"] = t["path"] + ";" + common_ship.defaultPathEnviron
