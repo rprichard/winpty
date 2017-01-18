@@ -1,8 +1,6 @@
-# Next Version
+# Version 0.4.2 (2017-01-18)
 
-This release improves WSL support (i.e. Bash-on-Windows).
-
-Changes:
+This release improves WSL support (i.e. Bash-on-Windows):
 
  * winpty generates more correct input escape sequences for WSL programs that
    enable an alternate input mode using DECCKM.  This bug affected arrow keys
@@ -12,6 +10,11 @@ Changes:
    `COMMON_LVB_UNDERSCORE` text attributes.  The Windows console uses these
    attributes to implement the SGR.4(Underline) and SGR.7(Negative) modes in
    its VT handling.  This change affects WSL pager status bars, man pages, etc.
+
+The build system no longer has a "version suffix" mechanism, so passing
+`VERSION_SUFFIX=<suffix>` to make or `-D VERSION_SUFFIX=<suffix>` to gyp now
+has no effect.  AFAIK, the mechanism was never used publicly.
+[67a34b6c03](https://github.com/rprichard/winpty/commit/67a34b6c03557a5c2e0a2bdd502c2210921d8f3e)
 
 # Version 0.4.1 (2017-01-03)
 
