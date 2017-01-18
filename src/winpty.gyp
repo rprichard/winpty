@@ -9,6 +9,9 @@
     # can be configured by passing variables to make, e.g.:
     #    make -j4 CXX=i686-w64-mingw32-g++ LDFLAGS="-static -static-libgcc -static-libstdc++"
 
+    'variables': {
+        'WINPTY_COMMIT_HASH%': '<!(cmd /c "cd shared && GetCommitHash.bat")',
+    },
     'target_defaults' : {
         'defines' : [
             'UNICODE',
@@ -19,7 +22,7 @@
         'include_dirs': [
             # Add the 'src/gen' directory to the include path and force gyp to
             # run the script (re)generating the version header.
-            '<!(cmd /c "cd shared && UpdateGenVersion.bat")',
+            '<!(cmd /c "cd shared && UpdateGenVersion.bat <(WINPTY_COMMIT_HASH)")',
         ],
     },
     'targets' : [

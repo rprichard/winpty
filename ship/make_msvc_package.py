@@ -106,7 +106,8 @@ def build(arch, packageDir, xp=False):
         '"' + devCmdPath + '" && '
         " vcbuild.bat" +
         " --gyp-msvs-version " + versionInfo["gyp_version"] +
-        " --msvc-platform " + archInfo["msvc_platform"]
+        " --msvc-platform " + archInfo["msvc_platform"] +
+        " --commit-hash " + common_ship.commitHash
     )
 
     subprocess.check_call(commandLine, shell=True, env=newEnv)
