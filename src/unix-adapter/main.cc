@@ -34,6 +34,7 @@
 #include <sys/cygwin.h>
 #include <termios.h>
 #include <unistd.h>
+#include <wchar.h>
 
 #include <map>
 #include <string>
@@ -198,41 +199,6 @@ static void registerResizeSignalHandler()
     sigaction(SIGWINCH, &resizeSigAct, NULL);
 }
 
-// Convert the path to a Win32 path if it is a POSIX path, and convert slashes
-// to backslashes.
-static std::string convertPosixPathToWin(const std::string &path)
-{
-    char *tmp;
-#if defined(CYGWIN_VERSION_CYGWIN_CONV) && \
-        CYGWIN_VERSION_API_MINOR >= CYGWIN_VERSION_CYGWIN_CONV
-    // MSYS2 and versions of Cygwin released after 2009 or so use this API.
-    // The original MSYS still lacks this API.
-    ssize_t newSize = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
-                                       path.c_str(), NULL, 0);
-    assert(newSize >= 0);
-    tmp = new char[newSize + 1];
-    ssize_t success = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_RELATIVE,
-                                       path.c_str(), tmp, newSize + 1);
-    assert(success == 0);
-#else
-    // In the current Cygwin header file, this API is documented as deprecated
-    // because it's restricted to paths of MAX_PATH length.  In the CVS version
-    // of MSYS, the newer API doesn't exist, and this older API is implemented
-    // using msys_p2w, which seems like it would handle paths larger than
-    // MAX_PATH, but there's no way to query how large the new path is.
-    // Hopefully, this is large enough.
-    tmp = new char[MAX_PATH + path.size()];
-    cygwin_conv_to_win32_path(path.c_str(), tmp);
-#endif
-    for (int i = 0; tmp[i] != '\0'; ++i) {
-        if (tmp[i] == '/')
-            tmp[i] = '\\';
-    }
-    std::string ret(tmp);
-    delete [] tmp;
-    return ret;
-}
-
 // Convert argc/argv into a Win32 command-line following the escaping convention
 // documented on MSDN.  (e.g. see CommandLineToArgvW documentation)
 static std::string argvToCommandLine(const std::vector<std::string> &argv)
@@ -270,6 +236,20 @@ static std::string argvToCommandLine(const std::vector<std::string> &argv)
         }
     }
     return result;
+}
+
+// The original MSYS lacks wcscpy.
+static wchar_t *appWcsCpy(wchar_t *dst, const wchar_t *src)
+{
+    memcpy(dst, src, (wcslen(src) + 1) * sizeof(wchar_t));
+    return dst;
+}
+
+// The original MSYS lacks wcscat.
+static wchar_t *appWscCat(wchar_t *dst, const wchar_t *src)
+{
+    appWcsCpy(dst + wcslen(dst), src);
+    return dst;
 }
 
 static wchar_t *heapMbsToWcs(const char *text)
@@ -497,6 +477,12 @@ int main(int argc, char *argv[])
 {
     setlocale(LC_ALL, "");
 
+    if (argc >= 3 && !strcmp(argv[1], "--child-exec")) {
+        execvp(argv[2], &argv[2]);
+        perror("error: exec failed");
+        exit(1);
+    }
+
     g_mainWakeup = new WakeupFd();
 
     Arguments args;
@@ -546,14 +532,35 @@ int main(int argc, char *argv[])
     HANDLE childHandle = NULL;
 
     {
+        wchar_t selfPath[1024];
+        {
+            selfPath[0] = L'\0';
+            HMODULE selfModule = NULL;
+            BOOL success = GetModuleHandleExW(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                (LPCWSTR)(void*)&main, &selfModule);
+            assert(success && "GetModuleHandleExW failed");
+            DWORD modPathLen = GetModuleFileNameW(selfModule, selfPath, 1024);
+            assert(modPathLen > 0 && modPathLen < 1024 && "GetModuleFileNameW failed");
+            FreeLibrary(selfModule);
+        }
+
         // Start the child process under the console.
-        args.childArgv[0] = convertPosixPathToWin(args.childArgv[0]);
-        std::string cmdLine = argvToCommandLine(args.childArgv);
-        wchar_t *cmdLineW = heapMbsToWcs(cmdLine.c_str());
+        //args.childArgv[0] = convertPosixPathToWin(args.childArgv[0]);
+        std::string childCmdLine = argvToCommandLine(args.childArgv);
+        wchar_t *const childCmdLineW = heapMbsToWcs(childCmdLine.c_str());
+
+        wchar_t *const cmdLineW = new wchar_t[wcslen(selfPath) + 32 + wcslen(childCmdLineW)];
+        cmdLineW[0] = L'\0';
+        appWscCat(cmdLineW, L"\"");
+        appWscCat(cmdLineW, selfPath);
+        appWscCat(cmdLineW, L"\" --child-exec ");
+        appWscCat(cmdLineW, childCmdLineW);
 
         winpty_spawn_config_t *spawnCfg = winpty_spawn_config_new(
                 WINPTY_SPAWN_FLAG_AUTO_SHUTDOWN,
-                NULL, cmdLineW, NULL, NULL, NULL);
+                NULL, // heapMbsToWcs(args.childArgv[0].c_str()),
+                cmdLineW, NULL, NULL, NULL);
         assert(spawnCfg != NULL);
 
         winpty_error_ptr_t spawnErr = NULL;
@@ -566,17 +573,18 @@ int main(int argc, char *argv[])
             winpty_result_t spawnCode = winpty_error_code(spawnErr);
             if (spawnCode == WINPTY_ERROR_SPAWN_CREATE_PROCESS_FAILED) {
                 fprintf(stderr, "Could not start '%s': %s\n",
-                    cmdLine.c_str(),
+                    childCmdLine.c_str(),
                     formatErrorMessage(lastError).c_str());
             } else {
                 fprintf(stderr, "Could not start '%s': internal error: %s\n",
-                    cmdLine.c_str(),
+                    childCmdLine.c_str(),
                     wcsToMbs(winpty_error_msg(spawnErr)).c_str());
             }
             exit(1);
         }
         winpty_error_free(spawnErr);
         delete [] cmdLineW;
+        delete [] childCmdLineW;
     }
 
     registerResizeSignalHandler();
