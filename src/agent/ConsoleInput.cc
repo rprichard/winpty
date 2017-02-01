@@ -39,6 +39,7 @@
 #include "UnicodeEncoding.h"
 #include "Win32Console.h"
 
+// MAPVK_VK_TO_VSC isn't defined by the old MinGW.
 #ifndef MAPVK_VK_TO_VSC
 #define MAPVK_VK_TO_VSC 0
 #endif
@@ -596,6 +597,7 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
     const bool ctrl = (keyState & LEFT_CTRL_PRESSED) != 0;
     const bool alt = (keyState & LEFT_ALT_PRESSED) != 0;
     const bool shift = (keyState & SHIFT_PRESSED) != 0;
+    const bool enhanced = (keyState & ENHANCED_KEY) != 0;
     bool hasDebugInput = false;
 
     if (isTracingEnabled()) {
@@ -642,6 +644,9 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
         stepKeyState |= SHIFT_PRESSED;
         appendInputRecord(records, TRUE, VK_SHIFT, 0, stepKeyState);
     }
+    if (enhanced) {
+        stepKeyState |= ENHANCED_KEY;
+    }
     if (m_escapeInputEnabled) {
         reencodeEscapedKeyPress(records, virtualKey, codePoint, stepKeyState);
     } else {
@@ -658,6 +663,9 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
         codePoint = 0;
     }
     appendCPInputRecords(records, FALSE, virtualKey, codePoint, stepKeyState);
+    if (enhanced) {
+        stepKeyState &= ~ENHANCED_KEY;
+    }
     if (shift) {
         stepKeyState &= ~SHIFT_PRESSED;
         appendInputRecord(records, FALSE, VK_SHIFT, 0, stepKeyState);
