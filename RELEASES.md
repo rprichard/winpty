@@ -1,3 +1,20 @@
+# Version Next
+
+Changes:
+
+ * winpty sets `ENHANCED_KEY` for arrow and navigation keys.  This fixes an
+   issue with the Ruby REPL.
+   [#99](https://github.com/rprichard/winpty/issues/99)
+ * AltGr keys are handled better now.
+   [#109](https://github.com/rprichard/winpty/issues/109)
+ * The way the `winpty` Cygwin/MSYS2 adapter searches for the program to
+   launch changed.  It now resolves symlinks and searches the PATH explicitly.
+   [#81](https://github.com/rprichard/winpty/issues/81)
+   [#98](https://github.com/rprichard/winpty/issues/98)
+
+This release does not include binaries for the old MSYS1 project anymore.
+MSYS2 will continue to be supported.
+
 # Version 0.4.2 (2017-01-18)
 
 This release improves WSL support (i.e. Bash-on-Windows):
