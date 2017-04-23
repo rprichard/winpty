@@ -64,7 +64,7 @@ public:
 
 private:
     void resetConsoleTracking(
-        Terminal::SendClearFlag sendClear, const SmallRect &windowRect);
+        Terminal::SendClearFlag sendClear, int64_t scrapedLineCount);
     void markEntireWindowDirty(const SmallRect &windowRect);
     void scanForDirtyLines(const SmallRect &windowRect);
     void clearBufferLines(int firstRow, int count);
