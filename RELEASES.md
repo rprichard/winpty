@@ -1,16 +1,15 @@
-# Version Next
+# Next Version
 
-Changes:
+Input handling changes:
 
  * winpty sets `ENHANCED_KEY` for arrow and navigation keys.  This fixes an
    issue with the Ruby REPL.
    [#99](https://github.com/rprichard/winpty/issues/99)
  * AltGr keys are handled better now.
    [#109](https://github.com/rprichard/winpty/issues/109)
- * The way the `winpty` Cygwin/MSYS2 adapter searches for the program to
-   launch changed.  It now resolves symlinks and searches the PATH explicitly.
-   [#81](https://github.com/rprichard/winpty/issues/81)
-   [#98](https://github.com/rprichard/winpty/issues/98)
+
+Resizing and scraping fixes:
+
  * winpty now synthesizes a `WINDOW_BUFFER_SIZE_EVENT` event after resizing
    the console to better propagate window size changes to console programs.
    In particular, this affects WSL and Cygwin.
@@ -18,6 +17,16 @@ Changes:
  * Better handling of resizing for certain full-screen programs, like
    WSL less.
    [#112](https://github.com/rprichard/winpty/issues/112)
+ * Hide the cursor if it's currently outside the console window.  This change
+   fixes an issue with Far Manager.
+   [#113](https://github.com/rprichard/winpty/issues/113)
+
+Cygwin/MSYS adapter fix:
+
+ * The way the `winpty` Cygwin/MSYS2 adapter searches for the program to
+   launch changed.  It now resolves symlinks and searches the PATH explicitly.
+   [#81](https://github.com/rprichard/winpty/issues/81)
+   [#98](https://github.com/rprichard/winpty/issues/98)
 
 This release does not include binaries for the old MSYS1 project anymore.
 MSYS2 will continue to be supported.
