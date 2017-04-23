@@ -73,9 +73,9 @@ private:
                                    ConsoleScreenBufferInfo &finalInfoOut);
     WORD attributesMask();
     void directScrapeOutput(const ConsoleScreenBufferInfo &info,
-                            bool cursorVisible);
+                            bool consoleCursorVisible);
     bool scrollingScrapeOutput(const ConsoleScreenBufferInfo &info,
-                               bool cursorVisible,
+                               bool consoleCursorVisible,
                                bool tentative);
     void syncMarkerText(CHAR_INFO (&output)[SYNC_MARKER_LEN]);
     int findSyncMarker();
