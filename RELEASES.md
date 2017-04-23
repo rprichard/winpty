@@ -11,6 +11,13 @@ Changes:
    launch changed.  It now resolves symlinks and searches the PATH explicitly.
    [#81](https://github.com/rprichard/winpty/issues/81)
    [#98](https://github.com/rprichard/winpty/issues/98)
+ * winpty now synthesizes a `WINDOW_BUFFER_SIZE_EVENT` event after resizing
+   the console to better propagate window size changes to console programs.
+   In particular, this affects WSL and Cygwin.
+   [#110](https://github.com/rprichard/winpty/issues/110)
+ * Better handling of resizing for certain full-screen programs, like
+   WSL less.
+   [#112](https://github.com/rprichard/winpty/issues/112)
 
 This release does not include binaries for the old MSYS1 project anymore.
 MSYS2 will continue to be supported.
