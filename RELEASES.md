@@ -20,6 +20,10 @@ Resizing and scraping fixes:
  * Hide the cursor if it's currently outside the console window.  This change
    fixes an issue with Far Manager.
    [#113](https://github.com/rprichard/winpty/issues/113)
+ * winpty now avoids using console fonts smaller than 5px high to improve
+   half-vs-full-width character handling.  See
+   https://github.com/Microsoft/vscode/issues/19665.
+   [b4db322010](https://github.com/rprichard/winpty/commit/b4db322010d2d897e6c496fefc4f0ecc9b84c2f3)
 
 Cygwin/MSYS adapter fix:
 
