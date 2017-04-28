@@ -7,6 +7,10 @@ Input handling changes:
    [#99](https://github.com/rprichard/winpty/issues/99)
  * AltGr keys are handled better now.
    [#109](https://github.com/rprichard/winpty/issues/109)
+ * In `ENABLE_VIRTUAL_TERMINAL_INPUT` mode, when typing Home/End with a
+   modifier (e.g. Ctrl), winpty now generates an H/F escape sequence like
+   `^[[1;5F` rather than a 1/4 escape like `^[[4;5~`.
+   [#114](https://github.com/rprichard/winpty/issues/114)
 
 Resizing and scraping fixes:
 
