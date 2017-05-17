@@ -553,7 +553,7 @@ void Agent::resizeWindow(int cols, int rows)
     sizeEvent.EventType = WINDOW_BUFFER_SIZE_EVENT;
     sizeEvent.Event.WindowBufferSizeEvent.dwSize = primaryBuffer->bufferSize();
     DWORD actual {};
-    WriteConsoleInput(GetStdHandle(STD_INPUT_HANDLE), &sizeEvent, 1, &actual);
+    WriteConsoleInputW(GetStdHandle(STD_INPUT_HANDLE), &sizeEvent, 1, &actual);
 }
 
 void Agent::scrapeBuffers()
