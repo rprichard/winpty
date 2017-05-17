@@ -343,12 +343,19 @@ void ConsoleInput::doWrite(bool isEof)
         idx += charSize;
     }
     m_byteQueue.erase(0, idx);
-    DWORD actual = 0;
-    if (records.size() > 0) {
-        if (!WriteConsoleInputW(m_conin, records.data(), records.size(), &actual)) {
-            trace("WriteConsoleInputW failed");
-        }
+    flushInputRecords(records);
+}
+
+void ConsoleInput::flushInputRecords(std::vector<INPUT_RECORD> &records)
+{
+    if (records.size() == 0) {
+        return;
     }
+    DWORD actual = 0;
+    if (!WriteConsoleInputW(m_conin, records.data(), records.size(), &actual)) {
+        trace("WriteConsoleInputW failed");
+    }
+    records.clear();
 }
 
 int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
@@ -360,6 +367,7 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
 
     // Ctrl-C.
     if (input[0] == '\x03' && (inputConsoleMode() & ENABLE_PROCESSED_INPUT)) {
+        flushInputRecords(records);
         trace("Ctrl-C");
         BOOL ret = GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
         trace("GenerateConsoleCtrlEvent: %d", ret);
@@ -652,6 +660,7 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
                 virtualKey == VK_HOME ||
                 virtualKey == VK_END) &&
             !ctrl && !leftAlt && !rightAlt && !shift) {
+        flushInputRecords(records);
         if (hasDebugInput) {
             trace("sending keypress to console HWND");
         }
