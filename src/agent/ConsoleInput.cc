@@ -358,6 +358,16 @@ void ConsoleInput::flushInputRecords(std::vector<INPUT_RECORD> &records)
     records.clear();
 }
 
+static void sendKeyMessage(HWND hwnd, bool isKeyDown, uint16_t virtualKey)
+{
+    uint32_t scanCode = MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
+    if (scanCode > 255) {
+        scanCode = 0;
+    }
+    SendMessage(hwnd, isKeyDown ? WM_KEYDOWN : WM_KEYUP, virtualKey,
+        (scanCode << 16) | 1u | (isKeyDown ? 0u : 0xc0000000u));
+}
+
 int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
                             const char *input,
                             int inputSize,
@@ -368,9 +378,11 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
     // Ctrl-C.
     if (input[0] == '\x03' && (inputConsoleMode() & ENABLE_PROCESSED_INPUT)) {
         flushInputRecords(records);
-        trace("Ctrl-C");
-        BOOL ret = GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
-        trace("GenerateConsoleCtrlEvent: %d", ret);
+        trace("Sending Ctrl-C KEYDOWN/KEYUP messages");
+        sendKeyMessage(m_console.hwnd(), true, VK_CONTROL);
+        sendKeyMessage(m_console.hwnd(), true, 'C');
+        sendKeyMessage(m_console.hwnd(), false, 'C');
+        sendKeyMessage(m_console.hwnd(), false, VK_CONTROL);
         return 1;
     }
 
@@ -664,14 +676,8 @@ void ConsoleInput::appendKeyPress(std::vector<INPUT_RECORD> &records,
         if (hasDebugInput) {
             trace("sending keypress to console HWND");
         }
-        uint32_t scanCode = MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
-        if (scanCode > 255) {
-            scanCode = 0;
-        }
-        SendMessage(m_console.hwnd(), WM_KEYDOWN, virtualKey,
-            (scanCode << 16) | 1u);
-        SendMessage(m_console.hwnd(), WM_KEYUP, virtualKey,
-            (scanCode << 16) | (1u | (1u << 30) | (1u << 31)));
+        sendKeyMessage(m_console.hwnd(), true, virtualKey);
+        sendKeyMessage(m_console.hwnd(), false, virtualKey);
         return;
     }
 
