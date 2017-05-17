@@ -1,4 +1,4 @@
-# Next Version
+# Version 0.4.3 (2017-05-17)
 
 Input handling changes:
 
@@ -37,7 +37,8 @@ Cygwin/MSYS adapter fix:
    [#98](https://github.com/rprichard/winpty/issues/98)
 
 This release does not include binaries for the old MSYS1 project anymore.
-MSYS2 will continue to be supported.
+MSYS2 will continue to be supported.  See
+https://github.com/rprichard/winpty/issues/97.
 
 # Version 0.4.2 (2017-01-18)
 
