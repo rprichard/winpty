@@ -375,7 +375,14 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
 {
     ASSERT(inputSize >= 1);
 
-    // Ctrl-C.
+    // Ctrl-C.  We need to use window messages when the console is in
+    // ENABLE_PROCESSED_INPUT mode so that Ctrl-C interrupts a ReadConsole
+    // call.  In unprocessed mode, we can't use this code path, because it
+    // would produce a KEY_EVENT_RECORD with a NUL UnicodeChar.  We can't use
+    // the ordinary VkKeyScan code path for Ctrl-C, either, because it produces
+    // an unmodified VK_CANCEL.  Instead, there's an entry for Ctrl-C in the
+    // SimpleEncoding table in DefaultInputMap.
+    // See https://github.com/rprichard/winpty/issues/116.
     if (input[0] == '\x03' && (inputConsoleMode() & ENABLE_PROCESSED_INPUT)) {
         flushInputRecords(records);
         trace("Sending Ctrl-C KEYDOWN/KEYUP messages");

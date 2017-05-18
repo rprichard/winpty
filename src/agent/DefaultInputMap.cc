@@ -235,6 +235,7 @@ static void addSimpleEntries(InputMap &inputMap) {
 
         {   "\x7F",         { VK_BACK,  '\x08', 0,                                  } },
         {   ESC "\x7F",     { VK_BACK,  '\x08', LEFT_ALT_PRESSED,                   } },
+        {   "\x03",         { 'C',      '\x03', LEFT_CTRL_PRESSED,                  } },
 
         // Handle special F1-F5 for TERM=linux and TERM=cygwin.
         {   ESC "[[A",      { VK_F1,    '\0',   0                                   } },
