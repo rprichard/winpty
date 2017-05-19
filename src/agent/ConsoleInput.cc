@@ -358,6 +358,15 @@ void ConsoleInput::flushInputRecords(std::vector<INPUT_RECORD> &records)
     records.clear();
 }
 
+// This behavior isn't strictly correct, because the keypresses (probably?)
+// adopt the keyboard state (e.g. Ctrl/Alt/Shift modifiers) of the current
+// window station's keyboard, which has no necessary relationship to the winpty
+// instance.  It's unlikely to be an issue in practice, but it's conceivable.
+// (Imagine a foreground SSH server, where the local user holds down Ctrl,
+// while the remote user tries to use WSL navigation keys.)  I suspect using
+// the BackgroundDesktop mechanism in winpty would fix the problem.
+//
+// https://github.com/rprichard/winpty/issues/116
 static void sendKeyMessage(HWND hwnd, bool isKeyDown, uint16_t virtualKey)
 {
     uint32_t scanCode = MapVirtualKey(virtualKey, MAPVK_VK_TO_VSC);
@@ -375,21 +384,22 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
 {
     ASSERT(inputSize >= 1);
 
-    // Ctrl-C.  We need to use window messages when the console is in
-    // ENABLE_PROCESSED_INPUT mode so that Ctrl-C interrupts a ReadConsole
-    // call.  In unprocessed mode, we can't use this code path, because it
-    // would produce a KEY_EVENT_RECORD with a NUL UnicodeChar.  We can't use
-    // the ordinary VkKeyScan code path for Ctrl-C, either, because it produces
-    // an unmodified VK_CANCEL.  Instead, there's an entry for Ctrl-C in the
-    // SimpleEncoding table in DefaultInputMap.
-    // See https://github.com/rprichard/winpty/issues/116.
+    // Ctrl-C.
+    //
+    // In processed mode, use GenerateConsoleCtrlEvent so that Ctrl-C handlers
+    // are called.  GenerateConsoleCtrlEvent unfortunately doesn't interrupt
+    // ReadConsole calls[1].  Using WM_KEYDOWN/UP fixes the ReadConsole
+    // problem, but breaks in background window stations/desktops.
+    //
+    // In unprocessed mode, there's an entry for Ctrl-C in the SimpleEncoding
+    // table in DefaultInputMap.
+    //
+    // [1] https://github.com/rprichard/winpty/issues/116
     if (input[0] == '\x03' && (inputConsoleMode() & ENABLE_PROCESSED_INPUT)) {
         flushInputRecords(records);
-        trace("Sending Ctrl-C KEYDOWN/KEYUP messages");
-        sendKeyMessage(m_console.hwnd(), true, VK_CONTROL);
-        sendKeyMessage(m_console.hwnd(), true, 'C');
-        sendKeyMessage(m_console.hwnd(), false, 'C');
-        sendKeyMessage(m_console.hwnd(), false, VK_CONTROL);
+        trace("Ctrl-C");
+        const BOOL ret = GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0);
+        trace("GenerateConsoleCtrlEvent: %d", ret);
         return 1;
     }
 
