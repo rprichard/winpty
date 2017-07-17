@@ -54,21 +54,27 @@
  * Error handling -- translate C++ exceptions to an optional error object
  * output and log the result. */
 
+#define ERRMSG_OUT_OF_MEMORY "Out of memory"
+static const char *const kOutOfMemoryUtf8 = ERRMSG_OUT_OF_MEMORY;
 static const winpty_error_s kOutOfMemory = {
     WINPTY_ERROR_OUT_OF_MEMORY,
-    L"Out of memory",
+    L"" ERRMSG_OUT_OF_MEMORY,
     nullptr
 };
 
+#define ERRMSG_BAD_RPC_PACKET "Bad RPC packet"
+static const char *const kBadRpcPacketUtf8 = ERRMSG_BAD_RPC_PACKET;
 static const winpty_error_s kBadRpcPacket = {
     WINPTY_ERROR_UNSPECIFIED,
-    L"Bad RPC packet",
+    L"" ERRMSG_BAD_RPC_PACKET,
     nullptr
 };
 
+#define ERRMSG_UNCAUGHT_EXCEPTION "Uncaught C++ exception"
+static const char *const kUncaughtExceptionUtf8 = ERRMSG_UNCAUGHT_EXCEPTION;
 static const winpty_error_s kUncaughtException = {
     WINPTY_ERROR_UNSPECIFIED,
-    L"Uncaught C++ exception",
+    L"" ERRMSG_UNCAUGHT_EXCEPTION,
     nullptr
 };
 
@@ -105,12 +111,17 @@ WINPTY_API void winpty_error_free(winpty_error_ptr_t err) {
 
 static void translateException(winpty_error_ptr_t *&err) {
     winpty_error_ptr_t ret = nullptr;
+    std::string utf8MsgDynamic;
+    const char *utf8Msg = "";
     try {
         try {
             throw;
         } catch (const ReadBuffer::DecodeError&) {
+            utf8Msg = kBadRpcPacketUtf8;
             ret = const_cast<winpty_error_ptr_t>(&kBadRpcPacket);
         } catch (const LibWinptyException &e) {
+            utf8MsgDynamic = utf8FromWide(*e.whatSharedStr());
+            utf8Msg = utf8MsgDynamic.c_str();
             std::unique_ptr<winpty_error_t> obj(new winpty_error_t);
             obj->code = e.code();
             obj->msgStatic = nullptr;
@@ -118,6 +129,8 @@ static void translateException(winpty_error_ptr_t *&err) {
                 new std::shared_ptr<std::wstring>(e.whatSharedStr());
             ret = obj.release();
         } catch (const WinptyException &e) {
+            utf8MsgDynamic = utf8FromWide(e.what());
+            utf8Msg = utf8MsgDynamic.c_str();
             std::unique_ptr<winpty_error_t> obj(new winpty_error_t);
             std::shared_ptr<std::wstring> msg(new std::wstring(e.what()));
             obj->code = WINPTY_ERROR_UNSPECIFIED;
@@ -126,13 +139,15 @@ static void translateException(winpty_error_ptr_t *&err) {
             ret = obj.release();
         }
     } catch (const std::bad_alloc&) {
+        utf8Msg = kOutOfMemoryUtf8;
         ret = const_cast<winpty_error_ptr_t>(&kOutOfMemory);
     } catch (...) {
+        utf8Msg = kUncaughtExceptionUtf8;
         ret = const_cast<winpty_error_ptr_t>(&kUncaughtException);
     }
     trace("libwinpty error: code=%u msg='%s'",
         static_cast<unsigned>(ret->code),
-        utf8FromWide(winpty_error_msg(ret)).c_str());
+        utf8Msg);
     if (err != nullptr) {
         *err = ret;
     } else {
