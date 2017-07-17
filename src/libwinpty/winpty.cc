@@ -130,9 +130,17 @@ static void translateException(winpty_error_ptr_t *&err) {
     } catch (...) {
         ret = const_cast<winpty_error_ptr_t>(&kUncaughtException);
     }
+    std::string utf8Dynamic;
+    const char *utf8Ptr = "";
+    try {
+        utf8Dynamic = utf8FromWide(winpty_error_msg(ret));
+        utf8Ptr = utf8Dynamic.c_str();
+    } catch (const std::bad_alloc&) {
+        utf8Ptr = "Out of memory converting winpty error message to UTF-8";
+    }
     trace("libwinpty error: code=%u msg='%s'",
         static_cast<unsigned>(ret->code),
-        utf8FromWide(winpty_error_msg(ret)).c_str());
+        utf8Ptr);
     if (err != nullptr) {
         *err = ret;
     } else {
