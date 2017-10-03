@@ -435,8 +435,16 @@ void Agent::handleGetConsoleProcessListPacket(ReadBuffer &packet)
 
     auto processList = std::vector<DWORD>(64);
     auto processCount = GetConsoleProcessList(&processList[0], processList.size());
-    if (processList.size() < processCount) {
-        processList.resize(processCount);
+
+    // The process list can change while we're trying to read it
+    while (processList.size() < processCount) {
+        // Multiplying by two caps the number of iterations
+        const int newSize = processList.size() * 2;
+        if (newSize <= processList.size()) { // Ensure we fail when new size overflows
+            processCount = 0;
+            break;
+        }
+        processList.resize(newSize);
         processCount = GetConsoleProcessList(&processList[0], processList.size());
     }
 
