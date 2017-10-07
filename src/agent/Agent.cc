@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -439,11 +440,7 @@ void Agent::handleGetConsoleProcessListPacket(ReadBuffer &packet)
     // The process list can change while we're trying to read it
     while (processList.size() < processCount) {
         // Multiplying by two caps the number of iterations
-        const int newSize = processList.size() * 2;
-        if (newSize <= processList.size()) { // Ensure we fail when new size overflows
-            processCount = 0;
-            break;
-        }
+        const auto newSize = std::max<DWORD>(processList.size() * 2, processCount);
         processList.resize(newSize);
         processCount = GetConsoleProcessList(&processList[0], processList.size());
     }
