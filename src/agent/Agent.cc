@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -332,6 +333,9 @@ void Agent::handlePacket(ReadBuffer &packet)
         // at once, we can ignore the early ones.
         handleSetSizePacket(packet);
         break;
+    case AgentMsg::GetConsoleProcessList:
+        handleGetConsoleProcessListPacket(packet);
+        break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
@@ -423,6 +427,33 @@ void Agent::handleSetSizePacket(ReadBuffer &packet)
     packet.assertEof();
     resizeWindow(cols, rows);
     auto reply = newPacket();
+    writePacket(reply);
+}
+
+void Agent::handleGetConsoleProcessListPacket(ReadBuffer &packet)
+{
+    packet.assertEof();
+
+    auto processList = std::vector<DWORD>(64);
+    auto processCount = GetConsoleProcessList(&processList[0], processList.size());
+
+    // The process list can change while we're trying to read it
+    while (processList.size() < processCount) {
+        // Multiplying by two caps the number of iterations
+        const auto newSize = std::max<DWORD>(processList.size() * 2, processCount);
+        processList.resize(newSize);
+        processCount = GetConsoleProcessList(&processList[0], processList.size());
+    }
+
+    if (processCount == 0) {
+        trace("GetConsoleProcessList failed");
+    }
+
+    auto reply = newPacket();
+    reply.putInt32(processCount);
+    for (DWORD i = 0; i < processCount; i++) {
+        reply.putInt32(processList[i]);
+    }
     writePacket(reply);
 }
 
