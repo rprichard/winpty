@@ -470,6 +470,7 @@ static bool shouldSpecifyHideFlag() {
 }
 
 static OwnedHandle startAgentProcess(
+        const winpty_config_t *cfg,
         const std::wstring &desktop,
         const std::wstring &controlPipeName,
         const std::wstring &params,
@@ -494,24 +495,92 @@ static OwnedHandle startAgentProcess(
         sui.dwFlags |= STARTF_USESHOWWINDOW;
         sui.wShowWindow = SW_HIDE;
     }
+
     PROCESS_INFORMATION pi = {};
-    const BOOL success =
-        CreateProcessW(exePath.c_str(),
-                       cmdlineV.data(),
-                       nullptr, nullptr,
-                       /*bInheritHandles=*/FALSE,
-                       /*dwCreationFlags=*/creationFlags,
-                       nullptr, nullptr,
-                       &sui, &pi);
-    if (!success) {
-        const DWORD lastError = GetLastError();
-        const auto errStr =
-            (WStringBuilder(256)
-                << L"winpty-agent CreateProcess failed: cmdline='" << cmdline
-                << L"' err=0x" << whexOfInt(lastError)).str_moved();
-        throw LibWinptyException(
-            WINPTY_ERROR_AGENT_CREATION_FAILED, errStr.c_str());
+    if (cfg->flags & WINPTY_FLAG_IMPERSONATE_THREAD) {
+        HRESULT hr;
+        HANDLE token = nullptr;
+        if (!OpenThreadToken(
+            GetCurrentThread(),
+            TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY,
+            FALSE,
+            &token))
+        {
+            const DWORD lastError = GetLastError();
+            const auto errStr =
+                (WStringBuilder(256)
+                    << L"winpty-agent OpenThreadToken failed: cmdline='" << cmdline
+                    << L"' err=0x" << whexOfInt(lastError)).str_moved();
+            throw LibWinptyException(
+                WINPTY_ERROR_AGENT_CREATION_FAILED, errStr.c_str());
+        }
+
+        HANDLE dupToken = nullptr;
+        if (!DuplicateTokenEx(
+            token,
+            TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY,
+            NULL,
+            SecurityImpersonation,
+            TokenPrimary,
+            &dupToken))
+        {
+            CloseHandle(token);
+            const DWORD lastError = GetLastError();
+            const auto errStr =
+                (WStringBuilder(256)
+                    << L"winpty-agent DuplicateTokenEx failed: cmdline='" << cmdline
+                    << L"' err=0x" << whexOfInt(lastError)).str_moved();
+            throw LibWinptyException(
+                WINPTY_ERROR_AGENT_CREATION_FAILED, errStr.c_str());
+        }
+
+        DWORD exitCode = 0;
+        const BOOL success = CreateProcessAsUser(
+            dupToken,
+            exePath.c_str(),
+            cmdlineV.data(),
+            nullptr,
+            nullptr,
+            FALSE,
+            CREATE_DEFAULT_ERROR_MODE | CREATE_BREAKAWAY_FROM_JOB | CREATE_UNICODE_ENVIRONMENT | NORMAL_PRIORITY_CLASS,
+            nullptr,
+            nullptr,
+            &sui,
+            &pi);
+        if (!success) {
+            CloseHandle(token);
+            CloseHandle(dupToken);
+            const DWORD lastError = GetLastError();
+            const auto errStr =
+                (WStringBuilder(256)
+                    << L"winpty-agent CreateProcessAsUser failed: cmdline='" << cmdline
+                    << L"' err=0x" << whexOfInt(lastError)).str_moved();
+            throw LibWinptyException(
+                WINPTY_ERROR_AGENT_CREATION_FAILED, errStr.c_str());
+        }
+
+        CloseHandle(token);
+        CloseHandle(dupToken);
+    } else {
+        const BOOL success =
+            CreateProcessW(exePath.c_str(),
+                        cmdlineV.data(),
+                        nullptr, nullptr,
+                        /*bInheritHandles=*/FALSE,
+                        /*dwCreationFlags=*/creationFlags,
+                        nullptr, nullptr,
+                        &sui, &pi);
+        if (!success) {
+            const DWORD lastError = GetLastError();
+            const auto errStr =
+                (WStringBuilder(256)
+                    << L"winpty-agent CreateProcess failed: cmdline='" << cmdline
+                    << L"' err=0x" << whexOfInt(lastError)).str_moved();
+            throw LibWinptyException(
+                WINPTY_ERROR_AGENT_CREATION_FAILED, errStr.c_str());
+        }
     }
+
     CloseHandle(pi.hThread);
     TRACE("Created agent successfully, pid=%u, cmdline=%s",
           static_cast<unsigned int>(pi.dwProcessId),
@@ -556,7 +625,7 @@ createAgentSession(const winpty_config_t *cfg,
 
     DWORD agentPid = 0;
     wp->agentProcess = startAgentProcess(
-        desktop, pipeName, params, creationFlags, agentPid);
+        cfg, desktop, pipeName, params, creationFlags, agentPid);
     connectControlPipe(*wp.get());
     verifyPipeClientPid(wp->controlPipe.get(), agentPid);
 
