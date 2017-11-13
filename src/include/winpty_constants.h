@@ -76,8 +76,8 @@
  * See https://github.com/rprichard/winpty/issues/58. */
 #define WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION 0x8ull
 
- /* Create agent proces from the thread token instead of current process.
-  * This is usefull when winpty.dll is called by Windows Service program to 
+ /* Create agent process from the thread token instead of current process.
+  * This is useful when winpty.dll is called by Windows Service program to 
   * impersonate to the original user from a remote process.
   * See https://github.com/rprichard/winpty/issues/132. */
 #define WINPTY_FLAG_IMPERSONATE_THREAD  0x10ull

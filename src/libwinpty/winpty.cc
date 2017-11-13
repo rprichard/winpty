@@ -534,6 +534,7 @@ static OwnedHandle startAgentProcess(
                 WINPTY_ERROR_AGENT_CREATION_FAILED, errStr.c_str());
         }
 
+        creationFlags = CREATE_NEW_CONSOLE | CREATE_DEFAULT_ERROR_MODE | CREATE_BREAKAWAY_FROM_JOB | NORMAL_PRIORITY_CLASS;
         DWORD exitCode = 0;
         const BOOL success = CreateProcessAsUser(
             dupToken,
@@ -542,7 +543,7 @@ static OwnedHandle startAgentProcess(
             nullptr,
             nullptr,
             FALSE,
-            CREATE_DEFAULT_ERROR_MODE | CREATE_BREAKAWAY_FROM_JOB | CREATE_UNICODE_ENVIRONMENT | NORMAL_PRIORITY_CLASS,
+            creationFlags,
             nullptr,
             nullptr,
             &sui,
