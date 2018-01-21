@@ -158,7 +158,7 @@ SET(debugserver_headers
 include_directories(src/include)
 include_directories(src/${ADDITIONAL_LIB})
 if(MSVC)
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif(MSVC)
 
 if(MINGW)
@@ -180,7 +180,7 @@ endif(BUILD_SHARED)
 
 if(BUILD_STATIC)
   add_library(winpty-static STATIC ${winpty_sources} ${winpty_headers})
-  set_target_properties(winpty-static PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE;_WIN32_WINNT=0x0501;NOMINMAX;COMPILING_WINPTY_DLL;")
+  set_target_properties(winpty-static PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE;_WIN32_WINNT=0x0501;NOMINMAX;WINPTY_STATIC;")
   target_link_libraries(winpty-static "-ladvapi32" "-luser32")
   install(TARGETS winpty-static RUNTIME DESTINATION bin
                                 LIBRARY DESTINATION lib
@@ -189,14 +189,14 @@ endif(BUILD_STATIC)
 
 if(BUILD_EXECUTABLE)
   add_executable(winpty-agent ${agent_sources} ${agent_headers})
-  set_target_properties(winpty-agent PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE;_WIN32_WINNT=0x0501;NOMINMAX;WINPTY_AGENT_ASSERT;COMPILING_WINPTY_DLL;")
+  set_target_properties(winpty-agent PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE;_WIN32_WINNT=0x0501;NOMINMAX;WINPTY_AGENT_ASSERT;WINPTY_STATIC;")
   target_link_libraries(winpty-agent "-ladvapi32" "-lshell32" "-luser32")
   install(TARGETS winpty-agent RUNTIME DESTINATION bin
                                LIBRARY DESTINATION lib
                                ARCHIVE DESTINATION lib)  
 
   add_executable(winpty-debugserver ${debugserver_sources} ${debugserver_headers})
-  set_target_properties(winpty-debugserver PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE;_WIN32_WINNT=0x0501;NOMINMAX;COMPILING_WINPTY_DLL;")
+  set_target_properties(winpty-debugserver PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE;_WIN32_WINNT=0x0501;NOMINMAX;WINPTY_STATIC;")
   target_link_libraries(winpty-debugserver "-ladvapi32")
   install(TARGETS winpty-debugserver RUNTIME DESTINATION bin
                                      LIBRARY DESTINATION lib
