@@ -32,10 +32,14 @@
  * When compiled with __declspec(dllexport), with either MinGW or MSVC, the
  * winpty functions are unadorned--no underscore prefix or '@nn' suffix--so
  * GetProcAddress can be used easily. */
+#ifndef WINPTY_STATIC
 #ifdef COMPILING_WINPTY_DLL
 #define WINPTY_API __declspec(dllexport)
 #else
 #define WINPTY_API __declspec(dllimport)
+#endif
+#else
+#define WINPTY_API
 #endif
 
 #ifdef __cplusplus
