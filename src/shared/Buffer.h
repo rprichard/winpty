@@ -93,8 +93,10 @@ public:
     ReadBuffer(ReadBuffer &&other) :
         m_buf(std::move(other.m_buf)), m_off(other.m_off) {}
     ReadBuffer &operator=(ReadBuffer &&other) {
-        m_buf = std::move(other.m_buf);
-        m_off = other.m_off;
+        if (this != &other) {
+            m_buf = std::move(other.m_buf);
+            m_off = other.m_off;
+        }
         return *this;
     }
 };
