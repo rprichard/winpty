@@ -200,14 +200,16 @@ namespace {
 // class enforces that requirement.
 class PendingIo {
     HANDLE m_file;
-    OVERLAPPED &m_over;
+    OVERLAPPED *m_over;
     bool m_finished;
 public:
     // The file handle and OVERLAPPED object must live as long as the PendingIo
     // object.
+    PendingIo() : m_file(nullptr), m_over(nullptr), m_finished(true) {}
     PendingIo(HANDLE file, OVERLAPPED &over) :
-        m_file(file), m_over(over), m_finished(false) {}
-    ~PendingIo() {
+        m_file(file), m_over(&over), m_finished(false) {}
+    ~PendingIo() { dispose(); }
+    void dispose() {
         if (!m_finished) {
             // We're not usually that interested in CancelIo's return value.
             // In any case, we must not throw an exception in this dtor.
@@ -216,15 +218,74 @@ public:
         }
     }
     std::tuple<BOOL, DWORD> waitForCompletion(DWORD &actual) WINPTY_NOEXCEPT {
+        ASSERT(m_over != nullptr && "waitForCompletion called with NULL m_over");
         m_finished = true;
         const BOOL success =
-            GetOverlappedResult(m_file, &m_over, &actual, TRUE);
+            GetOverlappedResult(m_file, m_over, &actual, TRUE);
         return std::make_tuple(success, GetLastError());
     }
     std::tuple<BOOL, DWORD> waitForCompletion() WINPTY_NOEXCEPT {
         DWORD actual = 0;
         return waitForCompletion(actual);
     }
+    PendingIo(const PendingIo &other) = delete;
+    PendingIo &operator=(const PendingIo &other) = delete;
+    PendingIo(PendingIo &&other) :
+            m_file(other.m_file),
+            m_over(other.m_over),
+            m_finished(other.m_finished) {
+        other.m_file = nullptr;
+        other.m_over = nullptr;
+        other.m_finished = true;
+    }
+    PendingIo &operator=(PendingIo &&other) {
+        if (this != &other) {
+            dispose();
+            m_file = other.m_file;
+            m_over = other.m_over;
+            m_finished = other.m_finished;
+            other.m_file = nullptr;
+            other.m_over = nullptr;
+            other.m_finished = true;
+        }
+        return *this;
+    }
+};
+
+static OwnedHandle createEvent() {
+    // manual reset, initially unset
+    HANDLE h = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (h == nullptr) {
+        throwWindowsError(L"CreateEventW failed");
+    }
+    return OwnedHandle(h);
+}
+
+class ControlPipeConnectOperation {
+    OwnedHandle m_pipe;
+    OwnedHandle m_event;
+    std::unique_ptr<OVERLAPPED> m_over;
+    PendingIo m_pendingIo;
+public:
+    ControlPipeConnectOperation(HANDLE pipe) :
+            m_pipe(pipe),
+            m_event(createEvent()),
+            m_over(new OVERLAPPED {}) {
+        m_over->hEvent = m_event.get();
+        BOOL success = ConnectNamedPipe(m_pipe.get(), m_over.get());
+        DWORD lastError = GetLastError();
+        if (success) {
+            throwWinptyException(L"ConnectNamedPipe unexpected succeeded; "
+                                  "expected ERROR_IO_PENDING");
+        } else if (lastError != ERROR_IO_PENDING) {
+            throwWindowsError(L"ConnectNamedPipe failed", lastError);
+        }
+        m_pendingIo = PendingIo(m_pipe.get(), *m_over);
+    }
+    HANDLE pipe() { return m_pipe.get(); }
+    HANDLE event() { return m_event.get(); }
+    PendingIo &pendingIo() { return m_pendingIo; }
+    OwnedHandle releasePipe() { return std::move(m_pipe); }
 };
 
 } // anonymous namespace
@@ -256,6 +317,7 @@ static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
     }
 }
 
+__attribute__((used))
 static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
                             DWORD &lastError) {
     DWORD actual = 0;
@@ -278,22 +340,6 @@ static void handleReadWriteErrors(winpty_t &wp, BOOL success, DWORD lastError,
         } else {
             throwWindowsError(genericErrMsg, lastError);
         }
-    }
-}
-
-// Calls ConnectNamedPipe to wait until the agent connects to the control pipe.
-static void
-connectControlPipe(winpty_t &wp) {
-    OVERLAPPED over = {};
-    over.hEvent = wp.ioEvent.get();
-    BOOL success = ConnectNamedPipe(wp.controlPipe.get(), &over);
-    DWORD lastError = GetLastError();
-    handlePendingIo(wp, over, success, lastError);
-    if (!success && lastError == ERROR_PIPE_CONNECTED) {
-        success = TRUE;
-    }
-    if (!success) {
-        throwWindowsError(L"ConnectNamedPipe failed", lastError);
     }
 }
 
@@ -367,45 +413,45 @@ static ReadBuffer readPacket(winpty_t &wp) {
     return ReadBuffer(std::move(bytes));
 }
 
-static OwnedHandle createControlPipe(const std::wstring &name) {
+static std::vector<ControlPipeConnectOperation>
+createControlPipe(const std::wstring &name) {
+    std::vector<ControlPipeConnectOperation> ret;
     const auto sd = createPipeSecurityDescriptorOwnerFullControl();
     if (!sd) {
         throwWinptyException(
             L"could not create the control pipe's SECURITY_DESCRIPTOR");
     }
-    SECURITY_ATTRIBUTES sa = {};
-    sa.nLength = sizeof(sa);
-    sa.lpSecurityDescriptor = sd.get();
-    HANDLE ret = CreateNamedPipeW(name.c_str(),
-        /*dwOpenMode=*/
-        PIPE_ACCESS_DUPLEX |
-            FILE_FLAG_FIRST_PIPE_INSTANCE |
-            FILE_FLAG_OVERLAPPED,
-        /*dwPipeMode=*/rejectRemoteClientsPipeFlag(),
-        /*nMaxInstances=*/1,
-        /*nOutBufferSize=*/8192,
-        /*nInBufferSize=*/256,
-        /*nDefaultTimeOut=*/30000,
-        &sa);
-    if (ret == INVALID_HANDLE_VALUE) {
-        throwWindowsError(L"CreateNamedPipeW failed");
+    const int kMaxControlPipeInstances = 4;
+    TRACE("creating server pipe [%s], %d instances",
+        utf8FromWide(name).c_str(), kMaxControlPipeInstances);
+    for (int i = 0; i < kMaxControlPipeInstances; ++i) {
+        SECURITY_ATTRIBUTES sa = {};
+        sa.nLength = sizeof(sa);
+        sa.lpSecurityDescriptor = sd.get();
+        DWORD openMode = PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED;
+        if (i == 0) {
+            openMode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
+        }
+        HANDLE pipe = CreateNamedPipeW(name.c_str(),
+            /*dwOpenMode=*/openMode,
+            /*dwPipeMode=*/rejectRemoteClientsPipeFlag(),
+            /*nMaxInstances=*/kMaxControlPipeInstances,
+            /*nOutBufferSize=*/8192,
+            /*nInBufferSize=*/256,
+            /*nDefaultTimeOut=*/30000,
+            &sa);
+        if (pipe == INVALID_HANDLE_VALUE) {
+            throwWindowsError(L"CreateNamedPipeW failed");
+        }
+        ret.push_back(ControlPipeConnectOperation(pipe));
     }
-    return OwnedHandle(ret);
+    return ret;
 }
 
 
 
 /*****************************************************************************
  * Start the agent. */
-
-static OwnedHandle createEvent() {
-    // manual reset, initially unset
-    HANDLE h = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    if (h == nullptr) {
-        throwWindowsError(L"CreateEventW failed");
-    }
-    return OwnedHandle(h);
-}
 
 // For debugging purposes, provide a way to keep the console on the main window
 // station, visible.
@@ -494,6 +540,7 @@ static OwnedHandle startAgentProcess(
         sui.dwFlags |= STARTF_USESHOWWINDOW;
         sui.wShowWindow = SW_HIDE;
     }
+    TRACE("Calling CreateProcess, cmdline=%s", utf8FromWide(cmdline).c_str());
     PROCESS_INFORMATION pi = {};
     const BOOL success =
         CreateProcessW(exePath.c_str(),
@@ -520,7 +567,7 @@ static OwnedHandle startAgentProcess(
     return OwnedHandle(pi.hProcess);
 }
 
-static void verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid) {
+static std::wstring verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid) {
     const auto client = getNamedPipeClientProcessId(serverPipe);
     const auto success = std::get<0>(client);
     const auto lastError = std::get<2>(client);
@@ -530,13 +577,109 @@ static void verifyPipeClientPid(HANDLE serverPipe, DWORD agentPid) {
             WStringBuilder errMsg;
             errMsg << L"Security check failed: pipe client pid (" << clientPid
                    << L") does not match agent pid (" << agentPid << L")";
-            throwWinptyException(errMsg.c_str());
+            return errMsg.str();
         }
     } else if (success == GetNamedPipeClientProcessId_Result::UnsupportedOs) {
         trace("Pipe client PID security check skipped: "
             "GetNamedPipeClientProcessId unsupported on this OS version");
     } else {
-        throwWindowsError(L"GetNamedPipeClientProcessId failed", lastError);
+        return std::wstring(L"GetNamedPipeClientProcessId failed: Win32 error " +
+            std::to_wstring(lastError));
+    }
+    return std::wstring(); // success
+}
+
+// Create multiple instances of the control pipe to work around antivirus
+// brokenness.
+//
+// Some antivirus programs override CreateProcess() and run the child process
+// initially in a sandbox, then after deciding the process is OK, they run it
+// again for real.  The initial instance of winpty-agent.exe connects to
+// libwinpty's control pipe, then when the actual agent process starts later,
+// it can't connect to the pipe because the pipe is in a disconnected/broken
+// state.
+//
+// Work around the problem by creating multiple instances of the control pipe
+// in libwinpty, then waiting on any of them to connect.  An error on one pipe
+// is logged to trace() but otherwise ignored as long as one of the pipes
+// eventually connects. The error isn't reported until the agent dies or the
+// connection has timed out.
+//
+// In practice, the initial sandbox connection's ConnectNamedPipe operation
+// will probably succeed, but its child PID will be wrong, so this function
+// quietly ignores verifyPipeClientPid failures (as long as one pipe
+// succeeds).
+static OwnedHandle
+connectControlPipe(std::vector<ControlPipeConnectOperation> &pipes,
+                   HANDLE agentProcess, DWORD agentTimeoutMs) {
+
+    std::wstring connectErrors;
+    auto addError = [&](const std::wstring &msg) {
+        if (connectErrors.empty()) {
+            connectErrors = L": control pipe connection errors:";
+        }
+        connectErrors += L" [";
+        connectErrors += msg;
+        connectErrors += L"]";
+        trace("control pipe connection failure: %s",
+              utf8FromWide(msg).c_str());
+    };
+
+    DWORD endTime = GetTickCount() + agentTimeoutMs;
+
+    while (true) {
+        std::vector<HANDLE> waitHandles;
+        waitHandles.push_back(agentProcess);
+        for (auto &pipe : pipes) {
+            waitHandles.push_back(pipe.event());
+        }
+
+        // Use an int intermediate type to guard against GetTickCount() being
+        // greater than endTime.
+        DWORD timeoutMs = std::max<int>(1, endTime - GetTickCount());
+
+        DWORD waitRet = WaitForMultipleObjects(
+            waitHandles.size(), waitHandles.data(), FALSE, timeoutMs);
+        if (waitRet == WAIT_OBJECT_0) {
+            throw LibWinptyException(WINPTY_ERROR_AGENT_DIED,
+                                     (L"agent died immediately" +
+                                            connectErrors).c_str());
+        } else if (waitRet == WAIT_TIMEOUT) {
+            throw LibWinptyException(WINPTY_ERROR_AGENT_TIMEOUT,
+                                     (L"timed out connecting to agent" +
+                                            connectErrors).c_str());
+        } else if (waitRet == WAIT_FAILED) {
+            throwWindowsError(L"WaitForMultipleObjects failed");
+        } else if (waitRet < WAIT_OBJECT_0 ||
+                   waitRet > WAIT_OBJECT_0 + waitHandles.size()) {
+            ASSERT(false && "unexpected WaitForMultipleObjects return value");
+        }
+
+        // One of the control pipe ConnectNamedPipe operations has completed.
+        size_t idx = waitRet - WAIT_OBJECT_0 - 1;
+        BOOL success {};
+        DWORD lastError {};
+        std::tie(success, lastError) = pipes[idx].pendingIo().waitForCompletion();
+        if (!success) {
+            addError(L"ConnectNamedPipe failed: Windows error " +
+                            std::to_wstring(lastError));
+            pipes.erase(pipes.begin() + idx);
+            continue;
+        }
+        auto msg = verifyPipeClientPid(pipes[idx].pipe(), GetProcessId(agentProcess));
+        if (!msg.empty()) {
+            pipes.erase(pipes.begin() + idx);
+            addError(msg);
+            continue;
+        }
+
+        // Return this pipe instance. We can sometimes remove a pipe connection
+        // operation when it fails, so for consistency, always clear the whole
+        // list before returning, which will cancel the remaining connect
+        // operations.
+        auto ret = pipes[idx].releasePipe();
+        pipes.clear();
+        return ret;
     }
 }
 
@@ -549,16 +692,16 @@ createAgentSession(const winpty_config_t *cfg,
     wp->agentTimeoutMs = cfg->timeoutMs;
     wp->ioEvent = createEvent();
 
-    // Create control server pipe.
+    // Create control server pipe instances.
     const auto pipeName =
         L"\\\\.\\pipe\\winpty-control-" + GenRandom().uniqueName();
-    wp->controlPipe = createControlPipe(pipeName);
+    auto pipes = createControlPipe(pipeName);
 
     DWORD agentPid = 0;
     wp->agentProcess = startAgentProcess(
         desktop, pipeName, params, creationFlags, agentPid);
-    connectControlPipe(*wp.get());
-    verifyPipeClientPid(wp->controlPipe.get(), agentPid);
+    wp->controlPipe = connectControlPipe(pipes, wp->agentProcess.get(),
+                                         wp->agentTimeoutMs);
 
     return std::move(wp);
 }
