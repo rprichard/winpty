@@ -1,7 +1,6 @@
 #!python3
 import os
 import sys
-sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import util
 
 import re
@@ -32,10 +31,20 @@ for setup, cygwin in (('setup-x86_64', 'cygwin64'), ('setup-x86', 'cygwin32')):
 
     check_call(['curl', '-fL', '-O', 'https://cygwin.com/{}.exe'.format(setup)])
 
+    # Include cross-compilers targeting both architectures, in both packages,
+    # because I might want to require having both cross-compilers in the build
+    # system at some point. (e.g. if winpty includes a synchronous WinEvents
+    # hook loaded into conhost.exe)
+    cygwinPackages = [
+        'gcc-g++',
+        'make',
+        'mingw64-i686-gcc-g++',
+        'mingw64-x86_64-gcc-g++',
+    ]
     check_call([
         abspath('{}.exe'.format(setup)),
         '-l', abspath('{}-packages'.format(cygwin)),
-        '-P', 'gcc-g++,make',
+        '-P', ','.join(cygwinPackages),
         '-s', 'http://mirrors.kernel.org/sourceware/cygwin',
         '-R', abspath(cygwin),
         '--no-admin', '--no-desktop', '--no-shortcuts', '--no-startmenu', '--quiet-mode',
@@ -43,10 +52,11 @@ for setup, cygwin in (('setup-x86_64', 'cygwin64'), ('setup-x86', 'cygwin32')):
 
     check_call(['{}/bin/ash.exe'.format(cygwin), '/bin/rebaseall', '-v'])
 
-    cygVer = dllversion.fileVersion('{}/bin/cygwin1.dll'.format(cygwin))
-    gppVer = getGppVer('{}/bin/g++.exe'.format(cygwin))
-
-    filename = '{}\\{}-{}-dll{}-gcc{}.7z'.format(artifactDir, cygwin, buildTimeStamp, cygVer, gppVer)
+    dllVer = dllversion.fileVersion('{}/bin/cygwin1.dll'.format(cygwin))
+    cygGccVer = getGppVer('{}/bin/g++.exe'.format(cygwin))
+    winGccVer = getGppVer('{}/bin/x86_64-w64-mingw32-g++.exe'.format(cygwin))
+    filename = '{}\\{}-{}-dll{}-cyggcc{}-wingcc{}.7z'.format(
+        artifactDir, cygwin, buildTimeStamp, dllVer, cygGccVer, winGccVer)
     rmpath(filename)
 
     open(cygwin + '/tmp/.keep', 'wb').close()

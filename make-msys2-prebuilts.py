@@ -1,7 +1,6 @@
 #!python3
 import os
 import sys
-sys.path.insert(1, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import util
 
 import hashlib
@@ -71,18 +70,38 @@ for name, arch in (('msys64', 'x86_64'), ('msys32', 'i686')):
 
     good or sys.exit('error: MSYS2 system update never finished')
 
-    cmd = [bashPath, '--login', '-c', 'pacman --noconfirm -S msys/gcc msys/make msys/tar']
+    # Include cross-compilers targeting both architectures, in both packages,
+    # because I might want to require having both cross-compilers in the build
+    # system at some point. (e.g. if winpty includes a synchronous WinEvents
+    # hook loaded into conhost.exe)
+    msysPackages = [
+        'msys/gcc',
+        'msys/make',
+        'msys/tar',
+        'mingw-w64-cross-toolchain',
+    ]
+    cmd = [bashPath, '--login', '-c', 'pacman --noconfirm -S ' + ' '.join(msysPackages)]
     print('Running {} ...'.format(repr(cmd)))
     check_call(cmd)
+
+    # pacman/gpg start gpg-agent and scdaemon processes, which prevents
+    # rebasing and would break appveyor. Kill pacman's gpg-agent.
+    # https://help.appveyor.com/discussions/problems/16396-build-freezes-between-commands-in-appveyoryml
+    check_call([
+        '{}/usr/bin/gpgconf.exe'.format(name),
+        '--homedir', '/etc/pacman.d/gnupg',
+        '--kill', 'all',
+    ])
 
     # The -p option passed by autorebase.bat doesn't look necessary. It relaxes
     # the sanity checking to allow more than just ash.exe/dash.exe processes.
     check_call(['{}/usr/bin/ash.exe'.format(name), '/usr/bin/rebaseall', '-v'])
 
-    msysVer = dllversion.fileVersion('{}/usr/bin/msys-2.0.dll'.format(name))
-    gppVer = getGppVer('{}/usr/bin/g++.exe'.format(name))
-
-    filename = '{}\\{}-{}-dll{}-gcc{}.7z'.format(artifactDir, name, buildTimeStamp, msysVer, gppVer)
+    dllVer = dllversion.fileVersion('{}/usr/bin/msys-2.0.dll'.format(name))
+    msysGccVer = getGppVer('{}/usr/bin/g++.exe'.format(name))
+    winGccVer = getGppVer('{}/mingw64/bin/x86_64-w64-mingw32-g++.exe'.format(name))
+    filename = '{}\\{}-{}-dll{}-msysgcc{}-wingcc{}.7z'.format(
+        artifactDir, name, buildTimeStamp, dllVer, msysGccVer, winGccVer)
     rmpath(filename)
 
     open(name + '/tmp/.keep', 'wb').close()
@@ -97,4 +116,5 @@ for name, arch in (('msys64', 'x86_64'), ('msys32', 'i686')):
         name + '/usr/lib',
         name + '/usr/include',
         name + '/usr/*-pc-msys',
+        name + '/opt',
     ]))
