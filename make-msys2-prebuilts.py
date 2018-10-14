@@ -40,14 +40,14 @@ mkdirs(artifactDir)
 
 os.chdir(buildDir)
 
-check_call(['curl', '-fL', '-O', 'http://repo.msys2.org/distrib/i686/msys2-base-i686-20161025.tar.xz'])
-check_call(['curl', '-fL', '-O', 'http://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-20161025.tar.xz'])
-checkSha256('msys2-base-i686-20161025.tar.xz',   '8bafd3d52f5a51528a8671c1cae5591b36086d6ea5b1e76e17e390965cf6768f')
-checkSha256('msys2-base-x86_64-20161025.tar.xz', 'bb1f1a0b35b3d96bf9c15092da8ce969a84a134f7b08811292fbc9d84d48c65d')
+check_call(['curl', '-fL', '-O', 'http://repo.msys2.org/distrib/i686/msys2-base-i686-20180531.tar.xz'])
+check_call(['curl', '-fL', '-O', 'http://repo.msys2.org/distrib/x86_64/msys2-base-x86_64-20180531.tar.xz'])
+checkSha256('msys2-base-i686-20180531.tar.xz',   '8ef5b18c4c91f3f2394823f1981babdee78a945836b2625f091ec934b1a37d32')
+checkSha256('msys2-base-x86_64-20180531.tar.xz', '4e799b5c3efcf9efcb84923656b7bcff16f75a666911abd6620ea8e5e1e9870c')
 
 for name, arch in (('msys64', 'x86_64'), ('msys32', 'i686')):
 
-    baseArchive = 'msys2-base-{}-20161025'.format(arch)
+    baseArchive = 'msys2-base-{}-20180531'.format(arch)
     check_call(['7z', 'x', '{}.tar.xz'.format(baseArchive)])
     check_call(['7z', 'x', '{}.tar'.format(baseArchive)])
 
