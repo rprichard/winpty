@@ -10,6 +10,7 @@ winpty.opensdf
 /build-gyp
 /build-libpty
 /ship/packages
+/ship/tmp
 /src/Default
 /src/Release
 /src/gen

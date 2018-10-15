@@ -36,10 +36,6 @@ import subprocess
 import sys
 
 os.chdir(common_ship.topDir)
-ZIP_TOOL = common_ship.requireExe("7z.exe", [
-    "C:\\Program Files\\7-Zip\\7z.exe",
-    "C:\\Program Files (x86)\\7-Zip\\7z.exe",
-])
 
 MSVC_VERSION_TABLE = {
     "2015" : {
@@ -103,7 +99,7 @@ def build(arch, packageDir, xp=False):
     newEnv = os.environ.copy()
     newEnv["PATH"] = os.path.dirname(sys.executable) + ";" + common_ship.defaultPathEnviron
     commandLine = (
-        '"' + devCmdPath + '" && '
+        '"' + devCmdPath + '" && ' +
         " vcbuild.bat" +
         " --gyp-msvs-version " + versionInfo["gyp_version"] +
         " --msvc-platform " + archInfo["msvc_platform"] +
@@ -159,7 +155,7 @@ def buildPackage():
     shutil.copy(topDir + "/README.md",                          packageDir)
     shutil.copy(topDir + "/RELEASES.md",                        packageDir)
 
-    subprocess.check_call([ZIP_TOOL, "a", packageFile, "."], cwd=packageDir)
+    subprocess.check_call([common_ship.ZIP_TOOL, "a", packageFile, "."], cwd=packageDir)
 
 if __name__ == "__main__":
     buildPackage()
