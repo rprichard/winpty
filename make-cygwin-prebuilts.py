@@ -53,8 +53,8 @@ for setup, cygwin in (('setup-x86_64', 'cygwin64'), ('setup-x86', 'cygwin32')):
     check_call(['{}/bin/ash.exe'.format(cygwin), '/bin/rebaseall', '-v'])
 
     dllVer = dllversion.fileVersion('{}/bin/cygwin1.dll'.format(cygwin))
-    cygGccVer = getGppVer('{}/bin/g++.exe'.format(cygwin))
-    winGccVer = getGppVer('{}/bin/x86_64-w64-mingw32-g++.exe'.format(cygwin))
+    cygGccVer = getGppVer(['{}/bin/g++.exe'.format(cygwin), '--version'])
+    winGccVer = getGppVer(['{}/bin/x86_64-w64-mingw32-g++.exe'.format(cygwin), '--version'])
     filename = '{}\\{}-{}-dll{}-cyggcc{}-wingcc{}.7z'.format(
         artifactDir, cygwin, buildTimeStamp, dllVer, cygGccVer, winGccVer)
     rmpath(filename)

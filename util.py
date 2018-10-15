@@ -44,8 +44,8 @@ def mkdirs(path):
         os.makedirs(path)
 
 
-def getGppVer(path):
-    txt = subprocess.check_output([path, '--version']).decode()
+def getGppVer(*cmd, **kwargs):
+    txt = subprocess.check_output(*cmd, **kwargs).decode()
     txt = txt.splitlines()[0]
     # Version strings we're trying to match:
     #  - cygwin/msys2 gcc: g++ (GCC) 7.3.0

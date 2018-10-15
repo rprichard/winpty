@@ -79,6 +79,7 @@ for name, arch in (('msys64', 'x86_64'), ('msys32', 'i686')):
         'msys/make',
         'msys/tar',
         'mingw-w64-cross-toolchain',
+        'python3',
     ]
     cmd = [bashPath, '--login', '-c', 'pacman --noconfirm -S ' + ' '.join(msysPackages)]
     print('Running {} ...'.format(repr(cmd)))
@@ -98,8 +99,8 @@ for name, arch in (('msys64', 'x86_64'), ('msys32', 'i686')):
     check_call(['{}/usr/bin/ash.exe'.format(name), '/usr/bin/rebaseall', '-v'])
 
     dllVer = dllversion.fileVersion('{}/usr/bin/msys-2.0.dll'.format(name))
-    msysGccVer = getGppVer('{}/usr/bin/g++.exe'.format(name))
-    winGccVer = getGppVer('{}/mingw64/bin/x86_64-w64-mingw32-g++.exe'.format(name))
+    msysGccVer = getGppVer([bashPath, '--login', '-c', '/usr/bin/g++.exe --version'])
+    winGccVer = getGppVer([bashPath, '--login', '-c', '/opt/bin/x86_64-w64-mingw32-g++.exe --version'])
     filename = '{}\\{}-{}-dll{}-msysgcc{}-wingcc{}.7z'.format(
         artifactDir, name, buildTimeStamp, dllVer, msysGccVer, winGccVer)
     rmpath(filename)
@@ -107,14 +108,17 @@ for name, arch in (('msys64', 'x86_64'), ('msys32', 'i686')):
     open(name + '/tmp/.keep', 'wb').close()
     open(name + '/etc/.keep', 'wb').close()
 
-    check_call(['7z', 'a', '-mx=9', filename] + glob_paths([
-        name + '/autorebase.bat',
-        name + '/dev',
-        name + '/etc/.keep',
-        name + '/tmp/.keep',
-        name + '/usr/bin',
-        name + '/usr/lib',
-        name + '/usr/include',
-        name + '/usr/*-pc-msys',
-        name + '/opt',
-    ]))
+    # Use pacman to determine a list of files to package.
+    cmd = [bashPath, '--login', '-c', 'python3 {}/msys2_subset_files.py'.format(projectDir.replace('\\', '/'))]
+    paths = subprocess.check_output(cmd).decode().splitlines()
+    paths.extend([
+        'dev',
+        'etc/.keep',
+        'tmp/.keep',
+    ])
+    paths = ['{}/{}'.format(name, p) for p in paths]
+    listFile = '{}-files'.format(name)
+    with open(listFile, 'w') as fp:
+        fp.write('\n'.join(paths) + '\n')
+
+    check_call(['7z', 'a', '-mx=9', filename, '@' + listFile])
