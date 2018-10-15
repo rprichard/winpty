@@ -317,13 +317,6 @@ static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
     }
 }
 
-__attribute__((used))
-static void handlePendingIo(winpty_t &wp, OVERLAPPED &over, BOOL &success,
-                            DWORD &lastError) {
-    DWORD actual = 0;
-    handlePendingIo(wp, over, success, lastError, actual);
-}
-
 static void handleReadWriteErrors(winpty_t &wp, BOOL success, DWORD lastError,
                                   const wchar_t *genericErrMsg) {
     if (!success) {
