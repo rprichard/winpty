@@ -1,0 +1,9 @@
+image: Visual Studio 2015
+
+build_script:
+ - C:\Python27-x64\python.exe ship\ship.py
+ - C:\Python27-x64\python.exe ship\make_msvc_package.py
+
+artifacts:
+ - path: ship\packages\*.tar.gz
+ - path: ship\packages\*.zip
