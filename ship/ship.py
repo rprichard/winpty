@@ -48,12 +48,6 @@ def dllVersion(path):
 print "Determining Cygwin/MSYS2 DLL versions..."
 sys.stdout.flush()
 BUILD_TARGETS = [
-    # {
-    #     "name": "msys",
-    #     "path": "C:\\MinGW\\bin;C:\\MinGW\\msys\\1.0\\bin",
-    #     # The parallel make.exe in the original MSYS/MinGW project hangs.
-    #     "make_binary": "mingw32-make.exe",
-    # },
     {
         "name": "msys2-" + dllVersion("C:\\msys32\\usr\\bin\\msys-2.0.dll") + "-ia32",
         "path": "C:\\msys32\\mingw32\\bin;C:\\msys32\\usr\\bin",
@@ -79,10 +73,9 @@ def buildTarget(target):
     oldPath = os.environ["PATH"]
     os.environ["PATH"] = target["path"] + ";" + common_ship.defaultPathEnviron
     subprocess.check_call(["sh.exe", "configure"])
-    makeBinary = target.get("make_binary", "make.exe")
-    subprocess.check_call([makeBinary, "clean"])
+    subprocess.check_call(["make.exe", "clean"])
     makeBaseCmd = [
-        makeBinary,
+        "make.exe",
         "USE_PCH=0",
         "COMMIT_HASH=" + common_ship.commitHash,
         "PREFIX=ship/packages/" + packageName
