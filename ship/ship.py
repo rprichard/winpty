@@ -42,16 +42,16 @@ def dllVersion(path):
 
 os.chdir(common_ship.topDir)
 
-URL_BASE = "file://c:/rprichard/proj/winpty-cygwin-prebuilts/out/artifact/"
+#URL_BASE = "file://c:/rprichard/proj/winpty-cygwin-prebuilts-1.0.20/"
+URL_BASE = "https://github.com/rprichard/winpty/raw/winpty-cygwin-prebuilts-1.0.20/"
 
 # Determine other build parameters.
-print("Determining Cygwin/MSYS2 DLL versions...")
-sys.stdout.flush()
 BUILD_TARGETS = [
     {
         "systemName": "msys32",
-        "systemArchive":               "msys32-20181014-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
-        "systemArchiveUrl": URL_BASE + "msys32-20181014-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
+        "systemArchive":               "msys32-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
+        "systemArchiveUrl": URL_BASE + "msys32-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
+        "systemArchiveSha": "82e92486b7891bf98a783d0acd50d2955a9d5abdd9f69f58701dbc242d2edd7a",
         "packageName": "msys2-{dllver}-ia32",
         "rebase": ["usr\\bin\\ash.exe", "/usr/bin/rebaseall", "-v"],
         "dll": "usr\\bin\\msys-2.0.dll",
@@ -59,8 +59,9 @@ BUILD_TARGETS = [
     },
     {
         "systemName": "msys64",
-        "systemArchive":               "msys64-20181014-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
-        "systemArchiveUrl": URL_BASE + "msys64-20181014-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
+        "systemArchive":               "msys64-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
+        "systemArchiveUrl": URL_BASE + "msys64-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
+        "systemArchiveSha": "e118f8877faf45b83759dc5a5a537c9dea81e025265a3817b3cf5047c1916726",
         "packageName": "msys2-{dllver}-x64",
         "rebase": ["usr\\bin\\ash.exe", "/usr/bin/rebaseall", "-v"],
         "dll": "usr\\bin\\msys-2.0.dll",
@@ -68,8 +69,9 @@ BUILD_TARGETS = [
     },
     {
         "systemName": "cygwin32",
-        "systemArchive":               "cygwin32-20181014-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
-        "systemArchiveUrl": URL_BASE + "cygwin32-20181014-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
+        "systemArchive":               "cygwin32-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
+        "systemArchiveUrl": URL_BASE + "cygwin32-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
+        "systemArchiveSha": "6fc0c2a07e2f3aeb041cce46e5152911d973c185ef0c606095871fe17fd0f7fa",
         "packageName": "cygwin-{dllver}-ia32",
         "rebase": ["bin\\ash.exe", "/bin/rebaseall", "-v"],
         "dll": "bin\\cygwin1.dll",
@@ -77,8 +79,9 @@ BUILD_TARGETS = [
     },
     {
         "systemName": "cygwin64",
-        "systemArchive":               "cygwin64-20181014-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
-        "systemArchiveUrl": URL_BASE + "cygwin64-20181014-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
+        "systemArchive":               "cygwin64-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
+        "systemArchiveUrl": URL_BASE + "cygwin64-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
+        "systemArchiveSha": "6bc948ce19ae1a14d1450d0f791d9a510cfa61a3007d9d3052396328a15b816d",
         "packageName": "cygwin-{dllver}-x64",
         "rebase": ["bin\\ash.exe", "/bin/rebaseall", "-v"],
         "dll": "bin\\cygwin1.dll",
@@ -104,6 +107,7 @@ def setup_cyg_system(target):
         if not os.path.exists(systemArchivePath):
             subprocess.check_call(["curl.exe", "-fL", "-o", systemArchivePath, target["systemArchiveUrl"]])
             assert os.path.exists(systemArchivePath)
+        common_ship.checkSha256(systemArchivePath, target["systemArchiveSha"])
         subprocess.check_call(["7z.exe", "x", systemArchivePath], cwd=os.path.dirname(systemDir))
         with common_ship.ModifyEnv(PATH=newPath):
             rebaseCmd = target["rebase"]
@@ -143,13 +147,6 @@ def main():
     targets = list(BUILD_TARGETS)
     if len(sys.argv) != 1:
         targets = [t for t in targets if t["systemName"] in sys.argv[1:]]
-
-    for t in targets:
-        newPath = setup_cyg_system(t)
-        with common_ship.ModifyEnv(PATH=newPath):
-            subprocess.check_output(["tar.exe", "--help"])
-            subprocess.check_output(["make.exe", "--help"])
-
     for t in targets:
         buildTarget(t)
 

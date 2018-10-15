@@ -11,6 +11,7 @@ if sys.version_info[0:2] != (2,7):
     sys.exit("Error: ship scripts require native Python 2.7. (wrong version)")
 
 import glob
+import hashlib
 import shutil
 import subprocess
 from distutils.spawn import find_executable
@@ -61,6 +62,16 @@ class ModifyEnv:
     def __exit__(self, type, value, traceback):
         for var, val in self._original.items():
             os.environ[var] = val
+
+def sha256(path):
+    with open(path, "rb") as fp:
+        return hashlib.sha256(fp.read()).hexdigest()
+
+def checkSha256(path, expected):
+    actual = sha256(path)
+    if actual != expected:
+        sys.exit("error: sha256 hash mismatch on {}: expected {}, found {}".format(
+            path, expected, actual))
 
 requireExe("git.exe", [
     "C:\\Program Files\\Git\\cmd\\git.exe",
