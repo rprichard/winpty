@@ -11,8 +11,10 @@ packages = {
     'mingw-w64-cross-toolchain',
     # Implicit packages
     'coreutils',
+    'findutils', # needed by rebase script
     'gzip',
     'rebase',
+    'which',
 }
 
 # mingw-w64-cross-toolchain is a "group" rather than a package, so expand
