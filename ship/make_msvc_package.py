@@ -96,6 +96,7 @@ def build(arch, packageDir, xp=False):
     if not os.path.isfile(devCmdPath):
         sys.exit("Error: MSVC environment script missing: " + devCmdPath)
 
+    toolsetArgument = " --toolset {}".format(versionInfo["xp_toolset"]) if xp else ""
     newEnv = os.environ.copy()
     newEnv["PATH"] = os.path.dirname(sys.executable) + ";" + common_ship.defaultPathEnviron
     commandLine = (
@@ -103,7 +104,8 @@ def build(arch, packageDir, xp=False):
         " vcbuild.bat" +
         " --gyp-msvs-version " + versionInfo["gyp_version"] +
         " --msvc-platform " + archInfo["msvc_platform"] +
-        " --commit-hash " + common_ship.commitHash
+        " --commit-hash " + common_ship.commitHash +
+        toolsetArgument
     )
 
     subprocess.check_call(commandLine, shell=True, env=newEnv)
