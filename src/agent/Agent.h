@@ -61,6 +61,7 @@ private:
     void handleSetSizePacket(ReadBuffer &packet);
     void handleGetConsoleProcessListPacket(ReadBuffer &packet);
     void pollConinPipe();
+    void handleGetCurrentDirectoryPacket(ReadBuffer &packet);
 
 protected:
     virtual void onPollTimeout() override;

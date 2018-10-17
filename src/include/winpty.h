@@ -223,6 +223,11 @@ WINPTY_API int
 winpty_get_console_process_list(winpty_t *wp, int *processList, const int processCount,
                                 winpty_error_ptr_t *err /*OPTIONAL*/);
 
+/* Retrieves the current directory for the process. */
+WINPTY_API DWORD
+winpty_get_current_directory(winpty_t *wp, DWORD nBufferLength, LPTSTR lpBuffer,
+                             winpty_error_ptr_t *err /*OPTIONAL*/);
+
 /* Frees the winpty_t object and the OS resources contained in it.  This
  * call breaks the connection with the agent, which should then close its
  * console, terminating the processes attached to it.

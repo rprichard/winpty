@@ -27,6 +27,7 @@ struct AgentMsg
         StartProcess,
         SetSize,
         GetConsoleProcessList,
+        GetCurrentDirectoryCommand
     };
 };
 

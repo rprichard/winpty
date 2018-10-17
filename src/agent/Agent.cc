@@ -31,6 +31,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <Winternl.h>
 
 #include "../include/winpty_constants.h"
 
@@ -336,6 +337,9 @@ void Agent::handlePacket(ReadBuffer &packet)
     case AgentMsg::GetConsoleProcessList:
         handleGetConsoleProcessListPacket(packet);
         break;
+    case AgentMsg::GetCurrentDirectoryCommand:
+        handleGetCurrentDirectoryPacket(packet);
+        break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
@@ -470,6 +474,87 @@ void Agent::pollConinPipe()
     } else {
         m_consoleInput->writeInput(newData);
     }
+}
+
+typedef NTSTATUS(NTAPI *_NtQueryInformationProcess)(
+    HANDLE ProcessHandle,
+    PROCESSINFOCLASS ProcessInformationClass,
+    PVOID ProcessInformation,
+    ULONG ProcessInformationLength,
+    PULONG ReturnLength
+);
+
+std::wstring getCurrentDirectory(HANDLE hProcess) {
+    HMODULE ntdllHandle = GetModuleHandle(L"ntdll.dll");
+    if (!ntdllHandle) {
+        throwWindowsError(L"Cannot get handle to ntdll.dll");
+    }
+    _NtQueryInformationProcess NtQueryInformationProcess = (_NtQueryInformationProcess)GetProcAddress(ntdllHandle, "NtQueryInformationProcess");
+
+    BOOL wow;
+    IsWow64Process(GetCurrentProcess(), &wow);
+    if (wow) {
+        throwWinptyException(L"Cannot fetch current directory for WoW64 process");
+    }
+
+    PROCESS_BASIC_INFORMATION pbi;
+
+    NTSTATUS status = NtQueryInformationProcess(hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), NULL);
+    if (!NT_SUCCESS(status)) {
+        throwWinptyException((L"NtQueryInformationProcess failed to fetch ProcessBasicInformation" + std::to_wstring(status)).c_str());
+    }
+
+    PEB peb;
+    if (!ReadProcessMemory(hProcess, pbi.PebBaseAddress, &peb, sizeof(peb), NULL))
+    {
+        throwWindowsError(L"Failed to read PROCESS_BASIC_INFORMATION.PebBaseAddress");
+    }
+
+    RTL_USER_PROCESS_PARAMETERS procParams;
+    if (!ReadProcessMemory(hProcess, peb.ProcessParameters, &procParams, sizeof(procParams), NULL))
+    {
+        throwWindowsError(L"Failed to read PEB.ProcessParameters");
+    }
+
+    // Unfortunately, CurrentDirectory is not declared in _RTL_USER_PROCESS_PARAMETERS, it's somewhere in the Reserved2 area.
+    // Use WinDbg, run "dt ntdll!_PEB - r2" command, find ProcessParameters, then find CurrentDirectory: offset 0x38.
+    UNICODE_STRING currentDirUnicodeStr = *(UNICODE_STRING*)((PCHAR)&procParams + 0x38);
+
+    if (currentDirUnicodeStr.Length <= 0 || currentDirUnicodeStr.MaximumLength <= 0
+        || currentDirUnicodeStr.Length >= currentDirUnicodeStr.MaximumLength || currentDirUnicodeStr.MaximumLength > 8192) {
+        throwWinptyException((L"Bad current directory: Length=" + std::to_wstring(currentDirUnicodeStr.Length)
+            + L", MaximumLength=" + std::to_wstring(currentDirUnicodeStr.MaximumLength)).c_str());
+    }
+
+    LPWSTR lpCurrentDir = new WCHAR[currentDirUnicodeStr.MaximumLength / sizeof(WCHAR) + 1];
+    if (!ReadProcessMemory(hProcess, currentDirUnicodeStr.Buffer, lpCurrentDir, currentDirUnicodeStr.MaximumLength, NULL))
+    {
+        delete[] lpCurrentDir;
+        throwWindowsError(L"Failed to read ProcessParameters.CurrentDirectory");
+    }
+    std::wstring currentDirectory = lpCurrentDir;
+    delete[] lpCurrentDir;
+    return currentDirectory;
+}
+
+void Agent::handleGetCurrentDirectoryPacket(ReadBuffer &packet)
+{
+    packet.assertEof();
+    std::wstring currentDirectory;
+    std::wstring error;
+    try {
+        currentDirectory = getCurrentDirectory(m_childProcess);
+    }
+    catch (const WinptyException &e) {
+        error = e.what();
+    }
+    catch (...) {
+        error = L"Unknown error";
+    }
+    auto reply = newPacket();
+    reply.putWString(currentDirectory.c_str(), currentDirectory.size());
+    reply.putWString(error.c_str(), error.size());
+    writePacket(reply);
 }
 
 void Agent::onPollTimeout()
