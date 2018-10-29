@@ -45,8 +45,8 @@ unneeded = [
     r'.*/$', # strip out directories
     r'/opt/armv7-w64-mingw32/',
     r'/usr/bin/msys-2\.0\.dbg$',
-    r'/(usr|opt)/share/(man|info|locale)/',
-    r'/usr/(share|lib|)/terminfo/',
+    r'/(usr|opt)/share/locale/',
+    r'/usr/(share|lib)/terminfo/',
 ]
 unneeded_re = re.compile('(' + '|'.join(unneeded) + ')')
 

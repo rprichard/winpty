@@ -68,6 +68,9 @@ for setup, cygwin in (('setup-x86_64', 'cygwin64'), ('setup-x86', 'cygwin32')):
         cygwin + '/bin',
         cygwin + '/lib',
         cygwin + '/usr/include',
+        cygwin + '/usr/share/doc',
+        cygwin + '/usr/share/info',
+        cygwin + '/usr/share/man',
         cygwin + '/usr/*-pc-cygwin',
         cygwin + '/usr/*-w64-mingw32',
     ]))
