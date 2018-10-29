@@ -26,6 +26,7 @@
 
 import common_ship
 
+from optparse import OptionParser
 import multiprocessing
 import os
 import shutil
@@ -42,87 +43,28 @@ def dllVersion(path):
 
 os.chdir(common_ship.topDir)
 
-#URL_BASE = "file://c:/rprichard/proj/winpty-cygwin-prebuilts-1.0.20/"
-URL_BASE = "https://github.com/rprichard/winpty/raw/winpty-cygwin-prebuilts-1.0.20/"
 
 # Determine other build parameters.
-BUILD_TARGETS = [
-    {
-        "systemName": "msys32",
-        "systemArchive":               "msys32-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
-        "systemArchiveUrl": URL_BASE + "msys32-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
-        "systemArchiveSha": "82e92486b7891bf98a783d0acd50d2955a9d5abdd9f69f58701dbc242d2edd7a",
-        "packageName": "msys2-{dllver}-ia32",
-        "rebase": ["usr\\bin\\ash.exe", "/usr/bin/rebaseall", "-v"],
-        "dll": "usr\\bin\\msys-2.0.dll",
-        "path": ["opt\\bin", "usr\\bin"],
-    },
-    {
-        "systemName": "msys64",
-        "systemArchive":               "msys64-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
-        "systemArchiveUrl": URL_BASE + "msys64-20181015-dll2.11.1-msysgcc7.3.0-wingcc7.3.0.7z",
-        "systemArchiveSha": "e118f8877faf45b83759dc5a5a537c9dea81e025265a3817b3cf5047c1916726",
-        "packageName": "msys2-{dllver}-x64",
-        "rebase": ["usr\\bin\\ash.exe", "/usr/bin/rebaseall", "-v"],
-        "dll": "usr\\bin\\msys-2.0.dll",
-        "path": ["opt\\bin", "usr\\bin"],
-    },
-    {
-        "systemName": "cygwin32",
-        "systemArchive":               "cygwin32-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
-        "systemArchiveUrl": URL_BASE + "cygwin32-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
-        "systemArchiveSha": "6fc0c2a07e2f3aeb041cce46e5152911d973c185ef0c606095871fe17fd0f7fa",
-        "packageName": "cygwin-{dllver}-ia32",
-        "rebase": ["bin\\ash.exe", "/bin/rebaseall", "-v"],
-        "dll": "bin\\cygwin1.dll",
+BUILD_KINDS = {
+    "cygwin": {
         "path": ["bin"],
-    },
-    {
-        "systemName": "cygwin64",
-        "systemArchive":               "cygwin64-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
-        "systemArchiveUrl": URL_BASE + "cygwin64-20181015-dll2.11.1-cyggcc7.3.0-wingcc6.4.0.7z",
-        "systemArchiveSha": "6bc948ce19ae1a14d1450d0f791d9a510cfa61a3007d9d3052396328a15b816d",
-        "packageName": "cygwin-{dllver}-x64",
-        "rebase": ["bin\\ash.exe", "/bin/rebaseall", "-v"],
         "dll": "bin\\cygwin1.dll",
-        "path": ["bin"],
     },
-]
+    "msys2": {
+        "path": ["opt\\bin", "usr\\bin"],
+        "dll": "usr\\bin\\msys-2.0.dll",
+    },
+}
 
 
-def targetSystemDir(target):
-    return os.path.abspath(os.path.join("ship", "tmp", target["systemName"]))
+def buildTarget(kind, syspath, arch):
 
-
-def setup_cyg_system(target):
-    common_ship.mkdir("ship/tmp")
-
-    systemDir = targetSystemDir(target)
-    systemArchivePath = os.path.abspath(os.path.join("ship", "tmp", target["systemArchive"]))
-    binPaths = [os.path.join(systemDir, p) for p in target["path"]]
+    binPaths = [os.path.join(syspath, p) for p in BUILD_KINDS[kind]["path"]]
     binPaths += common_ship.defaultPathEnviron.split(";")
     newPath = ";".join(binPaths)
 
-    if not os.path.exists(systemDir):
-        if not os.path.exists(systemArchivePath):
-            subprocess.check_call(["curl.exe", "-fL", "-o", systemArchivePath, target["systemArchiveUrl"]])
-            assert os.path.exists(systemArchivePath)
-        common_ship.checkSha256(systemArchivePath, target["systemArchiveSha"])
-        subprocess.check_call(["7z.exe", "x", systemArchivePath], cwd=os.path.dirname(systemDir))
-        with common_ship.ModifyEnv(PATH=newPath):
-            rebaseCmd = target["rebase"]
-            rebaseCmd[0] = os.path.join(systemDir, rebaseCmd[0])
-            subprocess.check_call(rebaseCmd)
-    assert os.path.exists(systemDir)
-
-    return newPath
-
-
-def buildTarget(target):
-    newPath = setup_cyg_system(target)
-
-    dllver = dllVersion(os.path.join(targetSystemDir(target), target["dll"]))
-    packageName = "winpty-" + common_ship.winptyVersion + "-" + target["packageName"].format(dllver=dllver)
+    dllver = dllVersion(os.path.join(syspath, BUILD_KINDS[kind]["dll"]))
+    packageName = "winpty-{}-{}-{}-{}".format(common_ship.winptyVersion, kind, dllver, arch)
     if os.path.exists("ship\\packages\\" + packageName):
         shutil.rmtree("ship\\packages\\" + packageName)
 
@@ -144,11 +86,18 @@ def buildTarget(target):
 
 
 def main():
-    targets = list(BUILD_TARGETS)
-    if len(sys.argv) != 1:
-        targets = [t for t in targets if t["systemName"] in sys.argv[1:]]
-    for t in targets:
-        buildTarget(t)
+    parser = OptionParser()
+    parser.add_option("--kind", type="choice", choices=["cygwin", "msys2"])
+    parser.add_option("--syspath")
+    parser.add_option("--arch", type="choice", choices=["ia32", "x64"])
+    (args, extra) = parser.parse_args()
+
+    args.kind or parser.error("--kind must be specified")
+    args.arch or parser.error("--arch must be specified")
+    args.syspath or parser.error("--syspath must be specified")
+    extra and parser.error("unexpected positional argument(s)")
+
+    buildTarget(args.kind, args.syspath, args.arch)
 
 
 if __name__ == "__main__":
