@@ -602,9 +602,11 @@ void Agent::syncConsoleTitle()
 {
     std::wstring newTitle = m_console.title();
     if (newTitle != m_currentTitle) {
-        std::string command = std::string("\x1b]0;") +
-                utf8FromWide(newTitle) + "\x07";
-        m_conoutPipe->write(command.c_str());
+        if (!m_plainMode && !m_conoutPipe->isClosed()) {
+            std::string command = std::string("\x1b]0;") +
+                    utf8FromWide(newTitle) + "\x07";
+            m_conoutPipe->write(command.c_str());
+        }
         m_currentTitle = newTitle;
     }
 }
