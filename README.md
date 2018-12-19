@@ -1,6 +1,6 @@
 # winpty
 
-[![Build Status](https://tea-ci.org/api/badges/rprichard/winpty/status.svg)](https://tea-ci.org/rprichard/winpty)
+[![Build Status](https://ci.appveyor.com/api/projects/status/69tb9gylsph1ee1x/branch/master?svg=true)](https://ci.appveyor.com/project/rprichard/winpty/branch/master)
 
 winpty is a Windows software package providing an interface similar to a Unix
 pty-master for communicating with Windows console programs.  The package
