@@ -76,11 +76,18 @@
  * See https://github.com/rprichard/winpty/issues/58. */
 #define WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION 0x8ull
 
+ /* Create agent process from the thread token instead of current process.
+  * This is useful when winpty.dll is called by Windows Service program to 
+  * impersonate to the original user from a remote process.
+  * See https://github.com/rprichard/winpty/issues/132. */
+#define WINPTY_FLAG_IMPERSONATE_THREAD  0x10ull
+
 #define WINPTY_FLAG_MASK (0ull \
     | WINPTY_FLAG_CONERR \
     | WINPTY_FLAG_PLAIN_OUTPUT \
     | WINPTY_FLAG_COLOR_ESCAPES \
     | WINPTY_FLAG_ALLOW_CURPROC_DESKTOP_CREATION \
+    | WINPTY_FLAG_IMPERSONATE_THREAD \
 )
 
 /* QuickEdit mode is initially disabled, and the agent does not send mouse
