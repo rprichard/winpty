@@ -111,6 +111,7 @@ install-bin : all
 	install -m 755 -p -s build/$(UNIX_ADAPTER_EXE) $(PREFIX)/bin
 	install -m 755 -p -s build/winpty.dll $(PREFIX)/bin
 	install -m 755 -p -s build/winpty-agent.exe $(PREFIX)/bin
+	install -m 755 -p -s build/winpty-cygwin-agent.exe $(PREFIX)/bin
 
 .PHONY : install-debugserver
 install-debugserver : all

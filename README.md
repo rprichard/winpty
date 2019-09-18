@@ -116,6 +116,33 @@ To run a Windows console program in `mintty` or Cygwin `sshd`, prepend
     30
     PS C:\rprichard\proj\winpty> exit
 
+### Building the Cygwin adapter
+
+In the project directory, run `./configure`, then `make`, then `make install`.
+By default, winpty is installed into `/usr/local`.  Pass `PREFIX=<path>` to
+`make install` to override this default.
+
+### Using the Cygwin adapter inside Visual Studio Code
+
+The integrated terminal in Visual Studio Code has numerous flaws[[11](#r1)] on Windows and winpty
+versions lacking ConPTY support, which covers the lion's share of installations, as
+ConPTY is only available on recent Windows 10 builds. Since winpty is ordinarily obliged to
+interact with Cygwin processes' terminal via Windows' deficient console APIs, the Cygwin
+adapter instead leverages Cygwin's native PTY implementation. This provides a direct
+interface between `xterm.js` and Cygwin processes, addressing most of those flaws
+and rendering the terminal usable.  
+  
+To obtain a fully functional integrated Cygwin terminal inside Visual Studio Code,
+copy `/usr/local/bin/winpty-cygwin-agent.exe` (see above) as `winpty-agent.exe` into
+the `Microsoft VS Code\resources\app\node_modules.asar.unpacked\node-pty\build\Release`
+directory inside either `%ProgramFiles%` or `%ProgramFiles(x86)%` on 64-bit and
+32-bit Windows respectively, preferably backing up the original `winpty-agent.exe`
+image first.  
+Ensure that the Cygwin installation is in `%Path%` either globally or for Visual
+Studio Code.
+
+``[1]`` <a href="https://github.com/microsoft/vscode/issues/45693" id="r1">Windows terminal issues caused by winpty · Issue #45693 · microsoft/vscode</a>
+
 ## Embedding winpty / MSVC compilation
 
 See `src/include/winpty.h` for the prototypes of functions exported by
