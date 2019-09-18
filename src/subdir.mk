@@ -1,4 +1,5 @@
 include src/agent/subdir.mk
+include src/cygwin-agent/subdir.mk
 include src/debugserver/subdir.mk
 include src/libwinpty/subdir.mk
 include src/tests/subdir.mk
