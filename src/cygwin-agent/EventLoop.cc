@@ -57,6 +57,9 @@ void EventLoop::run()
             }
         }
 
+        if (didSomething)
+            continue;
+
         // Attempt to make progress with the pty.
         didSomething = onPtyIo();
         if ((hEvent = getPtyEventHandle())) {
