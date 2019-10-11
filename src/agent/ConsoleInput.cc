@@ -285,6 +285,7 @@ void ConsoleInput::flushIncompleteEscapeCode()
             (GetTickCount() - m_lastWriteTick) > kIncompleteEscapeTimeoutMs) {
         doWrite(true);
         m_byteQueue.clear();
+        m_dsrSent = false;
     }
 }
 
@@ -431,6 +432,15 @@ int ConsoleInput::scanInput(std::vector<INPUT_RECORD> &records,
         // timeout to signify flushed input).
         trace("Incomplete escape sequence");
         return -1;
+    } else if (matchLen > 0 && 
+                   input[0] == '\x1B' && inputSize >= 2 && input[1] == '\x1B' &&
+                   m_dsrSent && matchDsr(&input[1], inputSize - 1) > 0) {
+        // If escape key is input and soon DSR reply is received,
+        // it might match to LAlt-Shift-F3, LAlt-F3, LAlt-LCtrl-F3, and so on.
+        // (These matches occur only when the cursor position (lines, cols) is
+        //  in the range of (1, 2) to (1, 8).)
+        // (e.g. `^[ ^[ [ 1 ; 2 R` = 'escape key input + DSR reply' = 'LAlt-Shift-F3')
+        // We ignore these matches.
     } else if (matchLen > 0) {
         uint32_t winCodePointDn = match.unicodeChar;
         if ((match.keyState & LEFT_CTRL_PRESSED) && (match.keyState & LEFT_ALT_PRESSED)) {
