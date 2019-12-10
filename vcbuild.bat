@@ -76,9 +76,8 @@ if errorlevel 1 (
 
 REM -------------------------------------------------------------------------
 REM -- Upgrade the project.
-devenv winpty.sln /Upgrade || (
-    echo error: Solution Upgrade failed
-    exit /b 1
+devenv winpty.sln /Upgrade 2>nul || (
+    echo warning: Solution upgrade not yet succeeded
 )
 
 REM -------------------------------------------------------------------------
