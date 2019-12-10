@@ -75,6 +75,13 @@ if errorlevel 1 (
 )
 
 REM -------------------------------------------------------------------------
+REM -- Upgrade the project.
+devenv winpty.sln /Upgrade || (
+    echo error: Solution Upgrade failed
+    exit /b 1
+)
+
+REM -------------------------------------------------------------------------
 REM -- Compile the project.
 
 msbuild winpty.sln /m /p:Platform=%MSVC_PLATFORM% || (
