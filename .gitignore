@@ -1,7 +1,10 @@
+.vs
 *.sln
 *.suo
+*.vcproj
 *.vcxproj
 *.vcxproj.filters
+UpgradeLog*.htm
 *.pyc
 winpty.sdf
 winpty.opensdf
