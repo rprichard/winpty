@@ -271,7 +271,18 @@ void Scraper::resizeImpl(const ConsoleScreenBufferInfo &origInfo)
     {
         // Resize the buffer to the final desired size.
         m_console.setFrozen(false);
+
+        // Workaround for the windows console crash if resizing screen so that
+        // the cursor is hidden on Windows 10.
+        // ( https://github.com/microsoft/terminal/issues/1976 )
+        const auto info = m_consoleBuffer->bufferInfo();
+        m_consoleBuffer->setCursorPosition(Coord(0, 0));
+
         m_consoleBuffer->resizeBufferRange(finalBufferSize);
+
+        // Restore cursor position from the above workaround.
+        m_consoleBuffer->setCursorPosition(Coord(info.cursorPosition().X,
+                                                 info.cursorPosition().Y));
     }
 
     {
