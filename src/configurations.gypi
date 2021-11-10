@@ -42,6 +42,9 @@
             'Release_x64': {
                 'msvs_configuration_platform': 'x64',
             },
+            'Release_arm64': {
+                'msvs_configuration_platform': 'arm64',
+            },
         },
         'msvs_configuration_attributes': {
             'OutputDirectory': '$(SolutionDir)$(ConfigurationName)\\$(Platform)',
