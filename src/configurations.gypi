@@ -8,11 +8,13 @@
 #
 #     C:\...\winpty\src>msbuild winpty.sln /p:Platform=Win32
 #     C:\...\winpty\src>msbuild winpty.sln /p:Platform=x64
+#     C:\...\winpty\src>msbuild winpty.sln /p:Platform=arm64
 #
 # The output is placed in:
 #
 #     C:\...\winpty\src\Release\Win32
 #     C:\...\winpty\src\Release\x64
+#     C:\...\winpty\src\Release\arm64
 #
 # Windows XP note: By default, the project files will use the default "toolset"
 # for the given MSVC version.  For MSVC 2013 and MSVC 2015, the default toolset
