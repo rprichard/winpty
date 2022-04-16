@@ -21,12 +21,12 @@
 # IN THE SOFTWARE.
 
 #
-# Run with native CPython 2.7 on a 64-bit computer.
+# Run with native CPython 3.2+ on a 64-bit computer.
 #
 
 import common_ship
 
-from optparse import OptionParser
+from argparse import ArgumentParser
 import multiprocessing
 import os
 import shutil
@@ -86,7 +86,7 @@ def buildTarget(kind, syspath, arch):
 
 
 def main():
-    parser = OptionParser()
+    parser = ArgumentParser()
     parser.add_option("--kind", type="choice", choices=["cygwin", "msys2"])
     parser.add_option("--syspath")
     parser.add_option("--arch", type="choice", choices=["ia32", "x64"])
