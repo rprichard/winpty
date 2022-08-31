@@ -59,9 +59,11 @@ public:
         other.m_v = nullptr;
     }
     SecurityItem &operator=(SecurityItem &&other) {
-        m_v = other.m_v;
-        other.m_v = nullptr;
-        m_pimpl = std::move(other.m_pimpl);
+        if (this != &other) {
+            m_v = other.m_v;
+            other.m_v = nullptr;
+            m_pimpl = std::move(other.m_pimpl);
+        }
         return *this;
     }
 };

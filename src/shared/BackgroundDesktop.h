@@ -50,14 +50,16 @@ public:
         other.m_newDesktop = nullptr;
     }
     BackgroundDesktop &operator=(BackgroundDesktop &&other) {
-        dispose();
-        m_originalStation = other.m_originalStation;
-        m_newStation = other.m_newStation;
-        m_newDesktop = other.m_newDesktop;
-        m_newDesktopName = std::move(other.m_newDesktopName);
-        other.m_originalStation = nullptr;
-        other.m_newStation = nullptr;
-        other.m_newDesktop = nullptr;
+        if (this != &other) {
+            dispose();
+            m_originalStation = other.m_originalStation;
+            m_newStation = other.m_newStation;
+            m_newDesktop = other.m_newDesktop;
+            m_newDesktopName = std::move(other.m_newDesktopName);
+            other.m_originalStation = nullptr;
+            other.m_newStation = nullptr;
+            other.m_newDesktop = nullptr;
+        }
         return *this;
     }
 

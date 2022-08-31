@@ -36,8 +36,10 @@ public:
     OwnedHandle(OwnedHandle &&other) : m_h(other.release()) {}
     OwnedHandle &operator=(const OwnedHandle &other) = delete;
     OwnedHandle &operator=(OwnedHandle &&other) {
-        dispose();
-        m_h = other.release();
+        if (this != &other) {
+            dispose();
+            m_h = other.release();
+        }
         return *this;
     }
 };
