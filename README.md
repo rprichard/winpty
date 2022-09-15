@@ -142,6 +142,19 @@ it:
 winpty also recognizes a `WINPTY_SHOW_CONSOLE` environment variable.  Set it
 to 1 to prevent winpty from hiding the console window.
 
+## Building using vcpkg
+
+You can build and install winpty using [vcpkg](https://github.com/Microsoft/vcpkg/) dependency manager:
+
+* git clone https://github.com/Microsoft/vcpkg.git
+* cd vcpkg
+* ./bootstrap-vcpkg.sh  # ./bootstrap-vcpkg.bat for Windows
+* ./vcpkg integrate install
+* ./vcpkg install winpty
+
+The winpty port in vcpkg is kept up to date by Microsoft team members and community contributors. If the version is out of date, please [create an issue or pull request](https://github.com/Microsoft/vcpkg) on the vcpkg repository.
+
+
 ## Copyright
 
 This project is distributed under the MIT license (see the `LICENSE` file in
