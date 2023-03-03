@@ -222,7 +222,10 @@ static std::string convertPosixPathToWin(const std::string &path)
     // MAX_PATH, but there's no way to query how large the new path is.
     // Hopefully, this is large enough.
     tmp = new char[MAX_PATH + path.size()];
-    cygwin_conv_to_win32_path(path.c_str(), tmp);
+    //cygwin_conv_to_win32_path(path.c_str(), tmp); // was deprecated and now removed
+    // I found the fix here: http://onelab.info/pipermail/gmsh/2018/012114.html
+    ssize_t size = cygwin_conv_path( CCP_POSIX_TO_WIN_A, path.c_str(), NULL, 0);
+    cygwin_conv_path( CCP_POSIX_TO_WIN_A, path.c_str(), tmp, size);
 #endif
     for (int i = 0; tmp[i] != '\0'; ++i) {
         if (tmp[i] == '/')
