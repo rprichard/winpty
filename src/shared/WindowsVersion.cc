@@ -21,6 +21,7 @@
 #include "WindowsVersion.h"
 
 #include <windows.h>
+#include <wow64apiset.h>
 #include <stdint.h>
 
 #include <memory>
@@ -184,8 +185,6 @@ bool isAtLeastWindows8() {
 #define WINPTY_ARCH WINPTY_X64
 #endif
 
-typedef BOOL WINAPI IsWow64Process_t(HANDLE hProcess, PBOOL Wow64Process);
-
 void dumpWindowsVersion() {
     if (!isTracingEnabled()) {
         return;
@@ -206,20 +205,14 @@ void dumpWindowsVersion() {
     b << ' ';
 #if WINPTY_ARCH == WINPTY_IA32
     b << "IA32";
-    OsModule kernel32(L"kernel32.dll");
-    IsWow64Process_t *pIsWow64Process =
-        reinterpret_cast<IsWow64Process_t*>(
-            kernel32.proc("IsWow64Process"));
-    if (pIsWow64Process != nullptr) {
-        BOOL result = false;
-        const BOOL success = pIsWow64Process(GetCurrentProcess(), &result);
-        if (!success) {
-            b << " WOW64:error";
-        } else if (success && result) {
+    BOOL result = false;
+    auto success = IsWow64Process(GetCurrentProcess(), &result);
+    if (success) {
+        if (result) {
             b << " WOW64";
         }
-    } else {
-        b << " WOW64:missingapi";
+    } else  {
+        b << " WOW64:error";
     }
 #elif WINPTY_ARCH == WINPTY_X64
     b << "X64";
